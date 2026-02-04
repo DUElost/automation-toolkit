@@ -1,0 +1,198 @@
+{
+  "version": "1.0.0",
+  "generated_at": "2026-02-04T19:23:02+08:00",
+  "project": {
+    "name": "automation-toolkit",
+    "description": "Automated Testing Toolkit - 统一管理各类测试工具和小脚本",
+    "version": "0.1.0",
+    "root_path": "d:\\Tinno_auto\\automation-toolkit"
+  },
+  "scan_summary": {
+    "total_files": 54,
+    "scanned_files": 31,
+    "skipped_files": 23,
+    "coverage_percent": 100,
+    "truncated": false
+  },
+  "ignore_rules": {
+    "source": ".gitignore",
+    "patterns": [
+      "__pycache__/**",
+      "*.py[cod]",
+      "*$py.class",
+      "*.so",
+      "build/**",
+      "dist/**",
+      "*.egg-info/**",
+      ".pytest_cache/**",
+      "*.log",
+      ".env",
+      ".venv/**",
+      "venv/**",
+      "ENV/**",
+      "*.class",
+      "*.jar",
+      "*.war",
+      "target/**",
+      "*.apk",
+      "*.ap_",
+      "*.dex",
+      "*.aab",
+      ".gradle/**",
+      "node_modules/**",
+      ".eslintcache",
+      ".idea/**",
+      ".vscode/**",
+      "*.iml",
+      "*.swp",
+      ".DS_Store",
+      "*.xlsx",
+      "*.xls",
+      "*.zip",
+      "*.rar",
+      "backup/**",
+      "*.hprof",
+      "*.tmp",
+      "*.bak",
+      "*.cache",
+      ".git/**",
+      ".github/hooks/**"
+    ],
+    "custom_reasons": {
+      "backup/*.xlsx": "Excel 模板文件（二进制）",
+      "*.pyc": "Python 编译缓存",
+      ".git/**": "Git 元数据"
+    }
+  },
+  "modules": [
+    {
+      "name": "performance_SMT_ResultFiller",
+      "path": "python-tools/performance_SMT_ResultFiller",
+      "language": "Python",
+      "status": "active",
+      "description": "SMT 性能测试结果自动填充 Excel 工具",
+      "version": "2.0",
+      "entry_points": [
+        "python-tools/performance_SMT_ResultFiller/main.py"
+      ],
+      "interfaces": [
+        {
+          "type": "CLI",
+          "description": "命令行接口",
+          "file": "python-tools/performance_SMT_ResultFiller/main.py",
+          "functions": [
+            "process_folder_transfer",
+            "process_sliding_transfer",
+            "batch_process"
+          ]
+        }
+      ],
+      "dependencies": [
+        "pandas>=2.0.0",
+        "openpyxl>=3.1.0",
+        "xlrd>=2.0.0",
+        "python-dotenv>=1.0.0"
+      ],
+      "config_files": [
+        "python-tools/performance_SMT_ResultFiller/requirements.txt",
+        "python-tools/performance_SMT_ResultFiller/.env"
+      ],
+      "data_models": [],
+      "test_files": [],
+      "test_framework": "pytest",
+      "documentation": [
+        "python-tools/performance_SMT_ResultFiller/README.md",
+        "python-tools/performance_SMT_ResultFiller/01-性能模块静态模型数据填写工具使用指南.md"
+      ],
+      "coverage": {
+        "has_tests": false,
+        "has_config": true,
+        "has_data_models": false,
+        "has_api": false,
+        "gaps": [
+          "缺少单元测试",
+          "缺少独立数据模型层",
+          "缺少 API 文档"
+        ]
+      }
+    },
+    {
+      "name": "python-utils",
+      "path": "shared/python-utils",
+      "language": "Python",
+      "status": "initial",
+      "description": "共享 Python 工具库",
+      "version": "0.1.0",
+      "entry_points": [],
+      "interfaces": [],
+      "dependencies": [],
+      "config_files": [],
+      "data_models": [],
+      "test_files": [],
+      "test_framework": null,
+      "documentation": [
+        "shared/python-utils/README.md"
+      ],
+      "coverage": {
+        "has_tests": false,
+        "has_config": false,
+        "has_data_models": false,
+        "has_api": false,
+        "gaps": [
+          "空模块，待开发"
+        ]
+      }
+    }
+  ],
+  "language_stats": {
+    "Python": {
+      "file_count": 7,
+      "lines_of_code": 2106,
+      "modules": 2
+    },
+    "PowerShell": {
+      "file_count": 1,
+      "lines_of_code": 89
+    },
+    "Makefile": {
+      "file_count": 1,
+      "lines_of_code": 57
+    },
+    "Batch": {
+      "file_count": 1,
+      "lines_of_code": 2
+    }
+  },
+  "directories": {
+    "python-tools": "Python 工具集",
+    "shared": "共享资源",
+    "android-tools": "Android 工具集（规划中）",
+    "java-platforms": "Java 平台（规划中）",
+    "node-scripts": "Node.js 脚本（规划中）",
+    "docs": "统一文档（规划中）"
+  },
+  "gaps": {
+    "missing_tests": [
+      "python-tools/performance_SMT_ResultFiller/tests/**"
+    ],
+    "missing_config": [
+      ".flake8",
+      "setup.cfg",
+      "pyproject.toml"
+    ],
+    "missing_docs": [
+      "shared/python-utils/CLAUDE.md（已创建）"
+    ],
+    "planned_modules": [
+      "android-tools/**",
+      "java-platforms/**",
+      "node-scripts/**"
+    ]
+  },
+  "next_steps": [
+    "为 performance_SMT_ResultFiller 添加单元测试",
+    "完善 python-utils 共享工具库",
+    "添加 .flake8 或 setup.cfg 统一代码风格",
+    "创建 android-tools、java-platforms、node-scripts 目录结构"
+  ]
+}
