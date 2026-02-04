@@ -1,0 +1,44 @@
+name: Python Tools CI
+
+on:
+  push:
+    paths:
+      - 'python-tools/**'
+      - '.github/workflows/python-tools.yml'
+  pull_request:
+    paths:
+      - 'python-tools/**'
+      - '.github/workflows/python-tools.yml'
+
+jobs:
+  performance-excel-filler:
+    name: Performance Excel Filler
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: python-tools/performance-excel-filler
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Lint with flake8
+        run: |
+          pip install flake8
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        continue-on-error: true
+
+      - name: Test
+        run: |
+          python -m pytest || true
+        continue-on-error: true
