@@ -84,3 +84,4 @@ dump.hprof
 *.bak
 *.cache
 nul
+.ace-tool/
