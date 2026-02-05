@@ -85,3 +85,4 @@ dump.hprof
 *.cache
 nul
 .ace-tool/
+.claude/
