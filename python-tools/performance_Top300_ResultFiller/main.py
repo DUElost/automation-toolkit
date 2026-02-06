@@ -43,38 +43,53 @@ def get_user_input() -> dict:
     if not load_standard:
         load_standard = "/"
 
-    # 3. 获取空载文件路径
+    # 3. 获取空载文件路径（输入 \ 表示跳过）
+    no_load_path = None
     while True:
-        no_load_file = input("\n请输入空载测试报告文件路径（如: test_report_空载.xlsx）: ").strip().strip('"').strip("'")
+        no_load_file = input("\n请输入空载测试报告文件路径（输入 \\ 跳过）: ").strip().strip('"').strip("'")
+        if no_load_file == "\\":
+            print("跳过空载测试报告")
+            break
         if no_load_file:
             no_load_path = Path(no_load_file)
             if no_load_path.exists():
                 break
             print(f"文件不存在: {no_load_file}")
         else:
-            print("请输入有效的文件路径")
+            print("请输入有效的文件路径，或输入 \\ 跳过")
 
-    # 4. 获取负载文件路径
+    # 4. 获取负载文件路径（输入 \ 表示跳过）
+    load_path = None
     while True:
-        load_file = input("\n请输入负载测试报告文件路径（如: test_report_负载.xlsx）: ").strip().strip('"').strip("'")
+        load_file = input("\n请输入负载测试报告文件路径（输入 \\ 跳过）: ").strip().strip('"').strip("'")
+        if load_file == "\\":
+            print("跳过负载测试报告")
+            break
         if load_file:
             load_path = Path(load_file)
             if load_path.exists():
                 break
             print(f"文件不存在: {load_file}")
         else:
-            print("请输入有效的文件路径")
+            print("请输入有效的文件路径，或输入 \\ 跳过")
+
+    # 检查至少需要一个文件
+    if no_load_path is None and load_path is None:
+        print("\n错误：至少需要提供一个测试报告文件（空载或负载）")
+        sys.exit(1)
 
     # 5. 获取目标文件路径
+    # 默认路径: backup/目标文件.xlsx
+    default_target = Path(__file__).parent / "backup" / "目标文件.xlsx"
     while True:
-        target_file = input("\n请输入目标Excel文件路径（如: 目标文件.xlsx）: ").strip().strip('"').strip("'")
-        if target_file:
-            target_path = Path(target_file)
-            if target_path.exists():
-                break
-            print(f"文件不存在: {target_file}")
-        else:
-            print("请输入有效的文件路径")
+        target_file = input(f"\n请输入目标Excel文件路径（直接回车默认为 backup\\目标文件.xlsx）: ").strip().strip('"').strip("'")
+        if not target_file:
+            target_file = str(default_target)
+
+        target_path = Path(target_file)
+        if target_path.exists():
+            break
+        print(f"文件不存在: {target_file}")
 
     return {
         "no_load_file": no_load_path,
@@ -98,8 +113,8 @@ def main():
         print("请确认处理信息:")
         print(f"  空载标准: {user_input['no_load_standard']}")
         print(f"  负载标准: {user_input['load_standard']}")
-        print(f"  空载文件: {user_input['no_load_file'].name}")
-        print(f"  负载文件: {user_input['load_file'].name}")
+        print(f"  空载文件: {user_input['no_load_file'].name if user_input['no_load_file'] else '跳过'}")
+        print(f"  负载文件: {user_input['load_file'].name if user_input['load_file'] else '跳过'}")
         print(f"  目标文件: {user_input['target_file'].name}")
         print("  输出文件: 将在原目录创建带时间戳的新文件")
         print("=" * 60)

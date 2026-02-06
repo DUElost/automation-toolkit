@@ -161,19 +161,19 @@ def find_rows_by_standard(sheet, column_map: Dict[str, int]) -> Dict[str, Option
     return result
 
 
-def create_new_sheet(wb, sheet_name: str, df: pd.DataFrame, zero_count: int) -> int:
+def create_new_sheet(wb, sheet_name: str, df: pd.DataFrame, zero_count: int, column_average: float = None) -> float:
     """
     在目标工作簿中创建新sheet
-    1. 复制筛选后的数据
-    2. 添加 "非首轮平均启动时间" 列
-    3. 计算每行的非首轮平均值
-    4. 在最后一行添加列平均值
+    1. 写入所有原始数据（包括所有时间类型）
+    2. "非首轮平均启动时间"列已由 data_processor 添加（仅符合条件的行有值）
+    3. 在最后一行添加列平均值
 
     Args:
         wb: openpyxl工作簿对象
         sheet_name: 新sheet名称
-        df: 筛选后的DataFrame
+        df: 处理后的DataFrame（包含所有原始数据）
         zero_count: AM且平均启动时间为0的个数
+        column_average: 列平均值（如为None则从df中计算）
 
     Returns:
         列平均值（用于回填测试结果页）
@@ -187,7 +187,7 @@ def create_new_sheet(wb, sheet_name: str, df: pd.DataFrame, zero_count: int) -> 
         # 创建新sheet
         ws = wb.create_sheet(title=sheet_name)
 
-        # 写入数据
+        # 写入数据（包括所有原始行）
         for r_idx, row in enumerate(dataframe_to_rows(df, index=False, header=True), start=1):
             for c_idx, value in enumerate(row, start=1):
                 ws.cell(row=r_idx, column=c_idx, value=value)
@@ -195,18 +195,20 @@ def create_new_sheet(wb, sheet_name: str, df: pd.DataFrame, zero_count: int) -> 
         # 获取非首轮平均启动时间列的位置
         non_first_col = len(df.columns)  # 最后一列
 
+        # 如果没有提供平均值，从df中计算（仅有效值）
+        if column_average is None:
+            valid_values = df["非首轮平均启动时间"].dropna()
+            valid_values = [v for v in valid_values if v != 0]
+            column_average = sum(valid_values) / len(valid_values) if valid_values else 0.0
+
         # 在数据最后一行添加列平均值
         last_data_row = len(df) + 1  # +1因为有表头
-        column_average = df["非首轮平均启动时间"].mean()
-
-        # 写入列平均值（使用代码计算的结果）
         ws.cell(row=last_data_row + 1, column=non_first_col, value=column_average)
 
-        # 可选：在sheet顶部添加零值统计信息
-        # ws.cell(row=1, column=non_first_col + 1, value=f"AM零值个数: {zero_count}")
-
-        logger.info(f"创建sheet '{sheet_name}': {len(df)}行数据, "
-                   f"零值个数={zero_count}, 列平均值={column_average:.2f}")
+        total_rows = len(df)
+        valid_rows = df["非首轮平均启动时间"].notna().sum()
+        logger.info(f"创建sheet '{sheet_name}': 总数据={total_rows}行, "
+                   f"计算数据={valid_rows}行, 零值个数={zero_count}, 列平均值={column_average:.2f}")
 
         return column_average
 

@@ -89,28 +89,27 @@ def calculate_non_first_average(row: pd.Series, round_columns: List[str]) -> flo
 
 def calculate_column_average(values: List[float]) -> float:
     """
-    计算列平均值
+    计算列平均值（所有值之和除以10000）
 
     Args:
         values: 数值列表
 
     Returns:
-        平均值
+        平均值（总和/10000）
     """
     valid_values = [v for v in values if pd.notna(v) and v != 0]
     if not valid_values:
         return 0.0
-    return sum(valid_values) / len(valid_values)
+    return sum(valid_values) / 10000
 
 
 def process_sheet_data(df: pd.DataFrame, sheet_name: str) -> Dict:
     """
     处理单个sheet的数据
-    1. 筛选 时间类型=AM 的数据
-    2. 统计 平均启动时间=0 的个数
-    3. 筛选 平均启动时间≠0 的数据
-    4. 计算非首轮平均启动时间（Round_2到Round_8的平均值）
-    5. 计算非首轮平均启动时间的列平均值
+    1. 保留所有原始数据（不再筛选）
+    2. 添加"非首轮平均启动时间"列
+    3. 只为时间类型=AM 且 平均启动时间≠0 的行计算非首轮平均值
+    4. 计算非首轮平均启动时间的列平均值（仅基于有效计算的数据）
 
     Args:
         df: 原始数据DataFrame
@@ -122,9 +121,12 @@ def process_sheet_data(df: pd.DataFrame, sheet_name: str) -> Dict:
     result = {
         "sheet_name": sheet_name,
         "zero_count": 0,
-        "filtered_df": None,
+        "processed_df": None,
         "non_first_averages": [],
         "column_average": 0.0,
+        "total_rows": 0,
+        "am_rows": 0,
+        "valid_rows": 0,
         "success": False,
         "error": None
     }
@@ -148,39 +150,53 @@ def process_sheet_data(df: pd.DataFrame, sheet_name: str) -> Dict:
             result["error"] = f"Round列不完整，找到{len(round_columns)}列"
             return result
 
-        # 1. 筛选 时间类型=AM 的数据
-        am_data = df[df[time_type_col] == TIME_TYPE_AM].copy()
+        # 复制所有原始数据
+        all_data = df.copy()
+        result["total_rows"] = len(all_data)
 
-        # 2. 统计 平均启动时间=0 的个数
+        # 添加"非首轮平均启动时间"列（初始化为NaN）
+        all_data["非首轮平均启动时间"] = None
+
+        # 筛选符合条件的行：时间类型=AM
+        am_mask = all_data[time_type_col] == TIME_TYPE_AM
+        result["am_rows"] = int(am_mask.sum())
+
+        # 统计 平均启动时间=0 的个数（仅AM数据中）
+        am_data = all_data[am_mask]
         zero_count = (am_data[avg_time_col] == 0).sum()
         result["zero_count"] = int(zero_count)
 
-        # 3. 筛选 平均启动时间≠0 的数据
-        filtered_data = am_data[am_data[avg_time_col] != 0].copy()
+        # 筛选有效数据：AM 且 平均启动时间≠0
+        valid_mask = am_mask & (all_data[avg_time_col] != 0)
+        valid_data = all_data[valid_mask]
+        result["valid_rows"] = len(valid_data)
 
-        if filtered_data.empty:
-            result["error"] = "筛选后无有效数据"
+        if valid_data.empty:
+            # 没有有效数据，但仍然返回所有原始数据
+            result["processed_df"] = all_data
+            result["success"] = True
+            logger.info(f"Sheet '{sheet_name}' 处理完成: 总数据={len(all_data)}行, "
+                       f"AM数据={result['am_rows']}行, 0值个数={zero_count}, 无有效计算数据")
             return result
 
-        # 4. 计算每行的非首轮平均值
+        # 计算每行的非首轮平均值（仅对有效行）
         non_first_averages = []
-        for _, row in filtered_data.iterrows():
+        for idx, row in valid_data.iterrows():
             avg = calculate_non_first_average(row, round_columns)
             non_first_averages.append(avg)
+            all_data.loc[idx, "非首轮平均启动时间"] = avg
 
-        filtered_data["非首轮平均启动时间"] = non_first_averages
-
-        # 5. 计算列平均值
+        # 计算列平均值（仅基于有效计算的数据）
         column_average = calculate_column_average(non_first_averages)
 
-        result["filtered_df"] = filtered_data
+        result["processed_df"] = all_data
         result["non_first_averages"] = non_first_averages
         result["column_average"] = column_average
         result["success"] = True
 
-        logger.info(f"Sheet '{sheet_name}' 处理完成: AM数据={len(am_data)}行, "
-                   f"0值个数={zero_count}, 有效数据={len(filtered_data)}行, "
-                   f"列平均值={column_average:.2f}")
+        logger.info(f"Sheet '{sheet_name}' 处理完成: 总数据={len(all_data)}行, "
+                   f"AM数据={result['am_rows']}行, 0值个数={zero_count}, "
+                   f"计算数据={len(valid_data)}行, 列平均值={column_average:.2f}")
 
     except Exception as e:
         result["error"] = str(e)

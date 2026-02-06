@@ -4,7 +4,7 @@
 """
 import logging
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from openpyxl import load_workbook
 
@@ -61,7 +61,7 @@ def process_source_file(file_path: Path, prefix: str) -> List[Dict]:
                 "new_sheet_name": new_sheet_name,
                 "zero_count": process_result["zero_count"],
                 "average_value": process_result["column_average"],
-                "filtered_df": process_result["filtered_df"],
+                "processed_df": process_result["processed_df"],
             })
 
             logger.info(f"处理完成: {sheet_name} -> {new_sheet_name}, "
@@ -103,23 +103,23 @@ def create_output_file(target_file: Path) -> Path:
 
 
 def process_all_sources(
-    no_load_file: Path,
-    load_file: Path,
+    no_load_file: Optional[Path],
+    load_file: Optional[Path],
     target_file: Path,
     no_load_standard: str,
     load_standard: str,
 ) -> Dict:
     """
     主处理流程
-    1. 读取空载文件，获取有效sheet列表并处理
-    2. 读取负载文件，获取有效sheet列表并处理
+    1. 读取空载文件（如果提供），获取有效sheet列表并处理
+    2. 读取负载文件（如果提供），获取有效sheet列表并处理
     3. 复制目标文件为新文件（原文件名+时间戳）
     4. 在新文件中创建新sheet并写入数据
     5. 更新测试结果sheet
 
     Args:
-        no_load_file: 空载文件路径
-        load_file: 负载文件路径
+        no_load_file: 空载文件路径（可选，None表示跳过）
+        load_file: 负载文件路径（可选，None表示跳过）
         target_file: 目标Excel文件路径
         no_load_standard: 空载标准
         load_standard: 负载标准
@@ -138,38 +138,57 @@ def process_all_sources(
     }
 
     try:
-        # 验证文件存在
-        if not validate_file_exists(no_load_file):
-            summary["error"] = f"空载文件不存在: {no_load_file}"
+        # 验证至少提供一个源文件
+        if no_load_file is None and load_file is None:
+            summary["error"] = "至少需要提供一个测试报告文件（空载或负载）"
             return summary
-        if not validate_file_exists(load_file):
-            summary["error"] = f"负载文件不存在: {load_file}"
-            return summary
+
+        # 验证目标文件存在
         if not validate_file_exists(target_file):
             summary["error"] = f"目标文件不存在: {target_file}"
+            return summary
+
+        # 验证空载文件存在（如果提供）
+        if no_load_file is not None and not validate_file_exists(no_load_file):
+            summary["error"] = f"空载文件不存在: {no_load_file}"
+            return summary
+
+        # 验证负载文件存在（如果提供）
+        if load_file is not None and not validate_file_exists(load_file):
+            summary["error"] = f"负载文件不存在: {load_file}"
             return summary
 
         # 创建输出文件（复制目标文件）
         output_file = create_output_file(target_file)
         summary["output_file"] = output_file
 
-        # 处理空载文件
-        logger.info(f"开始处理空载文件: {no_load_file.name}")
-        no_load_results = process_source_file(no_load_file, NO_LOAD_PREFIX)
-        summary["no_load_results"] = no_load_results
+        # 初始化结果列表
+        no_load_results = []
+        load_results = []
 
-        for result in no_load_results:
-            summary["zero_counts"][result["new_sheet_name"]] = result["zero_count"]
-            summary["averages"][result["new_sheet_name"]] = result["average_value"]
+        # 处理空载文件（如果提供）
+        if no_load_file is not None:
+            logger.info(f"开始处理空载文件: {no_load_file.name}")
+            no_load_results = process_source_file(no_load_file, NO_LOAD_PREFIX)
+            summary["no_load_results"] = no_load_results
 
-        # 处理负载文件
-        logger.info(f"开始处理负载文件: {load_file.name}")
-        load_results = process_source_file(load_file, LOAD_PREFIX)
-        summary["load_results"] = load_results
+            for result in no_load_results:
+                summary["zero_counts"][result["new_sheet_name"]] = result["zero_count"]
+                summary["averages"][result["new_sheet_name"]] = result["average_value"]
+        else:
+            logger.info("跳过空载文件处理")
 
-        for result in load_results:
-            summary["zero_counts"][result["new_sheet_name"]] = result["zero_count"]
-            summary["averages"][result["new_sheet_name"]] = result["average_value"]
+        # 处理负载文件（如果提供）
+        if load_file is not None:
+            logger.info(f"开始处理负载文件: {load_file.name}")
+            load_results = process_source_file(load_file, LOAD_PREFIX)
+            summary["load_results"] = load_results
+
+            for result in load_results:
+                summary["zero_counts"][result["new_sheet_name"]] = result["zero_count"]
+                summary["averages"][result["new_sheet_name"]] = result["average_value"]
+        else:
+            logger.info("跳过负载文件处理")
 
         # 打开输出文件（不是原目标文件）
         wb = load_workbook(output_file)
@@ -179,8 +198,9 @@ def process_all_sources(
             create_new_sheet(
                 wb,
                 result["new_sheet_name"],
-                result["filtered_df"],
-                result["zero_count"]
+                result["processed_df"],
+                result["zero_count"],
+                result["average_value"]
             )
 
         # 更新测试结果sheet
@@ -247,6 +267,8 @@ def print_summary(summary: Dict) -> None:
                 print(f"  - {result['new_sheet_name']}: "
                      f"零值个数={result['zero_count']}, "
                      f"平均值={result['average_value']:.2f}")
+        else:
+            print("\n空载文件: 跳过")
 
         # 负载结果
         load_results = summary.get("load_results", [])
@@ -256,6 +278,8 @@ def print_summary(summary: Dict) -> None:
                 print(f"  - {result['new_sheet_name']}: "
                      f"零值个数={result['zero_count']}, "
                      f"平均值={result['average_value']:.2f}")
+        else:
+            print("\n负载文件: 跳过")
 
         # 输出文件信息
         if summary.get("output_file"):

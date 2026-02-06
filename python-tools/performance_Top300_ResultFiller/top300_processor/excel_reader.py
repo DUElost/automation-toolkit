@@ -53,6 +53,11 @@ def get_valid_sheets(file_path: Path) -> List[str]:
                 if all(header in df.columns for header in SOURCE_HEADERS):
                     valid_sheets.append(sheet_name)
                     logger.debug(f"找到有效sheet: {sheet_name}")
+                else:
+                    # 输出调试信息：显示哪些表头缺失
+                    missing_headers = [h for h in SOURCE_HEADERS if h not in df.columns]
+                    logger.warning(f"Sheet '{sheet_name}' 无效，缺失表头: {missing_headers}")
+                    logger.info(f"Sheet '{sheet_name}' 实际列名: {list(df.columns)}")
             except Exception as e:
                 logger.warning(f"读取sheet {sheet_name} 时出错: {e}")
                 continue
