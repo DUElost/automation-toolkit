@@ -1,0 +1,105 @@
+{
+    "general": {
+        "default_loop_count": 3000,
+        "screen_timeout_minutes": 1999999999,
+        "monkey_duration_seconds": 300
+    },
+    "adb_commands": {
+        "reboot": "adb -s {device} reboot",
+        "root": "adb -s {device} root",
+        "factory_reset": "adb -s {device} shell am broadcast -a android.intent.action.FACTORY_RESET --receiver-foreground -p android -es \"android.intent.extra.REASON\" \"ExitRetailModeConfirmed\" -ez \"android.intent.extra.WIPE_EXTERNAL_STORAGE\" true -ez \"com.android.internal.intent.extra.WIPE_ESIMS\" true",
+        "skip_oobe": {
+            "user_setup_complete": "adb -s {device} shell settings put secure user_setup_complete 1",
+            "device_provisioned": "adb -s {device} shell settings put global device_provisioned 1",
+            "system_locales": "adb -s {device} shell settings put system system_locales en-US",
+            "go_home": "adb -s {device} shell am start -a android.intent.action.MAIN -c android.intent.category.HOME"
+        },
+        "screen_timeout": "adb -s {device} shell settings put system screen_off_timeout {timeout_ms}",
+        "gesture_nav": "adb -s {device} shell cmd overlay enable com.android.internal.systemui.navbar.gestural",
+        "keyevent_back": "adb -s {device} shell input keyevent 4",
+        "keyevent_home": "adb -s {device} shell input keyevent 3",
+        "keyevent_power": "adb -s {device} shell input keyevent 26"
+    },
+    "monkey": {
+        "command": "adb -s {device} shell monkey -v -v -v --ignore-crashes --ignore-timeouts --ignore-security-exceptions --kill-process-after-error --pct-trackball 0 --pct-nav 0 --pct-majornav 0 --pct-anyevent 0 --pct-syskeys 0 -s 805169 --throttle 1000 {events} > /sdcard/monkeytest.txt",
+        "events_per_minute": 60
+    },
+    "log_commands": [
+        "am broadcast -a com.debug.loggerui.ADB_CMD -e cmd_name stop --ei cmd_target 1 -n com.debug.loggerui/.framework.LogReceiver",
+        "am broadcast -a com.debug.loggerui.ADB_CMD -e cmd_name set_sublog_5_0 --ei cmd_target 1 -n com.debug.loggerui/.framework.LogReceiver",
+        "am broadcast -a com.debug.loggerui.ADB_CMD -e cmd_name set_log_size_61440 --ei cmd_target 1 -n com.debug.loggerui/.framework.LogReceiver",
+        "am broadcast -a com.debug.loggerui.ADB_CMD -e cmd_name start --ei cmd_target 1 -n com.debug.loggerui/.framework.LogReceiver"
+    ],
+    "timings": {
+        "device_ready_timeout": 300,
+        "boot_complete_timeout": 300,
+        "short_wait": 3,
+        "medium_wait": 10,
+        "ui_load_wait": 5,
+        "post_power_key_wait": 2
+    },
+    "ui_coordinates": {
+        "power_menu_swipe": {
+            "start_x": 200,
+            "start_y": 50,
+            "end_x": 200,
+            "end_y": 1600,
+            "duration": 300
+        }
+    },
+    "reboot_buttons": {
+        "HONOR": {
+            "steps": [
+				{"type": "text", "value": "Restart"}
+            ]
+        },
+        "ZTE": {
+            "steps": [
+                {"type": "resource-id", "value": "com.android.systemui:id/reset"},
+                {"type": "resource-id", "value": "com.android.systemui:id/reset"}
+            ]
+        },
+        "Moto": {
+            "steps": [
+                {"type": "text", "value": "Restart"}
+            ]
+        },
+        "Transsion": {
+            "steps": [
+                {"type": "text", "value": "Restart"}
+            ]
+        },
+        "default": {
+            "steps": [
+                {"type": "resource-id", "value": "com.android.systemui:id/reset"},
+                {"type": "resource-id", "value": "com.android.systemui:id/reset"}
+            ]
+        }
+    },
+    "test_modes": {
+        "1": {
+            "name": "恢复出厂设置专项",
+            "description": "模拟用户恢复出厂设置，通过OOBE.bat跳过开机向导"
+        },
+        "2": {
+            "name": "UI联机重启专项",
+            "description": "通过模拟用户操作长按Power键点击重启按钮"
+        },
+        "3": {
+            "name": "ADB reboot重启专项",
+            "description": "adb命令重启手机，进到桌面后执行5分钟原生monkey"
+        },
+        "4": {
+            "name": "连贯执行全部专项",
+            "description": "依次执行：恢复出厂设置 -> UI联机重启 -> ADB reboot重启"
+        },
+        "5": {
+            "name": "开关机专项",
+            "description": "使用adb shell setprop sys.powerctl shutdown关机，等待手动开机后再次关机"
+        },
+        "6": {
+            "name": "休眠唤醒专项",
+            "description": "按电源键灭屏，静置待机预设时间，再按电源键亮屏，循环执行"
+        }
+    }
+}

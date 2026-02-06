@@ -1,0 +1,2 @@
+python MemoryFusion.py
+pause
