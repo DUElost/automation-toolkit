@@ -1,0 +1,1 @@
+pip install uiautomator2 -i https://pypi.tuna.tsinghua.edu.cn/simple
