@@ -456,6 +456,11 @@ def Reset_Phone_Skip(count, device):
             find_text_coordinate('Erase all data', device)
             time.sleep(5)
             find_text_coordinate('Erase all data', device)
+        elif board_output in {"Infinix-X6896"}:
+            subprocess.getstatusoutput(f"adb -s {device} shell am start -n com.android.settings/com.android.settings.Settings\$FactoryResetActivity")
+            find_text_coordinate('Erase All Data',device)
+            time.sleep(2)
+            find_text_coordinate('Erase All Data', device)
         else:
             # 构建工厂重置的ADB Shell命令
             adb_command = f"adb -s {device} root"
@@ -482,7 +487,15 @@ def Reset_Phone_Skip(count, device):
         adb_command = f"adb -s {device} shell input keyevent 4"
         # 使用subprocess模块执行ADB Shell命令
         subprocess.run(adb_command, shell=True)
-
+        if board_output in {"Infinix-X6896"}:
+            subprocess.getstatusoutput(
+                f"adb -s {device} shell am start -a android.intent.action.MAIN -c android.intent.category.HOME")
+            subprocess.getstatusoutput(f"adb -s {device} shell setprop sys.powerctl reboot")
+            time.sleep(50)
+            #亮屏操作
+            time.sleep(10)
+            for _ in range(2) :
+                subprocess.getstatusoutput(f"adb -s {device} shell input keyevent 82")
 
 def Reboot_Phone(count, device):
     for i in range(count):
