@@ -83,34 +83,34 @@ def get_storage_info(device):
     use_percentage = int(storage_info[4][:-1])  # 去掉百分号
     return total_storage, used_storage, available_storage, use_percentage
 
-def fill_storage_to_percentage(percentage, device):
-    # 检查文件是否存在，如果存在则先删除
-    subprocess.run(f"adb -s {device} shell if [ -f /sdcard/fill_storage ]; then rm /sdcard/fill_storage; fi", shell=True)
-
-    total_storage, used_storage, available_storage, use_percentage = get_storage_info(device)
-    # 增加10%存储使用百分比
-    use_percentage = Memory_use
-    # 增加10%已使用存储空间
-    used_storage = total_storage * (Memory_use/100)
-
-    target_storage = round(total_storage * percentage // 100 - total_storage * Memory_use // 100)
-
-    remaining_storage = total_storage - used_storage
-
-    count_num = target_storage // 16
-
-    #print(f"Total storage: {total_storage} MB")
-    #print(f"Used storage: {used_storage} MB")
-    #print(f"Available storage: {available_storage} MB")
-    print(f"{Fore.YELLOW}Remaining storage: {Fore.BLUE}{remaining_storage} {Style.RESET_ALL}MB")
-    print(f"{Fore.YELLOW}Use percentage: {Fore.BLUE}{use_percentage}{Style.RESET_ALL}%")
-    print(f"{Fore.YELLOW}Target storage to fill: {Fore.BLUE}{target_storage} {Style.RESET_ALL}MB")
-
-    # 填充新的存储块
-    subprocess.run(f"adb -s {device} shell dd if=/dev/zero of=/sdcard/fill_storage bs=16M count={count_num}", shell=True)
-    subprocess.run(f"adb -s {device} shell cat /sdcard/fill_storage > /dev/null", shell=True)
-
-    print(f"Storage filled to {percentage}%")
+# def fill_storage_to_percentage(percentage, device):
+#     # 检查文件是否存在，如果存在则先删除
+#     subprocess.run(f"adb -s {device} shell if [ -f /sdcard/fill_storage ]; then rm /sdcard/fill_storage; fi", shell=True)
+#
+#     total_storage, used_storage, available_storage, use_percentage = get_storage_info(device)
+#     # 增加10%存储使用百分比
+#     use_percentage = Memory_use
+#     # 增加10%已使用存储空间
+#     used_storage = total_storage * (Memory_use/100)
+#
+#     target_storage = round(total_storage * percentage // 100 - total_storage * Memory_use // 100)
+#
+#     remaining_storage = total_storage - used_storage
+#
+#     count_num = target_storage // 16
+#
+#     #print(f"Total storage: {total_storage} MB")
+#     #print(f"Used storage: {used_storage} MB")
+#     #print(f"Available storage: {available_storage} MB")
+#     print(f"{Fore.YELLOW}Remaining storage: {Fore.BLUE}{remaining_storage} {Style.RESET_ALL}MB")
+#     print(f"{Fore.YELLOW}Use percentage: {Fore.BLUE}{use_percentage}{Style.RESET_ALL}%")
+#     print(f"{Fore.YELLOW}Target storage to fill: {Fore.BLUE}{target_storage} {Style.RESET_ALL}MB")
+#
+#     # 填充新的存储块
+#     subprocess.run(f"adb -s {device} shell dd if=/dev/zero of=/sdcard/fill_storage bs=16M count={count_num}", shell=True)
+#     subprocess.run(f"adb -s {device} shell cat /sdcard/fill_storage > /dev/null", shell=True)
+#
+#     print(f"Storage filled to {percentage}%")
 
 def find_text_coordinate(text, device):
     #休眠
@@ -350,6 +350,12 @@ def Select_text_Memory(text, device):
         print(f"{Fore.BLUE}Found {text} in Select_text_Memory")
         time.sleep(3)
         find_Contain_text_coordinate('Modify and restart', device)
+    elif board_output in {"Infinix-X6896"}:
+        subprocess.getstatusoutput('adb shell am start com.android.settings/com.transsion.settings.memfusion.MemFusionActivity')
+        find_text_coordinate('Set Virtual RAM', device)
+        text = text.replace('GB', '').strip() + ' GB'
+        find_text_coordinate(text, device)
+        find_text_coordinate('Modify and restart', device)
     else:
         subprocess.run(['adb', '-s', device, 'shell', 'am', 'start', 'com.android.settings/com.android.settings.Settings'], stdout=subprocess.DEVNULL)
         time.sleep(5)
@@ -450,6 +456,11 @@ def Reset_Phone_Skip(count, device):
             find_text_coordinate('Erase all data', device)
             time.sleep(5)
             find_text_coordinate('Erase all data', device)
+        elif board_output in {"Infinix-X6896"}:
+            subprocess.getstatusoutput(f"adb -s {device} shell am start -n com.android.settings/com.android.settings.Settings\$FactoryResetActivity")
+            find_text_coordinate('Erase All Data',device)
+            time.sleep(2)
+            find_text_coordinate('Erase All Data', device)
         else:
             # 构建工厂重置的ADB Shell命令
             adb_command = f"adb -s {device} root"
@@ -476,7 +487,15 @@ def Reset_Phone_Skip(count, device):
         adb_command = f"adb -s {device} shell input keyevent 4"
         # 使用subprocess模块执行ADB Shell命令
         subprocess.run(adb_command, shell=True)
-
+        if board_output in {"Infinix-X6896"}:
+            subprocess.getstatusoutput(
+                f"adb -s {device} shell am start -a android.intent.action.MAIN -c android.intent.category.HOME")
+            subprocess.getstatusoutput(f"adb -s {device} shell setprop sys.powerctl reboot")
+            time.sleep(50)
+            #亮屏操作
+            time.sleep(10)
+            for _ in range(2) :
+                subprocess.getstatusoutput(f"adb -s {device} shell input keyevent 82")
 
 def Reboot_Phone(count, device):
     for i in range(count):
@@ -515,7 +534,7 @@ def check_memfusion_swapfile(memory_value, device):
             mismatch_found = True
             actual_value = swapfile_value if swapfile_value else '未知'
             print(f"属性值检查{Fore.RED}FAIL: 设置的值为{Fore.RED}{memory_value}, 但手机实际的值为{Fore.BLUE}{actual_value}{Style.RESET_ALL}")
-    elif board_output in {"TECNO-KO5"}:
+    elif board_output in {"TECNO-KO5","Infinix-X6896"}:
         target_value = memory_value
         # 将内存数值转换为MB单位
         if 'GB' in target_value:
