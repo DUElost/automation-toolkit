@@ -2213,23 +2213,50 @@ def reboot_and_power_wake_up(device,loop_number,wakeup_time,sleep_time):
     return True
 
 
+# def split_devices_by_sn(devices):
+#     """
+#     根据SN号将设备分成两组
+#     返回: (group1, group2) - 两个设备列表
+#     """
+#     # 根据SN号的哈希值进行分组，确保分布均匀
+#     device_groups = {'group1': [], 'group2': []}
+#
+#     for device in devices:
+#         # 使用SN号的哈希值决定分组
+#         hash_value = hash(device)
+#         if hash_value % 2 == 0:
+#             device_groups['group1'].append(device)
+#         else:
+#             device_groups['group2'].append(device)
+#
+#     return device_groups['group1'], device_groups['group2']
 def split_devices_by_sn(devices):
     """
-    根据SN号将设备分成两组
+    根据SN号将设备均匀分成两组
     返回: (group1, group2) - 两个设备列表
     """
-    # 根据SN号的哈希值进行分组，确保分布均匀
-    device_groups = {'group1': [], 'group2': []}
+    device_count = len(devices)
 
-    for device in devices:
-        # 使用SN号的哈希值决定分组
-        hash_value = hash(device)
-        if hash_value % 2 == 0:
-            device_groups['group1'].append(device)
-        else:
-            device_groups['group2'].append(device)
+    if device_count < 2:
+        print(f"{Fore.YELLOW}警告：设备数量({device_count})不足以分成两组，将全部执行相同的测试{Style.RESET_ALL}")
+        return devices, []  # 返回原列表和空列表
 
-    return device_groups['group1'], device_groups['group2']
+    # 计算每组应该有多少设备
+    group1_size = device_count // 2
+    group2_size = device_count - group1_size
+
+    print(f"{Fore.CYAN}设备分组信息：{Style.RESET_ALL}")
+    print(f"  总设备数: {device_count}")
+    print(f"  Group1 (开关机测试) 设备数: {group1_size}")
+    print(f"  Group2 (休眠唤醒测试) 设备数: {group2_size}")
+
+    # 方法1：根据SN号排序后均匀分配（推荐，保证每次运行同一设备分配到同一组）
+    sorted_devices = sorted(devices)  # 按SN号排序
+
+    group1 = sorted_devices[:group1_size]
+    group2 = sorted_devices[group1_size:]
+
+    return group1, group2
 
 
 def handle_split_test(devices, loop_count):
