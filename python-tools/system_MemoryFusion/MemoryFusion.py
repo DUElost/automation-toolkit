@@ -350,7 +350,7 @@ def Select_text_Memory(text, device):
         print(f"{Fore.BLUE}Found {text} in Select_text_Memory")
         time.sleep(3)
         find_Contain_text_coordinate('Modify and restart', device)
-    elif board_output in {"Infinix-X6896"}:
+    elif board_output in {"Infinix-X6896","Infinix-X1103"}:
         subprocess.getstatusoutput('adb shell am start com.android.settings/com.transsion.settings.memfusion.MemFusionActivity')
         find_text_coordinate('Set Virtual RAM', device)
         text = text.replace('GB', '').strip() + ' GB'
@@ -456,7 +456,7 @@ def Reset_Phone_Skip(count, device):
             find_text_coordinate('Erase all data', device)
             time.sleep(5)
             find_text_coordinate('Erase all data', device)
-        elif board_output in {"Infinix-X6896"}:
+        elif board_output in {"Infinix-X6896","Infinix-X1103"}:
             subprocess.getstatusoutput(f"adb -s {device} shell am start -n com.android.settings/com.android.settings.Settings\$FactoryResetActivity")
             find_text_coordinate('Erase All Data',device)
             time.sleep(2)
@@ -487,7 +487,7 @@ def Reset_Phone_Skip(count, device):
         adb_command = f"adb -s {device} shell input keyevent 4"
         # 使用subprocess模块执行ADB Shell命令
         subprocess.run(adb_command, shell=True)
-        if board_output in {"Infinix-X6896"}:
+        if board_output in {"Infinix-X6896","Infinix-X1103"}:
             subprocess.getstatusoutput(
                 f"adb -s {device} shell am start -a android.intent.action.MAIN -c android.intent.category.HOME")
             subprocess.getstatusoutput(f"adb -s {device} shell setprop sys.powerctl reboot")
@@ -534,7 +534,7 @@ def check_memfusion_swapfile(memory_value, device):
             mismatch_found = True
             actual_value = swapfile_value if swapfile_value else '未知'
             print(f"属性值检查{Fore.RED}FAIL: 设置的值为{Fore.RED}{memory_value}, 但手机实际的值为{Fore.BLUE}{actual_value}{Style.RESET_ALL}")
-    elif board_output in {"TECNO-KO5","Infinix-X6896"}:
+    elif board_output in {"TECNO-KO5","Infinix-X6896","Infinix-X1103"}:
         target_value = memory_value
         # 将内存数值转换为MB单位
         if 'GB' in target_value:
