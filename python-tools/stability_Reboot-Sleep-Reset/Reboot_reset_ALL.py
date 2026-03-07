@@ -1950,7 +1950,7 @@ def check_screen_off(device):
     return False
 
 
-def sleep_wake_test(device, loop_count, sleep_time_minutes=5, wake_time_minutes=2):
+def sleep_wake_test(device, loop_count, sleep_time_minutes, wake_time_minutes):
     """休眠唤醒专项：按电源键灭屏，静置待机，再按电源键亮屏"""
     global exit_flag
     log_print(device, "开始执行【休眠唤醒专项】", Fore.CYAN)
@@ -2212,6 +2212,74 @@ def reboot_and_power_wake_up(device,loop_number,wakeup_time,sleep_time):
             log_print(device, f"  失败的迭代: {check_stats['failed_iterations']}", Fore.RED)
     return True
 
+
+def split_devices_by_sn(devices):
+    """
+    根据SN号将设备分成两组
+    返回: (group1, group2) - 两个设备列表
+    """
+    # 根据SN号的哈希值进行分组，确保分布均匀
+    device_groups = {'group1': [], 'group2': []}
+
+    for device in devices:
+        # 使用SN号的哈希值决定分组
+        hash_value = hash(device)
+        if hash_value % 2 == 0:
+            device_groups['group1'].append(device)
+        else:
+            device_groups['group2'].append(device)
+
+    return device_groups['group1'], device_groups['group2']
+
+
+def handle_split_test(devices, loop_count):
+    """
+    处理分组测试：一半设备执行开关机测试，一半执行休眠唤醒测试
+    """
+    print(f"\n{Fore.CYAN}[{get_timestamp()}] 开始分组测试...{Style.RESET_ALL}")
+    print(f"{Fore.YELLOW}根据SN号将设备分为两组：{Style.RESET_ALL}")
+
+    # 获取两组设备
+    group1, group2 = split_devices_by_sn(devices)
+
+    # 确保两组都有设备
+    if not group1 or not group2:
+        print(f"{Fore.RED}错误：设备数量不足以分成两组！{Style.RESET_ALL}")
+        print(f"  Group1设备数: {len(group1)}")
+        print(f"  Group2设备数: {len(group2)}")
+        return
+
+    print(f"\n{Fore.GREEN}Group1 (开关机测试):{Style.RESET_ALL}")
+    for device in group1:
+        print(f"  - {device}")
+
+    print(f"\n{Fore.GREEN}Group2 (休眠唤醒测试):{Style.RESET_ALL}")
+    for device in group2:
+        print(f"  - {device}")
+
+    print(f"\n{Fore.CYAN}[{get_timestamp()}] 开始并行执行分组测试...{Style.RESET_ALL}")
+
+    # 使用ThreadPoolExecutor并发处理所有设备
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        futures = []
+
+        # 提交group1的任务（开关机测试 - 模式5）
+        for device in group1:
+            print(f"{Fore.BLUE}[{device}] 分配开关机测试{Style.RESET_ALL}")
+            futures.append(executor.submit(power_on_off_test, device, loop_count))
+
+        # 提交group2的任务（休眠唤醒测试 - 模式6）
+        for device in group2:
+            print(f"{Fore.BLUE}[{device}] 分配休眠唤醒测试{Style.RESET_ALL}")
+            futures.append(executor.submit(sleep_wake_test, device, loop_count))
+
+        # 等待所有任务完成
+        concurrent.futures.wait(futures)
+
+    print(f"\n{Fore.GREEN}[{get_timestamp()}] 分组测试完成！{Style.RESET_ALL}")
+    print(f"  - 开关机测试设备数: {len(group1)}")
+    print(f"  - 休眠唤醒测试设备数: {len(group2)}")
+
 def handle_device(device, loop_count, switch_value,wakeup_time,sleep_time):
     """根据选择执行对应的测试专项"""
     if switch_value == 1:
@@ -2225,7 +2293,7 @@ def handle_device(device, loop_count, switch_value,wakeup_time,sleep_time):
     elif switch_value == 5:
         power_on_off_test(device, loop_count)
     elif switch_value == 6:
-        sleep_wake_test(device, loop_count)
+        sleep_wake_test(device, loop_count,wakeup_time,sleep_time)
     elif switch_value == 7:
         reboot_and_power_wake_up(device, loop_count,wakeup_time,sleep_time)
 
@@ -2322,15 +2390,24 @@ if __name__ == "__main__":
             print(f"  {key}. {mode['name']}")
             print(f"     {Fore.WHITE}{mode['description']}{Style.RESET_ALL}")
         print(f"{Fore.CYAN}{'='*50}{Style.RESET_ALL}")
-        switch_value = int(input(f"\n{Fore.CYAN}请输入测试项编号 (1-7)：{Style.RESET_ALL}"))
+        switch_value = int(input(f"\n{Fore.CYAN}请输入测试项编号 (1-8)：{Style.RESET_ALL}"))
 
     # 解析或交互获取循环次数
     default_count = CONFIG['general']['default_loop_count']
+    ##带mix的参数为选项7开关机+休眠唤醒融合参数
     # 默认亮屏时间(单位:分钟)
-    default_wakeup_time = CONFIG['general']['default_wakeup_time']
+    default_mix_wakeup_time = CONFIG['general']['default_mix_wakeup_time']
     # 默认休眠时间(单位:分钟)
+    default_mix_sleep_time = CONFIG['general']['default_mix_sleep_time']
+    #不带mix参数为选项6单独休眠唤醒参数
+    # (纯休眠唤醒) 默认唤醒时间(单位:分钟)
+    default_wakeup_time = CONFIG['general']['default_wakeup_time']
+    # (纯休眠唤醒) 默认休眠时间(单位:分钟)
     default_sleep_time = CONFIG['general']['default_sleep_time']
-    #定义参数
+    #(开关机+休眠唤醒)定义参数
+    mix_wakeup_time = default_mix_wakeup_time
+    mix_sleep_time = default_mix_sleep_time
+    #(休眠唤醒)定义参数
     wakeup_time = default_wakeup_time
     sleep_time = default_sleep_time
     if args.loop is not None:
@@ -2343,31 +2420,47 @@ if __name__ == "__main__":
         loop_input = input(f"{Fore.CYAN}请输入循环次数 (直接回车使用默认值)：{Style.RESET_ALL}")
         loop_count = int(loop_input) if loop_input.strip() else default_count
         if switch_value == 7:
-            wakeup_input = input(f"{Fore.CYAN}请输入唤醒时间 (直接回车使用默认值:默认值为2分钟)：{Style.RESET_ALL}")
+            wakeup_input = input(f"{Fore.CYAN}请输入唤醒时间 (直接回车使用默认值:默认值为{default_mix_wakeup_time}分钟)：{Style.RESET_ALL}")
+            mix_wakeup_time = int(wakeup_input) if wakeup_input.strip() else default_mix_wakeup_time
+            sleep_input = input(f"{Fore.CYAN}请输入休眠时间 (直接回车使用默认值:默认值为{default_mix_sleep_time}分钟)：{Style.RESET_ALL}")
+            mix_sleep_time = int(sleep_input) if sleep_input.strip() else default_mix_sleep_time
+        elif switch_value == 6:
+            wakeup_input = input(f"{Fore.CYAN}请输入唤醒时间 (直接回车使用默认值:默认值为{default_wakeup_time}分钟)：{Style.RESET_ALL}")
             wakeup_time = int(wakeup_input) if wakeup_input.strip() else default_wakeup_time
-            sleep_input = input(f"{Fore.CYAN}请输入休眠时间 (直接回车使用默认值:默认值为5分钟)：{Style.RESET_ALL}")
+            sleep_input = input(f"{Fore.CYAN}请输入休眠时间 (直接回车使用默认值:默认值为{default_sleep_time}分钟)：{Style.RESET_ALL}")
             sleep_time = int(sleep_input) if sleep_input.strip() else default_sleep_time
 
 
     mode_info = CONFIG['test_modes'].get(str(switch_value), {})
     mode_name = mode_info.get('name', f"模式 {switch_value}")
     print(f"\n{Fore.GREEN}[{get_timestamp()}] 即将开始执行测试...{Style.RESET_ALL}")
-    if switch_value != 7:
+    if switch_value < 6:
         print(f"  测试项: {mode_name}")
         print(f"  循环次数: {loop_count}")
+        print(f"  设备数量: {len(devices)}")
+    elif switch_value == 6:
+        print(f"  测试项: {mode_name}")
+        print(f"  休眠唤醒循环次数: {loop_count}")
+        print(f"  休眠唤醒-休眠时间: {sleep_time}")
+        print(f"  休眠唤醒-唤醒时间: {wakeup_time}")
         print(f"  设备数量: {len(devices)}")
     elif switch_value == 7:
         print(f"  测试项: {mode_name}")
         print(f"  开关机和休眠唤醒融合总循环次数: {loop_count}")
-        print(f"  休眠唤醒休眠时间: {sleep_time}")
-        print(f"  休眠唤醒唤醒时间: {wakeup_time}")
+        print(f"  休眠唤醒-休眠时间: {mix_sleep_time}")
+        print(f"  休眠唤醒-唤醒时间: {mix_wakeup_time}")
         print(f"  设备数量: {len(devices)}")
 
     # 使用ThreadPoolExecutor并发处理每个设备
     try:
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            futures = [executor.submit(handle_device, device, loop_count, switch_value,wakeup_time,sleep_time) for device in devices]
-            concurrent.futures.wait(futures)
+        # 特殊处理模式8（分组测试）
+        if switch_value == 8:
+            # 模式7需要所有设备一起处理，不能逐个设备调用handle_device
+            handle_split_test(devices, loop_count)
+        else:
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                futures = [executor.submit(handle_device, device, loop_count, switch_value,wakeup_time,sleep_time) for device in devices]
+                concurrent.futures.wait(futures)
     except KeyboardInterrupt:
         print(f"\n{Fore.YELLOW}[{get_timestamp()}] 用户中断，正在退出...{Style.RESET_ALL}")
 

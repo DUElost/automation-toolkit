@@ -3,8 +3,10 @@
         "default_loop_count": 3000,
         "screen_timeout_minutes": 1999999999,
         "monkey_duration_seconds": 300,
-        "default_wakeup_time": 2,
-        "default_sleep_time": 5
+        "default_wakeup_time": 3,
+        "default_sleep_time": 6,
+        "default_mix_wakeup_time": 2,
+        "default_mix_sleep_time": 5
     },
     "adb_commands": {
         "reboot": "adb -s {device} reboot",
@@ -106,6 +108,10 @@
         "7": {
             "name": "开关机加休眠唤醒专项",
             "description": "先执行开关机专项，再执行休眠唤醒专项，循环执行"
+        },
+        "8": {
+            "name": "混合测试（一半开关机，一半休眠唤醒）",
+            "description": "根据SN号将设备分成两组，一半执行开关机测试，一半执行休眠唤醒测试"
         }
     }
 }
