@@ -1,0 +1,105 @@
+{
+  "default": {
+    "scan_site": "上海AEE",
+    "ratio_std_aee": 90,
+    "ratio_std_tne": 90,
+    "scan_type": "shanghai",
+    "place": "SH",
+    "submit_jira": false,
+    "pkglist_file": "pkglist.txt"
+  },
+  "3rd_app": {
+    "submit_jira_url": "http://jenkins.transsion.com:8080/jenkins/job/AutoAeeLog/buildWithParameters",
+    "special_build_prefix": "AppCompatibilityAutoTesting",
+    "jira_repo": "AppCompatibilityAutoTesting",
+    "reporter": "TranAutoTest.swt",
+    "reporter": "zi.wang",
+    "archive_address": "\\\\10.150.152.35\\",
+    "replace_index": 3,
+    "ignore_pkglist": true,
+    "submit_jira": true
+  },
+  "3rd_app_beta": {
+    "submit_jira_url": "http://jenkins.transsion.com:8080/jenkins/job/AutoAeeLog/buildWithParameters",
+    "special_build_prefix": "AppCompatibilityAutoTesting",
+    "jira_repo": "AppCompatibilityAutoTesting",
+    "reporter": "TranAutoTest.swt",
+    "reporter": "zhongyu.huang",
+    "archive_address": "\\\\10.150.152.35\\",
+    "replace_index": 3,
+    "ignore_pkglist": true,
+    "submit_jira": true
+  },
+  "sz": {
+    "place": "SZ",
+    "scan_type": "factory",
+    "submit_jira": false
+  },
+  "cq": {
+    "scan_type": "shanghai",
+    "submit_jira": false,
+    "archive_address": "\\\\10.205.101.200\\",
+    "replace_index": 3
+  },
+  "cqf": {
+    "scan_type": "factory",
+    "submit_jira": false,
+    "archive_address": "\\\\10.207.203.200\\",
+    "replace_index": 3
+  },
+  "cqf-lab": {
+    "scan_type": "shanghai",
+    "submit_jira": false,
+    "archive_address": "\\\\10.207.203.200\\",
+    "replace_index": 3,
+    "pkglist_file": "pkglist_factory.txt"
+  },
+  "lab_35": {
+    "archive_address": "\\\\10.150.152.35\\",
+    "replace_index": 3
+  },
+  "lab_36": {
+    "archive_address": "\\\\10.150.152.36\\",
+    "replace_index": 3
+  },
+  "jenkins_36_nas2": {
+    "archive_address": "\\\\10.150.152.36\\nas2\\",
+    "replace_index": 3,
+    "win_to_mnt": {
+      "//10.150.152.36/nas2/": "/mnt/nas5/"
+    }
+  },
+  "jenkins_35_nas1nas2": {
+    "archive_address": "\\\\10.150.152.35\\",
+    "replace_index": 2,
+    "win_to_mnt": {
+      "//10.150.152.35/nas1/": "/mnt/nas1/",
+      "//10.150.152.35/nas2/": "/mnt/nas2/"
+    }
+  },
+  "jenkins_35_nas1_sp": {
+    "archive_address": "\\\\10.150.152.35\\",
+    "replace_index": 2,
+    "win_to_mnt": {
+      "//10.150.152.35/nas1/": "/mnt/nas1/"
+    },
+    "ignore_pkglist": true
+  },
+  "jenkins_cq_200_nas1": {
+    "archive_address": "\\\\10.205.101.200\\",
+    "replace_index": 3,
+    "win_to_mnt": {
+      "//10.205.101.200/nas1/": "/mnt/10.205.101.200/nas1/",
+      "//10.205.101.200/scan_logs": "/mnt/10.205.101.200/scan_logs/"
+    }
+  },
+  "os": {
+    "archive_address": "\\\\10.150.148.44\\",
+    "replace_index": "扫描 /mnt/nas_comp_test/Searchlog/Dailymonkey，替换从Searchlog开始",
+    "replace_index": 3
+  },
+  "smoke": {
+    "archive_address": "\\\\10.150.98.90\\03_测试Log\\SmokeLog\\tmp\\",
+    "replace_index": 2
+  }
+}

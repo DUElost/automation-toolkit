@@ -1,0 +1,131 @@
+{
+  "default": {
+    "scan_site": "重庆数据谷-212",
+    "ratio_std_aee": 90,
+    "scan_type": "shanghai",
+    "place": "CQ",
+    "pkglist_file": "pkglist.txt",
+    "mp_block_file": "mp_block.txt",
+    "jira_project_file": "jira_project.txt",
+    "submit_jira": true,
+    "submit_jira_url": "http://jenkins.transsion.com:8080/jenkins/job/AutoAeeLog/buildWithParameters",
+    "reporter": "huijing.chen",
+    "archive_address": "\\\\10.150.152.36\\",
+    "replace_index": "平台扫描 /mnt/10.150.152.36/nas1，替换从nas1开始",
+    "replace_index": 3,
+    "result_dir": "/mnt/fans_log/Result/fans",
+    "submit_monkey_db": false,
+    "send_notify_mail_to_tester": true,
+    "send_notify_mail_to_default": false,
+    "send_notify_mail_to_project": false,
+    "send_warning_mail": true,
+    "mail_receivers_to_tester": "huijing.chen@transsion.com, yunqing.gui@transsion.com",
+    "mail_receivers_to_default": "huijing.chen@transsion.com, yunqing.gui@transsion.com",
+    "mail_receivers_to_new_app": "yunqing.gui@transsion.com, zhao.li5@transsion.com, guxiang.li@transsion.com, shenglong.wu@transsion.com, nana.cui@transsion.com, yinyin.liu@transsion.com"
+  },
+  "Tecno-AD8": {
+    "jira_repo": "AD8-AD9-H831-T"
+  },
+  "Tecno-AD9": {
+    "jira_repo": "AD8-AD9-H831-T"
+  },
+  "Tecno-AD11": {
+    "jira_repo": "AD11-H932"
+  },
+  "Tecno-BG6m": {
+    "jira_repo": "BG6m-Public"
+  },
+  "Tecno-CK6-CK6n-U": {
+    "jira_repo": "CK6-CK6n-U-H6929"
+  },
+  "TECNO-CK7N": {
+    "jira_repo": "CK7n-H894"
+  },
+  "Tecno-CK8n-U": {
+    "jira_repo": "CK8n-U-Public"
+  },
+  "Tecno-CK9n-u": {
+    "jira_repo": "CK9n-H933-U"
+  },
+  "Tecno-CL6": {
+    "jira_repo": "CL6-Public"
+  },
+  "Tecno-CL8": {
+    "jira_repo": "CL8-H962"
+  },
+  "Tecno-CL9": {
+    "jira_repo": "CL9-H961"
+  },
+  "Tecno-CLA6": {
+    "jira_repo": "CLA6-H8910"
+  },
+  "Tecno-KJ5": {
+    "jira_repo": "KJ5-KJ5n-H6931-T"
+  },
+  "Tecno-KJ5n": {
+    "jira_repo": "KJ5-KJ5n-H6931-T"
+  },
+  "Tecno-KJ7": {
+    "jira_repo": "KJ7-H895"
+  },
+  "Tecno-LI8": {
+    "jira_repo": "LI8-H962"
+  },
+  "Tecno-LI9": {
+    "jira_repo": "LI9-H335"
+  },
+  "Infinix-X6525D": {
+    "jira_repo": "X6525D-Public"
+  },
+  "Infinix-X6731": {
+    "jira_repo": "X6731-H935"
+  },
+  "Infinix-X6731B": {
+    "jira_repo": "X6731B-H896"
+  },
+  "Infinix-X678B-U": {
+    "jira_repo": "X678B-U-H894"
+  },
+  "Infinix-X6836": {
+    "jira_repo": "X6836-H6932"
+  },
+  "Infinix-X6837": {
+    "jira_repo": "X6837-H897"
+  },
+  "Infinix-X6850": {
+    "jira_repo": "X6850-H895"
+  },
+  "Infinix-X6850B": {
+    "jira_repo": "X6850B-H895"
+  },
+  "Infinix-X6853": {
+    "jira_repo": "X6853-H895"
+  },
+  "Infinix-X6860": {
+    "jira_repo": "X6860-H899"
+  },
+  "Infinix-X6871": {
+    "jira_repo": "X6871-H962"
+  },
+  "Tecno-LI6": {
+    "jira_repo": "LI6-H897"
+  },
+  "Tecno-LI7": {
+    "jira_repo": "LI7-H897"
+  },
+  "Tecno-AE10": {
+    "jira_repo": "AE10-H833"
+  },
+  "Tecno-AE11": {
+    "jira_repo": "AE11-H911"
+  },
+  "Tecno-KJ8": {
+    "jira_repo": "KJ8-H338"
+  },
+  "Infinix-X6962": {
+    "jira_repo": "X6962-H911"
+  },
+  "itel-S667LN": {
+    "jira_repo": "S667LN-Public"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "default": {
+    "scan_site": "重庆数据谷",
+    "scan_type": "shanghai",
+    "ratio_std_aee": 90,
+    "pkglist_file": "pkglist.txt",
+    "mp_block_file": "mp_block.txt",
+    "jira_project_file": "jira_project.txt",
+    "recognize_except": true,
+    "submit_jira": false,
+    "submit_jira_url": "http://jenkins.transsion.com:8080/jenkins/job/AutoAeeLog/buildWithParameters",
+    "reporter": "donglai.wang",
+    "archive_address": "\\\\10.205.101.200\\",
+    "replace_index": 3,
+    "send_notify_mail_to_tester": false,
+    "send_notify_mail_to_default": false,
+    "send_notify_mail_to_project": false,
+    "send_warning_mail": false,
+    "mail_receivers_to_tester": "donglai.wang@transsion.com",
+    "mail_receivers_to_default": "kaiyuan.xie@transsion.com, donglai.wang@transsion.com, ziwei.gong@transsion.com",
+    "mail_receivers_to_new_app": "kaiyuan.xie@transsion.com"
+  }
+}

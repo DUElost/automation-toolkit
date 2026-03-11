@@ -1,0 +1,49 @@
+{
+  "default": {
+    "scan_type": "fans",
+    "ratio_std_aee": 90,
+    "scan_root_dir": "/mnt/fans_log/fans",
+    "archive_address": "\\\\10.150.152.36\\",
+    "replace_index": 2,
+    "result_dir": "/mnt/fans_log/Result/fans",
+    "pkglist_file": "pkglist_fans.txt",
+    "top_apk_file": "top_apk.txt",
+    "recognize_except": true,
+    "send_warning_mail": true,
+    "mail_receivers_to_default": "yunqing.gui@transsion.com, zhao.li5@transsion.com, lihua.sheng@transsion.com",
+    "limited_max_days":  90,
+    "limited_prj_date": {},
+    "stop_prj_list": ["CE7","CE8","CE9","CG8","KF8","LC7","LE7","X659","X683","X687","X692","X693","X695","CH9n","AC8","X6811","X697","X6815","CG6","KG5j","BD4j","A631W","CG6j","X670","CI8n","X676B","KH6","X663","X669","BE7","X666","BE8i","BF6","CI7n","AD8","AD9","AD10","X6711","CK6","CK6n","X678B","X6731","X6833B","X6710","X6831","LH8n","A663LC","CK9n","AD11","X6836","X6837"],
+    "submit_jira": true,
+    "submit_jira_url": "http://jenkins.transsion.com:8080/jenkins/job/AutoAeeLog/buildWithParameters",
+    "jira_server": "http://jira-ex.transsion.com:6001",
+    "reporter": "auto.sdd",
+    "core_app_reporter": "auto.sdd",
+    "core_app_reporter_out": "auto.sdd",
+    "core_app_repo": {
+      "KJ6": "KJ6-H897-AeeExpAuto",
+      "X6850": "X6850-H895-AeeExpAuto",
+      "X6853": "X6853-H895-AeeExpAuto",
+      "CL9": "CL9-H961-AeeExpAuto",
+      "AE10": "AE10-H833-AeeExpAuto",
+      "CL6": "CL6-Public-AeeExpAuto",
+      "CL8": "CL8-H962-AeeExpAuto",
+      "X6871": "X6871-H962-AeeExpAuto",
+      "AE11": "AE11-H911-AeeExpAuto",
+      "LI9": "LI9-H335-AeeExpAuto",
+      "KJ7": "KJ7-H895-AeeExpAuto",
+      "X6962": "X6962-H911-AeeExpAuto"
+
+    },
+    "core_app_repo_out": {
+      "BG7n": "BG7-XE674S-AeeExpAuto",
+      "CL7": "CL7-CL7K-P765-AeeExpAuto",
+      "X6526": "X6526-V658A-AeeExpAuto",
+      "X6851": "X6851-P865-AeeExpAuto",
+      "A665L": "A665L-SE673S-AeeExpAuto",
+      "A667L": "A667LP-U-Go-AeeExpAuto",
+      "S666LN": "S666LN-MA66B-AeeExpAuto",
+      "P671L": "P671L-P672L-SK677-AeeExpAuto"
+    }
+  }
+}

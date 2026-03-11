@@ -1,0 +1,26 @@
+{
+  "default": {
+    "scan_site": "深圳-61",
+    "ratio_std_aee": 90,
+    "scan_type": "factory",
+    "pkglist_file": "pkglist.txt",
+    "mp_block_file": "mp_block.txt",
+    "jira_project_file": "jira_project.txt",
+    "submit_jira": true,
+    "submit_jira_url": "http://jenkins.transsion.com:8080/jenkins/job/AutoAeeLog/buildWithParameters",
+    "log_smb_username": "monkeytest",
+    "log_smb_password": "monkey123",
+    "reporter": "weiqi.liu",
+    "archive_address": "\\\\10.243.155.10\\",
+    "replace_index": "平台扫描 /mnt/10.150.152.36/nas1，替换从nas1开始",
+    "replace_index": 3,
+    "submit_monkey_db": false,
+    "send_notify_mail_to_tester": true,
+    "send_notify_mail_to_default": false,
+    "send_notify_mail_to_project": false,
+    "send_warning_mail": true,
+    "mail_receivers_to_tester": "weiqi.liu@transsion.com, yunqing.gui@transsion.com",
+    "mail_receivers_to_default": "zhao.li5@transsion.com, hao.wu@transsion.com, mei.wu@transsion.com, lin.li5@transsion.com, chengqi.ma@transsion.com, xue.li@transsion.com, jie.yang2@transsion.com, qiao.chen@transsion.com, guxiang.li@transsion.com, yinyin.liu@transsion.com",
+    "mail_receivers_to_new_app": "yunqing.gui@transsion.com, zhao.li5@transsion.com, guxiang.li@transsion.com, shenglong.wu@transsion.com, nana.cui@transsion.com, yinyin.liu@transsion.com"
+  }
+}

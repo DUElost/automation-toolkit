@@ -1,0 +1,76 @@
+{
+  "X688B": {
+    "submit_jira": true,
+    "jira_repo": "R0MP1-AeeExpAuto",
+    "trunk_build_prefix": "R0MP1",
+    "jira_reporter": "haohao.huang",
+    "submit_monkey_db": true,
+    "trunk_name_db": "R0MP1",
+    "trunk_prj_name_db": "R0MP1-X688B"
+  },
+  "TECNO-CG6": {
+    "submit_jira": true,
+    "jira_repo": "S0MP1-AeeExpAuto",
+    "trunk_build_prefix": "S0MP1",
+    "jira_reporter": "haohao.huang",
+    "submit_monkey_db": true,
+    "trunk_name_db": "S0MP1",
+    "trunk_prj_name_db": "S0MP1-CG6"
+  },
+  "INFINIX-X677": {
+    "submit_jira": true,
+    "jira_repo": "S0MP1-AeeExpAuto",
+    "jira_reporter": "haohao.huang",
+    "submit_monkey_db": true,
+    "trunk_name_db": "S0MP1",
+    "trunk_prj_name_db": "X677"
+  },
+  "TECNO-CI7N": {
+    "submit_jira": true,
+    "jira_repo": "T0MP1-AeeExpAuto",
+    "jira_reporter": "haohao.huang",
+    "submit_monkey_db": true,
+    "trunk_name_db": "T0MP1",
+    "trunk_prj_name_db": "CI7n"
+  },
+  "INFINIX-X6710": {
+    "submit_jira": true,
+    "jira_repo": "T0MP1-AeeExpAuto",
+    "jira_reporter": "haohao.huang",
+    "submit_monkey_db": true,
+    "trunk_name_db": "T0MP1",
+    "trunk_prj_name_db": "X6710"
+  },
+  "TECNO-CK7N": {
+    "submit_jira": true,
+    "jira_repo": "T0MP1-AeeExpAuto",
+    "jira_reporter": "haohao.huang",
+    "submit_monkey_db": true,
+    "trunk_name_db": "T0MP1",
+    "trunk_prj_name_db": "CK7n"
+  },
+  "TECNO-CK6": {
+    "submit_jira": true,
+    "jira_repo": "T0MP1-AeeExpAuto",
+    "jira_reporter": "haohao.huang",
+    "submit_monkey_db": true,
+    "trunk_name_db": "T0MP1",
+    "trunk_prj_name_db": "CK6"
+  },
+  "TECNO-KI5N": {
+    "submit_jira": true,
+    "jira_repo": "T0MP1-AeeExpAuto",
+    "jira_reporter": "haohao.huang",
+    "submit_monkey_db": true,
+    "trunk_name_db": "T0MP1",
+    "trunk_prj_name_db": "KI5n"
+  },
+  "TECNO-KI8": {
+    "submit_jira": true,
+    "jira_repo": "T0MP1-AeeExpAuto",
+    "jira_reporter": "haohao.huang",
+    "submit_monkey_db": true,
+    "trunk_name_db": "T0MP1",
+    "trunk_prj_name_db": "KI8"
+  }
+}

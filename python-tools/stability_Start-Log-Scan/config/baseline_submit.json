@@ -1,0 +1,28 @@
+{
+  "prj_to_jira": {
+    "Q": {
+      "TECNO-CE7": "Q68-Trunk",
+      "INFINIX-X657": "Q80-Trunk",
+      "INFINIX-X687": "Q85-Trunk"
+    },
+    "R": {
+      "TECNO-KF6": "R61-Trunk",
+      "TECNO-KF8": "R68-G80-Trunk",
+      "INFINIX-X659": "R68-G70-Trunk"
+    }
+  },
+  "prj_to_monkeydb": {
+    "Q": {
+      "trunk_name_db": "Q0_Trunk",
+      "TECNO-CE7": "Q0_MT6768",
+      "INFINIX-X657": "Q0_MT6580",
+      "INFINIX-X687": "Q0_MT6785"
+    },
+    "R": {
+      "trunk_name_db": "R0_Trunk",
+      "TECNO-KF6": "R0_MT6761",
+      "TECNO-KF8": "R0_MT6768_G80",
+      "INFINIX-X659": "R0_MT6768_G70"
+    }
+  }
+}

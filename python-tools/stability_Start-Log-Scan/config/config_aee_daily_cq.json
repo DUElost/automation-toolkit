@@ -1,0 +1,223 @@
+{
+  "default": {
+    "scan_site": "重庆数据谷",
+    "scan_type": "shanghai",
+    "ratio_std_aee": 90,
+    "pkglist_file": "pkglist.txt",
+    "mp_block_file": "mp_block.txt",
+    "jira_project_file": "jira_project.txt",
+    "submit_jira": false,
+    "submit_jira_url": "http://jenkins.transsion.com:8080/jenkins/job/AutoAeeLog/buildWithParameters",
+    "reporter": "bing.lei",
+    "archive_address": "\\\\10.205.101.200\\",
+    "replace_index": 3,
+    "result_dir": "/mnt/10.205.101.200/nas1/Result",
+    "send_notify_mail_to_tester": true,
+    "send_notify_mail_to_default": false,
+    "send_notify_mail_to_project": false,
+    "send_warning_mail": true,
+    "mail_receivers_to_tester": "bing.lei@transsion.com, yunqing.gui@transsion.com",
+    "mail_receivers_to_default": "zhao.li5@transsion.com, hao.wu@transsion.com, mei.wu@transsion.com, lin.li5@transsion.com, chengqi.ma@transsion.com, xue.li@transsion.com, jie.yang2@transsion.com, qiao.chen@transsion.com, guxiang.li@transsion.com, yinyin.liu@transsion.com",
+    "mail_receivers_to_new_app": "yunqing.gui@transsion.com, zhao.li5@transsion.com, guxiang.li@transsion.com, shenglong.wu@transsion.com, nana.cui@transsion.com, yinyin.liu@transsion.com"
+  },
+  "dv-01-00": {
+    "scan_root_dir": "/mnt/10.205.101.200/nas1/dv-01-00/LoNg_R/MTBF-log",
+    "submit_jira": false
+  },
+  "dv-01-01": {
+    "scan_root_dir": "/mnt/10.205.101.200/nas1/dv-01-01/LoNg_R/MTBF-log",
+    "submit_jira": false
+  },
+  "dv-01-02": {
+    "scan_root_dir": "/mnt/10.205.101.200/nas1/dv-01-02/LoNg_R/MTBF-log",
+    "submit_jira": false
+  },
+  "dv-01-03": {
+    "scan_root_dir": "/mnt/10.205.101.200/nas1/dv-01-03/LoNg_R/MTBF-log",
+    "submit_jira": false
+  },
+  "dv-01-04": {
+    "scan_root_dir": "/mnt/10.205.101.200/nas1/dv-01-04/LoNg_R/MTBF-log",
+    "submit_jira": false
+  },
+  "dv-01-05": {
+    "scan_root_dir": "/mnt/10.205.101.200/nas1/dv-01-05/LoNg_R/MTBF-log",
+    "submit_jira": false
+  },
+  "dv-01-06": {
+    "scan_root_dir": "/mnt/10.205.101.200/nas1/dv-01-06/LoNg_R/MTBF-log",
+    "submit_jira": false
+  },
+  "dv-01-07": {
+    "scan_root_dir": "/mnt/10.205.101.200/nas1/dv-01-07/LoNg_R/MTBF-log",
+    "submit_jira": false
+  },
+  "dv-01-08": {
+    "scan_root_dir": "/mnt/10.205.101.200/nas1/dv-01-08/LoNg_R/MTBF-log",
+    "submit_jira": false
+  },
+  "dv-01-09": {
+    "scan_root_dir": "/mnt/10.205.101.200/nas1/dv-01-09/LoNg_R/MTBF-log",
+    "submit_jira": false
+  },
+  "dv-02-00": {
+    "scan_root_dir": "/mnt/10.205.101.200/nas1/dv-02-00/LoNg_S/MTBF-log",
+    "submit_jira": false
+  },
+  "dv-02-01": {
+    "scan_root_dir": "/mnt/10.205.101.200/nas1/dv-02-01/LoNg/MTBF-log",
+    "submit_jira": false
+  },
+  "dv-02-02": {
+    "scan_root_dir": "/mnt/10.205.101.200/nas1/dv-02-02/LoNg/MTBF-log",
+    "submit_jira": false
+  },
+  "dv-02-03": {
+    "scan_root_dir": "/mnt/10.205.101.200/nas1/dv-02-03/LoNg_S/MTBF-log",
+    "submit_jira": false
+  },
+  "dv-02-04": {
+    "scan_root_dir": "/mnt/10.205.101.200/nas1/dv-02-04/LoNg/MTBF-log",
+    "submit_jira": false
+  },
+  "dv-02-05": {
+    "scan_root_dir": "/mnt/10.205.101.200/nas1/dv-02-05/LoNg_S/MTBF-log",
+    "submit_jira": false
+  },
+  "dv-02-06": {
+    "scan_root_dir": "/mnt/10.205.101.200/nas1/dv-02-06/LoNg_R/MTBF-log",
+    "submit_jira": false
+  },
+  "dv-02-07": {
+    "scan_root_dir": "/mnt/10.205.101.200/nas1/dv-02-07/LoNg_S/MTBF-log",
+    "submit_jira": false
+  },
+  "dv-02-08": {
+    "scan_root_dir": "/mnt/10.205.101.200/nas1/dv-02-08/LoNg_S/MTBF-log",
+    "submit_jira": false
+  },
+  "dv-02-09": {
+    "scan_root_dir": "/mnt/10.205.101.200/nas1/dv-02-09/LoNg_S/MTBF-log",
+    "submit_jira": false
+  },
+  "dv-03-00": {
+    "scan_root_dir": "/mnt/10.205.101.200/nas1/dv-03-00/LoNg_R/MTBF-log",
+    "submit_jira": false
+  },
+  "dv-03-01": {
+    "scan_root_dir": "/mnt/10.205.101.200/nas1/dv-03-01/LoNg_R/MTBF-log",
+    "submit_jira": false
+  },
+  "dv-03-02": {
+    "scan_root_dir": "/mnt/10.205.101.200/nas1/dv-03-02/LoNg_R/MTBF-log",
+    "submit_jira": false
+  },
+  "dv-03-03": {
+    "scan_root_dir": "/mnt/10.205.101.200/nas1/dv-03-03/LoNg_R/MTBF-log",
+    "submit_jira": false
+  },
+  "dv-03-04": {
+    "scan_root_dir": "/mnt/10.205.101.200/nas1/dv-03-04/LoNg_R/MTBF-log",
+    "submit_jira": false
+  },
+  "dv-03-05": {
+    "scan_root_dir": "/mnt/10.205.101.200/nas1/dv-03-05/LoNg_R/MTBF-log",
+    "submit_jira": false
+  },
+  "dv-03-06": {
+    "scan_root_dir": "/mnt/10.205.101.200/nas1/dv-03-06/LoNg_R/MTBF-log",
+    "submit_jira": false
+  },
+  "dv-03-07": {
+    "scan_root_dir": "/mnt/10.205.101.200/nas1/dv-03-07/LoNg_R/MTBF-log",
+    "submit_jira": false
+  },
+  "dv-03-08": {
+    "scan_root_dir": "/mnt/10.205.101.200/nas1/dv-03-08/LoNg_R/MTBF-log",
+    "submit_jira": false
+  },
+  "dv-03-09": {
+    "scan_root_dir": "/mnt/10.205.101.200/nas1/dv-03-09/LoNg_R/MTBF-log",
+    "submit_jira": false
+  },
+  "dv-04-00": {
+    "scan_root_dir": "/mnt/10.205.101.200/nas1/dv-04-00/LoNg_R/MTBF-log",
+    "submit_jira": false
+  },
+  "dv-04-01": {
+    "scan_root_dir": "/mnt/10.205.101.200/nas1/dv-04-01/LoNg_R/MTBF-log",
+    "submit_jira": false
+  },
+  "dv-04-02": {
+    "scan_root_dir": "/mnt/10.205.101.200/nas1/dv-04-02/LoNg_R/MTBF-log",
+    "submit_jira": false
+  },
+  "dv-04-03": {
+    "scan_root_dir": "/mnt/10.205.101.200/nas1/dv-04-03/LoNg_R/MTBF-log",
+    "submit_jira": false
+  },
+  "dv-04-04": {
+    "scan_root_dir": "/mnt/10.205.101.200/nas1/dv-04-04/LoNg_R/MTBF-log",
+    "submit_jira": false
+  },
+  "dv-04-05": {
+    "scan_root_dir": "/mnt/10.205.101.200/nas1/dv-04-05/LoNg_R/MTBF-log",
+    "submit_jira": false
+  },
+  "dv-04-06": {
+    "scan_root_dir": "/mnt/10.205.101.200/nas1/dv-04-06/LoNg_R/MTBF-log",
+    "submit_jira": false
+  },
+  "dv-04-07": {
+    "scan_root_dir": "/mnt/10.205.101.200/nas1/dv-04-07/LoNg_R/MTBF-log",
+    "submit_jira": false
+  },
+  "dv-04-08": {
+    "scan_root_dir": "/mnt/10.205.101.200/nas1/dv-04-08/LoNg_R/MTBF-log",
+    "submit_jira": false
+  },
+  "dv-04-09": {
+    "scan_root_dir": "/mnt/10.205.101.200/nas1/dv-04-09/LoNg_R/MTBF-log",
+    "submit_jira": false
+  },
+  "dv-05-00": {
+    "scan_root_dir": "/mnt/10.205.101.200/nas1/dv-05-00/LoNg_R/MTBF-log",
+    "submit_jira": false
+  },
+  "dv-05-01": {
+    "scan_root_dir": "/mnt/10.205.101.200/nas1/dv-05-01/LoNg_R/MTBF-log",
+    "submit_jira": false
+  },
+  "dv-05-02": {
+    "scan_root_dir": "/mnt/10.205.101.200/nas1/dv-05-02/LoNg_R/MTBF-log",
+    "submit_jira": false
+  },
+  "dv-05-03": {
+    "scan_root_dir": "/mnt/10.205.101.200/nas1/dv-05-03/LoNg_R/MTBF-log",
+    "submit_jira": false
+  },
+  "dv-05-04": {
+    "scan_root_dir": "/mnt/10.205.101.200/nas1/dv-05-04/LoNg_R/MTBF-log",
+    "submit_jira": false
+  },
+  "dv-05-05": {
+    "scan_root_dir": "/mnt/10.205.101.200/nas1/dv-05-05/LoNg_R/MTBF-log",
+    "submit_jira": false
+  },
+  "dv-05-06": {
+    "scan_root_dir": "/mnt/10.205.101.200/nas1/dv-05-06/LoNg_R/MTBF-log",
+    "submit_jira": false
+  },
+  "dv-05-07": {
+    "scan_root_dir": "/mnt/10.205.101.200/nas1/dv-05-07/LoNg_R/MTBF-log",
+    "submit_jira": false
+  },
+  "dv-05-08": {
+    "scan_root_dir": "/mnt/10.205.101.200/nas1/dv-05-08/LoNg_R/MTBF-log",
+    "submit_jira": false
+  },
+  "dv-05-09": {
+    "scan_root_dir": "/mnt/10.205.101.200/nas1/dv-05-09/LoNg_R/MTBF-log",
+    "submit_jira": false
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "default": {
+    "scan_root_dir": "/mnt/fans_log/daemoncrash",
+    "ratio_std_tne": 90,
+    "submit_jira": true,
+    "submit_jira_url": "http://jenkins.transsion.com:8080/jenkins/view/About_Jira/job/AutoAeeLog/buildWithParameters",
+    "reporter": "auto.sdd",
+    "archive_address": "\\\\10.150.152.36\\",
+    "replace_index": 2,
+    "result_dir": "/mnt/fans_log/Result/daemoncrash",
+    "limited_prj_build": {
+      "KF6i": [],
+      "KF6j": []
+    },
+    "submit_freeze_tne_in_monkey": true,
+    "limited_max_days": 365 ,
+    "limited_prj_date": {
+      "KF6i": "210528",
+      "KF6j": "210528",
+      "CG6": "210616",
+      "CE9": "210829",
+      "CE7j": "210830",
+      "X695": "210705",
+      "X689C": "210623",
+      "AC8": "210630"
+    },
+    "ignore_tne_type_list": ["0xffffff0e", "0xffffff10", "0x007a002a", "0x007a0039"],
+    "send_warning_mail": true,
+    "mail_receivers_to_default": "yunqing.gui@transsion.com, zhao.li5@transsion.com, lihua.sheng@transsion.com",
+    "stop_prj_list": ["CK7n"]
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "default": {
+    "scan_root_dir": "/mnt/fans_log/stucklogo",
+    "ratio_std_tne": 90,
+    "submit_jira": true,
+    "submit_jira_url": "http://jenkins.transsion.com:8080/jenkins/job/AutoAeeLog/buildWithParameters",
+    "reporter": "auto.sdd",
+    "archive_address": "\\\\10.150.152.36\\",
+    "replace_index": 2,
+    "result_dir": "/mnt/fans_log/Result/stucklogo",
+    "send_warning_mail": true,
+    "mail_receivers_to_default": "yunqing.gui@transsion.com, zhao.li5@transsion.com, lihua.sheng@transsion.com"
+  }
+}

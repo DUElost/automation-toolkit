@@ -1,0 +1,18 @@
+{
+  "default": {
+    "scan_site": "重庆工厂-241",
+    "ratio_std_aee": 90,
+    "scan_type": "shanghai",
+    "pkglist_file": "pkglist.txt",
+    "mp_block_file": "mp_block.txt",
+    "jira_project_file": "jira_project.txt",
+    "submit_jira": false,
+    "submit_jira_url": "http://jenkins.transsion.com:8080/jenkins/job/AutoAeeLog/buildWithParameters",
+    "reporter": "None",
+    "archive_address": "\\\\10.205.101.200\\",
+    "replace_index": "平台扫描 /mnt/10.205.101.200/nas1，替换从nas1开始",
+    "replace_index": 3,
+    "result_dir": "/mnt/10.205.101.200/nas2/PlatformResult/MTBF",
+    "mail_receivers": "yunqing.gui@transsion.com, aoxiang.liu@transsion.com, zhao.li5@transsion.com"
+  }
+}

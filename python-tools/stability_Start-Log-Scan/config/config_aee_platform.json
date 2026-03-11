@@ -1,0 +1,31 @@
+{
+  "default": {
+    "ratio_std_aee": 90,
+    "pkglist_file": "pkglist.txt",
+    "mp_block_file": "mp_block.txt",
+    "jira_project_file": "jira_project.txt",
+    "submit_jira": false,
+    "submit_jira_url": "http://jenkins.transsion.com:8080/jenkins/job/AutoAeeLog/buildWithParameters",
+    "reporter": "haohao.huang",
+    "archive_address": "\\\\10.150.152.36\\",
+    "replace_index": "平台扫描 /mnt/10.150.152.36/nas1，替换从nas1开始",
+    "replace_index": 3,
+    "result_dir": "/mnt/fans_log/Result/fans",
+    "mail_receivers": "yunqing.gui@transsion.com, haohao.huang@transsion.com, zhao.li5@transsion.com",
+    "submit_monkey_db": true
+  },
+  "project_test": {
+  },
+  "baseline": {
+    "reporter": "yunqing.gui",
+    "mail_receivers": "yunqing.gui@transsion.com",
+    "place": "trunk",
+    "submit_jira": true
+  },
+  "TECNO-LE8": {
+    "submit_jira": true
+  },
+  "TECNO-CG6": {
+    "submit_jira": true
+  }
+}

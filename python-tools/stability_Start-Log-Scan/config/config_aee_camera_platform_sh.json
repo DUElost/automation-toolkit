@@ -1,0 +1,56 @@
+{
+  "default": {
+    "scan_site": "上海-200",
+    "ratio_std_aee": 90,
+    "scan_type": "shanghai",
+    "place": "SH",
+    "pkglist_file": "pkglist.txt",
+    "mp_block_file": "mp_block.txt",
+    "jira_project_file": "jira_project.txt",
+    "submit_jira": true,
+    "submit_jira_url": "http://jenkins.transsion.com:8080/jenkins/job/AutoAeeLog/buildWithParameters",
+    "reporter": "huijing.chen",
+    "archive_address": "\\\\10.150.152.36\\",
+    "replace_index": "平台扫描 /mnt/10.150.152.36/nas1，替换从nas1开始",
+    "replace_index": 3,
+    "result_dir": "/mnt/fans_log/Result/fans",
+    "submit_monkey_db": false,
+    "send_notify_mail_to_tester": true,
+    "send_notify_mail_to_default": false,
+    "send_notify_mail_to_project": false,
+    "send_warning_mail": true,
+    "mail_receivers_to_tester": "huijing.chen@transsion.com, yunqing.gui@transsion.com",
+    "mail_receivers_to_default": "huijing.chen@transsion.com, yunqing.gui@transsion.com",
+    "mail_receivers_to_new_app": "yunqing.gui@transsion.com, zhao.li5@transsion.com, guxiang.li@transsion.com, shenglong.wu@transsion.com, nana.cui@transsion.com, yinyin.liu@transsion.com"
+  },
+  "Tecno-AD11": {
+    "jira_repo": "AD11-H932"
+  },
+  "TECNO-CK7N": {
+    "jira_repo": "CK7n-H894"
+  },
+  "Tecno-CK9n-u": {
+    "jira_repo": "CK9n-H933-U"
+  },
+  "Tecno-KJ5": {
+    "jira_repo": "KJ5-KJ5n-H6931-T"
+  },
+  "Tecno-KJ5n": {
+    "jira_repo": "KJ5-KJ5n-H6931-T"
+  },
+  "Tecno-KJ7": {
+    "jira_repo": "KJ7-H895"
+  },
+  "Infinix-X6731": {
+    "jira_repo": "X6731-H935"
+  },
+  "Infinix-X6731B": {
+    "jira_repo": "X6731B-H896"
+  },
+  "Infinix-X6836": {
+    "jira_repo": "X6836-H6932"
+  },
+  "Infinix-X6837": {
+    "jira_repo": "X6837-H897"
+  }
+}
