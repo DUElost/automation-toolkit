@@ -28,6 +28,7 @@ init()
 # 全局退出标志
 exit_flag = False
 
+
 def signal_handler(signum, frame):
     """处理Ctrl+C和Ctrl+Z信号"""
     global exit_flag
@@ -35,21 +36,25 @@ def signal_handler(signum, frame):
     print(f"\n{Fore.YELLOW}[{get_timestamp()}] 收到退出信号，正在安全退出...{Style.RESET_ALL}")
     sys.exit(0)
 
+
 # 注册信号处理
-signal.signal(signal.SIGINT, signal_handler)   # Ctrl+C
+signal.signal(signal.SIGINT, signal_handler)  # Ctrl+C
 signal.signal(signal.SIGTERM, signal_handler)  # 终止信号
 try:
     signal.signal(signal.SIGBREAK, signal_handler)  # Windows Ctrl+Break
 except AttributeError:
     pass  # SIGBREAK 仅在 Windows 上可用
 
+
 def get_timestamp():
     """获取当前时间戳"""
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
+
 def log_print(device, message, color=Fore.WHITE):
     """带时间戳的日志打印"""
     print(f"{color}[{get_timestamp()}] [{device}] {message}{Style.RESET_ALL}")
+
 
 # 加载配置文件
 def get_base_path():
@@ -61,10 +66,12 @@ def get_base_path():
         # 开发环境运行
         return os.path.dirname(os.path.abspath(__file__))
 
+
 def load_config():
     config_path = os.path.join(get_base_path(), 'config.json')
     with open(config_path, 'r', encoding='utf-8') as f:
         return json.load(f)
+
 
 CONFIG = load_config()
 
@@ -82,14 +89,18 @@ SETUP_WIZARD_KEYWORDS = [
 DEVICE_CHECK_SCRIPT_PATH = "/data/local/tmp/mtk_device_check.sh"
 DEVICE_CHECK_LOG_DIR = "/data/local/tmp/device_check"
 
+
 def get_ro_product_model():
     result = subprocess.run(["adb", "shell", "getprop", "ro.product.model"], capture_output=True, text=True)
     return result.stdout.strip()
 
+
 def get_device_brand(device):
     """获取设备品牌 ro.product.brand"""
-    result = subprocess.run(["adb", "-s", device, "shell", "getprop", "ro.product.brand"], capture_output=True, text=True)
+    result = subprocess.run(["adb", "-s", device, "shell", "getprop", "ro.product.brand"], capture_output=True,
+                            text=True)
     return result.stdout.strip()
+
 
 def get_u2_device(device):
     """获取uiautomator2设备对象（失败返回None）"""
@@ -112,6 +123,7 @@ def get_u2_device(device):
         log_print(device, f"uiautomator2连接失败，已降级为ADB方式: {e}", Fore.YELLOW)
         return None
 
+
 def u2_click_selector(selector, timeout):
     """使用uiautomator2 selector等待并点击"""
     click_exists = getattr(selector, 'click_exists', None)
@@ -121,6 +133,7 @@ def u2_click_selector(selector, timeout):
         selector.click()
         return True
     return False
+
 
 def u2_click_xpath(d, xpath, timeout):
     """使用uiautomator2 xpath等待并点击"""
@@ -132,6 +145,7 @@ def u2_click_xpath(d, xpath, timeout):
         xp.click()
         return True
     return False
+
 
 def create_device_check_script():
     """创建器件检测脚本内容"""
@@ -403,25 +417,26 @@ else
 fi
 '''
 
+
 def push_device_check_script(device):
     """推送器件检测脚本到设备"""
     log_print(device, "推送器件检测脚本...", Fore.CYAN)
     script_content = create_device_check_script()
     local_script = f"mtk_device_check_{device}.sh"
-    
+
     try:
         with open(local_script, 'w', encoding='utf-8', newline='\n') as f:
             f.write(script_content)
-        
+
         result = subprocess.run(['adb', '-s', device, 'push', local_script, DEVICE_CHECK_SCRIPT_PATH],
-                               capture_output=True, text=True, timeout=30)
+                                capture_output=True, text=True, timeout=30)
         if result.returncode != 0:
             log_print(device, f"推送脚本失败: {result.stderr}", Fore.RED)
             return False
-        
+
         subprocess.run(['adb', '-s', device, 'shell', 'chmod', '755', DEVICE_CHECK_SCRIPT_PATH],
-                      capture_output=True, timeout=10)
-        
+                       capture_output=True, timeout=10)
+
         os.remove(local_script)
         log_print(device, "器件检测脚本推送成功", Fore.GREEN)
         return True
@@ -431,35 +446,37 @@ def push_device_check_script(device):
             os.remove(local_script)
         return False
 
+
 def run_device_check(device, iteration):
     """运行器件检测并返回结果"""
     log_print(device, f"执行器件检测 (第 {iteration} 次)...", Fore.CYAN)
-    
+
     try:
         result = subprocess.run(['adb', '-s', device, 'shell', DEVICE_CHECK_SCRIPT_PATH],
-                               capture_output=True, text=True, timeout=120)
+                                capture_output=True, text=True, timeout=120)
         output = result.stdout
-        
+
         # 分析结果
         pass_count = output.count('[PASS]')
         fail_count = output.count('[FAIL]')
         warn_count = output.count('[WARN]')
-        
+
         # 提取失败项
         failed_items = []
         for line in output.split('\n'):
             if '[FAIL]' in line:
                 failed_items.append(line.replace('[FAIL]', '').strip())
-        
-        log_print(device, f"检测结果: PASS={pass_count}, FAIL={fail_count}, WARN={warn_count}", 
-                 Fore.GREEN if fail_count == 0 else Fore.RED)
-        
+
+        log_print(device, f"检测结果: PASS={pass_count}, FAIL={fail_count}, WARN={warn_count}",
+                  Fore.GREEN if fail_count == 0 else Fore.RED)
+
         if failed_items:
             for item in failed_items:
                 log_print(device, f"  失败项: {item}", Fore.RED)
-        
-        return fail_count == 0, {'pass': pass_count, 'fail': fail_count, 'warn': warn_count, 'failed_items': failed_items}
-    
+
+        return fail_count == 0, {'pass': pass_count, 'fail': fail_count, 'warn': warn_count,
+                                 'failed_items': failed_items}
+
     except subprocess.TimeoutExpired:
         log_print(device, "器件检测超时", Fore.RED)
         return False, {'pass': 0, 'fail': 1, 'warn': 0, 'failed_items': ['检测超时']}
@@ -467,18 +484,20 @@ def run_device_check(device, iteration):
         log_print(device, f"器件检测异常: {e}", Fore.RED)
         return False, {'pass': 0, 'fail': 1, 'warn': 0, 'failed_items': [str(e)]}
 
+
 def clear_device_check_baseline(device):
     """清除设备上的基准文件（用于首次运行）"""
     subprocess.run(['adb', '-s', device, 'shell', 'rm', '-rf', DEVICE_CHECK_LOG_DIR],
-                  capture_output=True, timeout=10)
+                   capture_output=True, timeout=10)
+
 
 def quick_click_by_text(device, text, timeout=5):
     """快速点击指定text的元素"""
     start_time = time.time()
     while time.time() - start_time < timeout:
         try:
-            subprocess.run(['adb', '-s', device, 'shell', 'uiautomator', 'dump'], 
-                          capture_output=True, text=True, timeout=3)
+            subprocess.run(['adb', '-s', device, 'shell', 'uiautomator', 'dump'],
+                           capture_output=True, text=True, timeout=3)
             result = subprocess.run(['adb', '-s', device, 'shell', 'cat', '/sdcard/window_dump.xml'],
                                     capture_output=True, text=True, encoding='utf-8', timeout=3)
             if result.returncode == 0:
@@ -499,6 +518,7 @@ def quick_click_by_text(device, text, timeout=5):
         time.sleep(0.5)
     return False
 
+
 def quick_click_element(device, element_type, element_value, timeout=5):
     """根据类型快速点击元素（支持resource-id、text和text_ignore_case）"""
     if element_type == "resource-id":
@@ -509,6 +529,7 @@ def quick_click_element(device, element_type, element_value, timeout=5):
         return quick_click_by_text_ignore_case(device, element_value, timeout)
     return False
 
+
 def check_element_exists_by_type(device, element_type, element_value, timeout=3):
     """根据类型检查元素是否存在（支持resource-id、text和text_ignore_case）"""
     start_time = time.time()
@@ -516,7 +537,7 @@ def check_element_exists_by_type(device, element_type, element_value, timeout=3)
     while time.time() - start_time < timeout:
         try:
             subprocess.run(['adb', '-s', device, 'shell', 'uiautomator', 'dump'],
-                          capture_output=True, text=True, timeout=3)
+                           capture_output=True, text=True, timeout=3)
             result = subprocess.run(['adb', '-s', device, 'shell', 'cat', '/sdcard/window_dump.xml'],
                                     capture_output=True, text=True, encoding='utf-8', timeout=3)
             if result.returncode == 0:
@@ -536,6 +557,7 @@ def check_element_exists_by_type(device, element_type, element_value, timeout=3)
         time.sleep(0.5)
     return False
 
+
 def wait_and_click_element_by_type(device, element_type, element_value, timeout=5):
     """等待控件出现后立即点击（支持resource-id、text和text_ignore_case）"""
     result = wait_and_click_element_by_type_u2(device, element_type, element_value, timeout)
@@ -544,6 +566,7 @@ def wait_and_click_element_by_type(device, element_type, element_value, timeout=
     if result is None:
         return wait_and_click_element_by_type_adb(device, element_type, element_value, timeout)
     return wait_and_click_element_by_type_adb(device, element_type, element_value, min(2, timeout))
+
 
 def wait_and_click_element_by_type_u2(device, element_type, element_value, timeout=5):
     """使用uiautomator2等待并点击"""
@@ -579,6 +602,7 @@ def wait_and_click_element_by_type_u2(device, element_type, element_value, timeo
         return None
     return False
 
+
 def wait_and_click_element_by_type_adb(device, element_type, element_value, timeout=5):
     """使用ADB+uiautomator dump等待并点击"""
     start_time = time.time()
@@ -586,7 +610,7 @@ def wait_and_click_element_by_type_adb(device, element_type, element_value, time
     while time.time() - start_time < timeout:
         try:
             subprocess.run(['adb', '-s', device, 'shell', 'uiautomator', 'dump'],
-                          capture_output=True, text=True, timeout=3)
+                           capture_output=True, text=True, timeout=3)
             result = subprocess.run(['adb', '-s', device, 'shell', 'cat', '/sdcard/window_dump.xml'],
                                     capture_output=True, text=True, encoding='utf-8', timeout=3)
             if result.returncode == 0:
@@ -618,14 +642,15 @@ def wait_and_click_element_by_type_adb(device, element_type, element_value, time
         time.sleep(0.5)
     return False
 
+
 def quick_click_by_text_ignore_case(device, text, timeout=5):
     """快速点击指定text的元素（不区分大小写）"""
     start_time = time.time()
     text_lower = text.lower()
     while time.time() - start_time < timeout:
         try:
-            subprocess.run(['adb', '-s', device, 'shell', 'uiautomator', 'dump'], 
-                          capture_output=True, text=True, timeout=3)
+            subprocess.run(['adb', '-s', device, 'shell', 'uiautomator', 'dump'],
+                           capture_output=True, text=True, timeout=3)
             result = subprocess.run(['adb', '-s', device, 'shell', 'cat', '/sdcard/window_dump.xml'],
                                     capture_output=True, text=True, encoding='utf-8', timeout=3)
             if result.returncode == 0:
@@ -647,18 +672,20 @@ def quick_click_by_text_ignore_case(device, text, timeout=5):
         time.sleep(0.5)
     return False
 
+
 def get_factory_reset_steps(device):
     """根据设备品牌获取恢复出厂设置按钮点击步骤"""
     brand = get_device_brand(device)
     factory_reset_buttons = CONFIG.get('factory_reset_buttons', {})
-    
+
     if brand in factory_reset_buttons:
         return factory_reset_buttons[brand]['steps']
-    
+
     return factory_reset_buttons.get('default', {}).get('steps', [
         {"type": "text_ignore_case", "value": "Erase all data"},
         {"type": "text_ignore_case", "value": "Erase all data"}
     ])
+
 
 def get_adb_device_state(device):
     """从adb devices中获取设备状态，未找到返回None"""
@@ -677,6 +704,7 @@ def get_adb_device_state(device):
             return parts[1] if len(parts) > 1 else ""
     return None
 
+
 def check_device_disconnected(device, timeout=5):
     """检查设备是否在指定时间内断开连接"""
     start_time = time.time()
@@ -691,6 +719,7 @@ def check_device_disconnected(device, timeout=5):
             return True
         time.sleep(1)
     return False
+
 
 def save_device_screenshot(device, suffix="debug"):
     """保存设备截图到log目录（便于调试）"""
@@ -714,6 +743,7 @@ def save_device_screenshot(device, suffix="debug"):
     except Exception as e:
         log_print(device, f"截图保存失败: {e}", Fore.YELLOW)
         return False
+
 
 def factory_reset_via_ui(device):
     """通过UI方式执行恢复出厂设置"""
@@ -743,7 +773,7 @@ def factory_reset_via_ui(device):
     # 获取该品牌对应的恢复出厂设置按钮点击步骤
     reset_steps = get_factory_reset_steps(device)
     log_print(device, f"恢复出厂设置步骤: {len(reset_steps)} 步", Fore.CYAN)
-    
+
     # 执行点击步骤（超时从10s增加到30s，应对高负载设备）
     for step_idx, step in enumerate(reset_steps, start=1):
         time.sleep(1)
@@ -753,28 +783,31 @@ def factory_reset_via_ui(device):
             # 保存截图以便排查问题
             save_device_screenshot(device, f"factory_reset_step{step_idx}_fail")
             return False
-    
+
     return True
+
 
 def get_reboot_steps(device):
     """根据设备品牌获取重启按钮点击步骤"""
     brand = get_device_brand(device)
     log_print(device, f"设备品牌: {brand}", Fore.CYAN)
-    
+
     reboot_buttons = CONFIG.get('reboot_buttons', {})
-    
+
     # 查找匹配的品牌配置
     if brand in reboot_buttons:
         return reboot_buttons[brand]['steps']
-    
+
     # 使用默认配置
     return reboot_buttons.get('default', {}).get('steps', [
         {"type": "resource-id", "value": "com.android.systemui:id/reset"},
         {"type": "resource-id", "value": "com.android.systemui:id/reset"}
     ])
 
+
 def tap_screen(device, x, y):
     subprocess.run(['adb', '-s', device, 'shell', 'input', 'tap', str(x), str(y)])
+
 
 def find_text_scroll_coordinates(text, device, max_scroll=10):
     scroll_count = 0
@@ -815,6 +848,7 @@ def find_text_scroll_coordinates(text, device, max_scroll=10):
     print('Reached maximum scroll attempts. Text not found.')
     return None
 
+
 def extract_coordinates(bounds):
     match = re.match(r'\[(\d+),(\d+)\]\[(\d+),(\d+)\]', bounds)
     if match:
@@ -824,8 +858,10 @@ def extract_coordinates(bounds):
         return (mid_x, mid_y)
     return None
 
+
 def tap_coordinate(device, x, y):
     subprocess.run(['adb', '-s', device, 'shell', f'input tap {x} {y}'])
+
 
 def scroll(device):
     screen_info = subprocess.run(['adb', '-s', device, 'shell', 'wm', 'size'], capture_output=True, text=True)
@@ -837,7 +873,9 @@ def scroll(device):
         end_y = 800
     else:
         start_x, start_y, end_y = 500, 1020, 200
-    subprocess.run(['adb', '-s', device, 'shell', 'input', 'swipe', str(start_x), str(start_y), str(start_x), str(end_y), '300'])
+    subprocess.run(
+        ['adb', '-s', device, 'shell', 'input', 'swipe', str(start_x), str(start_y), str(start_x), str(end_y), '300'])
+
 
 def find_text_coordinate(text, device):
     time.sleep(3)
@@ -886,6 +924,7 @@ def find_Contain_desc_coordinate(desc, device):
         print('Error occurred while reading file.')
         return None
 
+
 def find_Contain_text_coordinate(text, device):
     time.sleep(3)
     subprocess.run(['adb', '-s', device, 'shell', 'uiautomator', 'dump'], capture_output=True, text=True)
@@ -908,6 +947,7 @@ def find_Contain_text_coordinate(text, device):
     else:
         print('Error occurred while reading file.')
         return None
+
 
 def find_res_coordinate(resource, device):
     time.sleep(3)
@@ -932,6 +972,7 @@ def find_res_coordinate(resource, device):
         print('Error occurred while reading file.')
         return None
 
+
 def get_power_event_node(device):
     """扫描设备输出，自动定位电源键对应的 event 节点"""
     try:
@@ -945,6 +986,7 @@ def get_power_event_node(device):
     except Exception as e:
         print(f"检测电源键节点失败: {e}")
     return None
+
 
 def long_press_power_sendevent(device, duration=3):
     """通过sendevent长按电源键"""
@@ -964,6 +1006,7 @@ def long_press_power_sendevent(device, duration=3):
     subprocess.run(full_cmd, shell=True)
     return True
 
+
 def check_element_exists(device, resource_id):
     """检查指定resource-id的元素是否存在"""
     subprocess.run(['adb', '-s', device, 'shell', 'uiautomator', 'dump'], capture_output=True, text=True)
@@ -973,6 +1016,7 @@ def check_element_exists(device, resource_id):
     if result.returncode == 0:
         return resource_id in result.stdout
     return False
+
 
 def wait_for_device_disconnect(device, timeout=60):
     """等待设备断开ADB连接"""
@@ -987,6 +1031,7 @@ def wait_for_device_disconnect(device, timeout=60):
     print(f"设备 {device} 等待断开超时")
     return False
 
+
 def wait_for_device(device, timeout=300):
     """等待设备ADB连接就绪"""
     print(f"设备 {device} 等待ADB连接...")
@@ -999,6 +1044,7 @@ def wait_for_device(device, timeout=300):
         time.sleep(2)
     print(f"设备 {device} 等待连接超时")
     return False
+
 
 def wait_for_boot_complete(device, timeout=300):
     """等待设备完全启动（sys.boot_completed=1）"""
@@ -1019,6 +1065,7 @@ def wait_for_boot_complete(device, timeout=300):
     print(f"设备 {device} 等待启动超时")
     return False
 
+
 def check_adb_transport_health(device):
     """检查ADB transport是否健康（通过简单的shell命令测试）"""
     try:
@@ -1029,6 +1076,7 @@ def check_adb_transport_health(device):
         return result.returncode == 0
     except (subprocess.TimeoutExpired, subprocess.CalledProcessError):
         return False
+
 
 def recover_adb_transport(device):
     """尝试恢复ADB transport连接"""
@@ -1058,6 +1106,7 @@ def recover_adb_transport(device):
 
     log_print(device, "ADB transport恢复失败", Fore.RED)
     return False
+
 
 def wait_for_system_ready(device, timeout=120, allow_timeout=True):
     """等待系统服务完全就绪"""
@@ -1103,6 +1152,7 @@ def wait_for_system_ready(device, timeout=120, allow_timeout=True):
     log_print(device, "等待系统服务就绪超时，终止当前流程", Fore.RED)
     return False
 
+
 def wait_device_ready(device, timeout=300, wait_disconnect=False):
     """等待设备完全就绪（ADB连接 + 系统启动完成）"""
     if wait_disconnect:
@@ -1111,6 +1161,7 @@ def wait_device_ready(device, timeout=300, wait_disconnect=False):
     wait_for_device(device, timeout)
     wait_for_boot_complete(device, timeout)
     time.sleep(5)  # 额外等待UI完全加载
+
 
 def get_setting_value(device, namespace, key, timeout=5):
     """获取系统设置值（失败返回None）"""
@@ -1126,11 +1177,13 @@ def get_setting_value(device, namespace, key, timeout=5):
     except Exception:
         return None
 
+
 def is_oobe_completed(device):
     """判断开机向导是否完成"""
     user_setup = get_setting_value(device, "secure", "user_setup_complete")
     device_prov = get_setting_value(device, "global", "device_provisioned")
     return user_setup == "1" and device_prov == "1"
+
 
 def get_foreground_activity_line(device):
     """获取前台Activity信息"""
@@ -1155,6 +1208,7 @@ def get_foreground_activity_line(device):
         pass
     return ""
 
+
 def extract_package_from_activity_line(line):
     """从Activity信息中提取包名"""
     if not line:
@@ -1164,6 +1218,7 @@ def extract_package_from_activity_line(line):
         return match.group(1)
     return None
 
+
 def is_setupwizard_line(line):
     """判断是否处于开机向导界面"""
     if not line:
@@ -1171,9 +1226,11 @@ def is_setupwizard_line(line):
     lower_line = line.lower()
     return any(keyword in lower_line for keyword in SETUP_WIZARD_KEYWORDS)
 
+
 def is_setupwizard_active(device):
     """判断当前前台是否为开机向导"""
     return is_setupwizard_line(get_foreground_activity_line(device))
+
 
 def get_home_package(device):
     """获取桌面启动器包名"""
@@ -1205,6 +1262,7 @@ def get_home_package(device):
     except Exception:
         return None
     return None
+
 
 def wait_for_home_screen(device, timeout=120):
     """等待进入系统主界面"""
@@ -1238,10 +1296,11 @@ def wait_for_home_screen(device, timeout=120):
         else:
             check_and_turn_on_screen(device)
         subprocess.run(CONFIG['adb_commands']['keyevent_home'].format(device=device),
-                      shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                       shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         time.sleep(2)
     log_print(device, f"等待系统主界面超时，当前焦点: {last_focus}，HOME包: {home_pkg or '未知'}", Fore.YELLOW)
     return False
+
 
 def ensure_home_ready(device, timeout=120):
     """确保已完成OOBE并进入桌面"""
@@ -1250,6 +1309,7 @@ def ensure_home_ready(device, timeout=120):
         if not skip_oobe_via_adb(device):
             return False
     return wait_for_home_screen(device, timeout)
+
 
 def ensure_device_ready_for_test(device, reason, require_home=True, timeout=None):
     """确保设备满足专项测试的前置条件"""
@@ -1270,6 +1330,7 @@ def ensure_device_ready_for_test(device, reason, require_home=True, timeout=None
         return False
     return True
 
+
 def is_screen_on_from_power_dump(power_output):
     """基于dumpsys power判断屏幕是否点亮（尽量兼容不同Android版本）"""
     if not power_output:
@@ -1282,6 +1343,7 @@ def is_screen_on_from_power_dump(power_output):
     if re.search(r"display power:.*state=on", lower):
         return True
     return False
+
 
 def check_and_turn_on_screen(device):
     try:
@@ -1321,11 +1383,14 @@ def check_and_turn_on_screen(device):
     subprocess.run(['adb', '-s', device, 'shell', 'input', 'keyevent', '82'],
                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
+
 def set_screen_timeout(device, timeout_minutes):
     timeout_ms = timeout_minutes
     subprocess.run(['adb', '-s', device, 'shell', 'settings', 'put', 'system', 'screen_off_timeout', str(timeout_ms)])
-    subprocess.run(['adb', '-s', device, 'shell', 'cmd', 'overlay', 'enable', 'com.android.internal.systemui.navbar.gestural'])
+    subprocess.run(
+        ['adb', '-s', device, 'shell', 'cmd', 'overlay', 'enable', 'com.android.internal.systemui.navbar.gestural'])
     print(f"设备 {device} 屏幕超时时间已设置为{Fore.RED}{timeout_minutes}{Style.RESET_ALL}分钟")
+
 
 def test_log(device):
     commands = CONFIG['log_commands']
@@ -1335,20 +1400,27 @@ def test_log(device):
     subprocess.run(f"adb -s {device} shell input keyevent 3", shell=True)
     time.sleep(CONFIG['timings']['medium_wait'])
 
+
 def skip_oobe_via_adb(device):
     """通过ADB命令跳过开机向导"""
     # 等待系统服务完全就绪
     if not wait_for_system_ready(device, allow_timeout=False):
         log_print(device, "系统服务未就绪，无法跳过开机向导", Fore.RED)
         return False
-    
+
     oobe_cmds = CONFIG['adb_commands']['skip_oobe']
-    subprocess.run(CONFIG['adb_commands']['root'].format(device=device), shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    subprocess.run(oobe_cmds['user_setup_complete'].format(device=device), shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    subprocess.run(oobe_cmds['device_provisioned'].format(device=device), shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    subprocess.run(oobe_cmds['system_locales'].format(device=device), shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    subprocess.run(CONFIG['adb_commands']['keyevent_back'].format(device=device), shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    subprocess.run(oobe_cmds['go_home'].format(device=device), shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.run(CONFIG['adb_commands']['root'].format(device=device), shell=True, stdout=subprocess.DEVNULL,
+                   stderr=subprocess.DEVNULL)
+    subprocess.run(oobe_cmds['user_setup_complete'].format(device=device), shell=True, stdout=subprocess.DEVNULL,
+                   stderr=subprocess.DEVNULL)
+    subprocess.run(oobe_cmds['device_provisioned'].format(device=device), shell=True, stdout=subprocess.DEVNULL,
+                   stderr=subprocess.DEVNULL)
+    subprocess.run(oobe_cmds['system_locales'].format(device=device), shell=True, stdout=subprocess.DEVNULL,
+                   stderr=subprocess.DEVNULL)
+    subprocess.run(CONFIG['adb_commands']['keyevent_back'].format(device=device), shell=True, stdout=subprocess.DEVNULL,
+                   stderr=subprocess.DEVNULL)
+    subprocess.run(oobe_cmds['go_home'].format(device=device), shell=True, stdout=subprocess.DEVNULL,
+                   stderr=subprocess.DEVNULL)
     log_print(device, "已跳过开机向导")
     return True
 
@@ -1361,39 +1433,43 @@ def pull_log(device):
     subprocess.run(['adb', '-s', device, 'pull', '/sdcard/monkeytest.txt', db_history_path])
     time.sleep(10)
 
+
 def run_monkey_timed(device, duration_seconds):
     """执行指定时长的monkey测试，到时间后kill进程"""
     log_print(device, f"开始执行 {duration_seconds} 秒 monkey测试...", Fore.CYAN)
-    
+
     # 设置屏幕常亮（禁用屏幕超时）
     subprocess.run(f"adb -s {device} shell svc power stayon true", shell=True, stdout=subprocess.DEVNULL)
     check_and_turn_on_screen(device)
-    
+
     # 启动monkey（设置一个很大的事件数，让它持续运行）
     monkey_cmd = f"adb -s {device} shell monkey -v -v -v --ignore-crashes --ignore-timeouts --ignore-security-exceptions --kill-process-after-error --pct-trackball 0 --pct-nav 0 --pct-majornav 0 --pct-anyevent 0 --pct-syskeys 0 -s 805169 --throttle 1000 999999999"
-    
+
     # 使用Popen启动monkey进程（非阻塞）
     process = subprocess.Popen(monkey_cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    
+
     # 等待指定时间
     time.sleep(duration_seconds)
-    
+
     # kill monkey进程
     log_print(device, "Monkey时间到，正在停止...", Fore.YELLOW)
-    subprocess.run(f"adb -s {device} shell pkill -f com.android.commands.monkey", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    subprocess.run(f"adb -s {device} shell am force-stop com.android.commands.monkey", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    
+    subprocess.run(f"adb -s {device} shell pkill -f com.android.commands.monkey", shell=True, stdout=subprocess.DEVNULL,
+                   stderr=subprocess.DEVNULL)
+    subprocess.run(f"adb -s {device} shell am force-stop com.android.commands.monkey", shell=True,
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
     # 恢复屏幕超时设置
     subprocess.run(f"adb -s {device} shell svc power stayon false", shell=True, stdout=subprocess.DEVNULL)
-    
+
     # 终止本地进程
     try:
         process.terminate()
         process.wait(timeout=5)
     except:
         pass
-    
+
     log_print(device, f"Monkey测试完成（运行 {duration_seconds} 秒）", Fore.GREEN)
+
 
 # ==================== 专项测试函数 ====================
 
@@ -1444,6 +1520,7 @@ def recover_device_after_failure(device, recovery_timeout=300):
     log_print(device, "【失败专项前置检查】完成，设备已恢复到可测试状态", Fore.GREEN)
     return True
 
+
 def skip_oobe_via_adb_relaxed(device):
     """
     宽松版本的跳过开机向导（不强制要求系统服务完全就绪）
@@ -1451,17 +1528,24 @@ def skip_oobe_via_adb_relaxed(device):
     """
     oobe_cmds = CONFIG['adb_commands']['skip_oobe']
     try:
-        subprocess.run(CONFIG['adb_commands']['root'].format(device=device), shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        subprocess.run(oobe_cmds['user_setup_complete'].format(device=device), shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        subprocess.run(oobe_cmds['device_provisioned'].format(device=device), shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        subprocess.run(oobe_cmds['system_locales'].format(device=device), shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        subprocess.run(CONFIG['adb_commands']['keyevent_back'].format(device=device), shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        subprocess.run(oobe_cmds['go_home'].format(device=device), shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(CONFIG['adb_commands']['root'].format(device=device), shell=True, stdout=subprocess.DEVNULL,
+                       stderr=subprocess.DEVNULL)
+        subprocess.run(oobe_cmds['user_setup_complete'].format(device=device), shell=True, stdout=subprocess.DEVNULL,
+                       stderr=subprocess.DEVNULL)
+        subprocess.run(oobe_cmds['device_provisioned'].format(device=device), shell=True, stdout=subprocess.DEVNULL,
+                       stderr=subprocess.DEVNULL)
+        subprocess.run(oobe_cmds['system_locales'].format(device=device), shell=True, stdout=subprocess.DEVNULL,
+                       stderr=subprocess.DEVNULL)
+        subprocess.run(CONFIG['adb_commands']['keyevent_back'].format(device=device), shell=True,
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(oobe_cmds['go_home'].format(device=device), shell=True, stdout=subprocess.DEVNULL,
+                       stderr=subprocess.DEVNULL)
         log_print(device, "已跳过开机向导（宽松模式）", Fore.GREEN)
         return True
     except Exception as e:
         log_print(device, f"跳过开机向导异常: {e}", Fore.YELLOW)
         return False
+
 
 def factory_reset_test(device, loop_count):
     """恢复出厂设置专项：模拟用户恢复出厂设置，通过内置ADB命令跳过开机向导"""
@@ -1486,12 +1570,14 @@ def factory_reset_test(device, loop_count):
                 # 设备已恢复，跳过本次循环的恢复出厂操作，直接进入下一轮
                 log_print(device, "设备已恢复，跳过本次循环，继续下一轮测试", Fore.GREEN)
                 continue
-            
+
             # 方法1: 执行标准广播方式恢复出厂设置
-            subprocess.run(CONFIG['adb_commands']['root'].format(device=device), shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            subprocess.run(CONFIG['adb_commands']['factory_reset'].format(device=device), shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.run(CONFIG['adb_commands']['root'].format(device=device), shell=True, stdout=subprocess.DEVNULL,
+                           stderr=subprocess.DEVNULL)
+            subprocess.run(CONFIG['adb_commands']['factory_reset'].format(device=device), shell=True,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             log_print(device, "正在恢复出厂设置（广播方式）......", Fore.BLUE)
-            
+
             # 检查10秒内设备是否断开连接（广播方式可能需要几秒才断开）
             if check_device_disconnected(device, timeout=120):
                 log_print(device, "广播方式生效，设备已断开", Fore.GREEN)
@@ -1506,10 +1592,11 @@ def factory_reset_test(device, loop_count):
                     if not factory_reset_via_ui(device):
                         log_print(device, "UI方式恢复出厂设置失败，跳过本次循环", Fore.RED)
                         continue
-            
+
             # 等待设备断开后重新连接并完全就绪
             wait_device_ready(device, wait_disconnect=True)
-            if not wait_for_system_ready(device, timeout=CONFIG.get('timings', {}).get('device_ready_timeout', 300), allow_timeout=False):
+            if not wait_for_system_ready(device, timeout=CONFIG.get('timings', {}).get('device_ready_timeout', 300),
+                                         allow_timeout=False):
                 log_print(device, "系统服务未就绪，终止恢复出厂设置专项", Fore.RED)
                 return False
             check_and_turn_on_screen(device)
@@ -1527,14 +1614,15 @@ def factory_reset_test(device, loop_count):
             continue
     return True
 
+
 def quick_click_by_resource_id(device, resource_id, timeout=5):
     """快速点击指定resource-id的元素（不等待dump完成后再点击）"""
     start_time = time.time()
     while time.time() - start_time < timeout:
         try:
             # 快速dump
-            subprocess.run(['adb', '-s', device, 'shell', 'uiautomator', 'dump'], 
-                          capture_output=True, text=True, timeout=3)
+            subprocess.run(['adb', '-s', device, 'shell', 'uiautomator', 'dump'],
+                           capture_output=True, text=True, timeout=3)
             result = subprocess.run(['adb', '-s', device, 'shell', 'cat', '/sdcard/window_dump.xml'],
                                     capture_output=True, text=True, encoding='utf-8', timeout=3)
             if result.returncode == 0 and resource_id in result.stdout:
@@ -1555,6 +1643,7 @@ def quick_click_by_resource_id(device, resource_id, timeout=5):
         time.sleep(0.5)
     return False
 
+
 def ui_reboot_test(device, loop_count):
     """UI联机重启专项：通过模拟用户操作长按Power键点击重启按钮"""
     global exit_flag
@@ -1563,7 +1652,7 @@ def ui_reboot_test(device, loop_count):
     if not ensure_device_ready_for_test(device, "UI联机重启专项前置检查"):
         log_print(device, "设备未就绪，终止UI联机重启专项", Fore.RED)
         return False
-    
+
     # 推送器件检测脚本
     if not push_device_check_script(device):
         log_print(device, "器件检测脚本推送失败，将跳过器件检测", Fore.YELLOW)
@@ -1572,14 +1661,14 @@ def ui_reboot_test(device, loop_count):
         device_check_enabled = True
         # 清除旧的基准文件，首次运行时创建新基准
         clear_device_check_baseline(device)
-    
+
     # 获取该设备品牌对应的重启按钮点击步骤
     reboot_steps = get_reboot_steps(device)
     log_print(device, f"重启步骤: {len(reboot_steps)} 步", Fore.CYAN)
-    
+
     # 统计
     check_stats = {'total': 0, 'passed': 0, 'failed': 0, 'failed_iterations': []}
-    
+
     for i in range(loop_count):
         if exit_flag:
             log_print(device, "检测到退出信号，停止测试", Fore.YELLOW)
@@ -1606,11 +1695,11 @@ def ui_reboot_test(device, loop_count):
             log_print(device, "返回桌面...")
             subprocess.run(f"adb -s {device} shell input keyevent 3", shell=True)
             time.sleep(CONFIG['timings']['short_wait'])
-            
+
             # 方法1: 使用 adb shell input keyevent --longpress 26 长按电源键
             log_print(device, "尝试使用 keyevent --longpress 长按电源键...")
             subprocess.run(f"adb -s {device} shell input keyevent --longpress 26", shell=True)
-            
+
             # 按配置的步骤点击重启按钮（先检查控件，识别到立即点击）
             first_step = reboot_steps[0]
             log_print(device, f"检查重启控件(等待5秒): {first_step['type']}={first_step['value']}...")
@@ -1638,17 +1727,18 @@ def ui_reboot_test(device, loop_count):
                     break
             if step_failed:
                 continue
-            
+
             # 等待设备重启并完全就绪
             time.sleep(3)
             wait_device_ready(device, wait_disconnect=True)
-            if not wait_for_system_ready(device, timeout=CONFIG.get('timings', {}).get('device_ready_timeout', 300), allow_timeout=False):
+            if not wait_for_system_ready(device, timeout=CONFIG.get('timings', {}).get('device_ready_timeout', 300),
+                                         allow_timeout=False):
                 log_print(device, "系统服务未就绪，终止UI联机重启专项", Fore.RED)
                 return False
             if not ensure_home_ready(device, timeout=CONFIG.get('timings', {}).get('device_ready_timeout', 300)):
                 log_print(device, "未进入系统主界面，终止UI联机重启专项", Fore.RED)
                 return False
-            
+
             # 执行器件检测
             if device_check_enabled:
                 check_stats['total'] += 1
@@ -1665,15 +1755,17 @@ def ui_reboot_test(device, loop_count):
         except Exception as e:
             log_print(device, f"UI重启第 {i + 1} 次出错: {e}", Fore.RED)
             continue
-    
+
     # 输出器件检测统计
     if device_check_enabled and check_stats['total'] > 0:
         log_print(device, f"【UI联机重启专项】器件检测统计:", Fore.MAGENTA)
-        log_print(device, f"  总次数: {check_stats['total']}, 通过: {check_stats['passed']}, 失败: {check_stats['failed']}", 
-                 Fore.GREEN if check_stats['failed'] == 0 else Fore.RED)
+        log_print(device,
+                  f"  总次数: {check_stats['total']}, 通过: {check_stats['passed']}, 失败: {check_stats['failed']}",
+                  Fore.GREEN if check_stats['failed'] == 0 else Fore.RED)
         if check_stats['failed_iterations']:
             log_print(device, f"  失败的迭代: {check_stats['failed_iterations']}", Fore.RED)
     return True
+
 
 def adb_reboot_test(device, loop_count):
     """ADB reboot重启专项：adb命令重启手机，进到桌面后执行5分钟原生monkey，然后再重启"""
@@ -1683,7 +1775,7 @@ def adb_reboot_test(device, loop_count):
     if not ensure_device_ready_for_test(device, "ADB reboot重启专项前置检查"):
         log_print(device, "设备未就绪，终止ADB reboot重启专项", Fore.RED)
         return False
-    
+
     # 推送器件检测脚本
     if not push_device_check_script(device):
         log_print(device, "器件检测脚本推送失败，将跳过器件检测", Fore.YELLOW)
@@ -1692,12 +1784,12 @@ def adb_reboot_test(device, loop_count):
         device_check_enabled = True
         # 清除旧的基准文件，首次运行时创建新基准
         clear_device_check_baseline(device)
-    
+
     monkey_duration = CONFIG['general']['monkey_duration_seconds']
-    
+
     # 统计
     check_stats = {'total': 0, 'passed': 0, 'failed': 0, 'failed_iterations': []}
-    
+
     for i in range(loop_count):
         if exit_flag:
             log_print(device, "检测到退出信号，停止测试", Fore.YELLOW)
@@ -1720,7 +1812,8 @@ def adb_reboot_test(device, loop_count):
         subprocess.run(CONFIG['adb_commands']['reboot'].format(device=device), shell=True)
         # 等待设备断开后重新连接并完全就绪
         wait_device_ready(device, wait_disconnect=True)
-        if not wait_for_system_ready(device, timeout=CONFIG.get('timings', {}).get('device_ready_timeout', 300), allow_timeout=False):
+        if not wait_for_system_ready(device, timeout=CONFIG.get('timings', {}).get('device_ready_timeout', 300),
+                                     allow_timeout=False):
             log_print(device, "系统服务未就绪，终止ADB reboot重启专项", Fore.RED)
             return False
         if not ensure_home_ready(device, timeout=CONFIG.get('timings', {}).get('device_ready_timeout', 300)):
@@ -1731,7 +1824,7 @@ def adb_reboot_test(device, loop_count):
         time.sleep(3)
         subprocess.run(f"adb -s {device} shell input keyevent 3", shell=True)
         time.sleep(2)
-        
+
         # 执行器件检测
         if device_check_enabled:
             check_stats['total'] += 1
@@ -1743,16 +1836,17 @@ def adb_reboot_test(device, loop_count):
                 check_stats['failed'] += 1
                 check_stats['failed_iterations'].append(i + 1)
                 log_print(device, f"器件检测失败", Fore.RED)
-        
+
         # 执行5分钟monkey测试
         run_monkey_timed(device, monkey_duration)
         log_print(device, f"ADB重启+Monkey第 {i + 1} 次完成", Fore.GREEN)
-    
+
     # 输出器件检测统计
     if device_check_enabled and check_stats['total'] > 0:
         log_print(device, f"【ADB reboot重启专项】器件检测统计:", Fore.MAGENTA)
-        log_print(device, f"  总次数: {check_stats['total']}, 通过: {check_stats['passed']}, 失败: {check_stats['failed']}", 
-                 Fore.GREEN if check_stats['failed'] == 0 else Fore.RED)
+        log_print(device,
+                  f"  总次数: {check_stats['total']}, 通过: {check_stats['passed']}, 失败: {check_stats['failed']}",
+                  Fore.GREEN if check_stats['failed'] == 0 else Fore.RED)
         if check_stats['failed_iterations']:
             log_print(device, f"  失败的迭代: {check_stats['failed_iterations']}", Fore.RED)
     return True
@@ -1766,7 +1860,7 @@ def power_on_off_test(device, loop_count, wait_time_after_boot=60):
     if not ensure_device_ready_for_test(device, "开关机专项前置检查"):
         log_print(device, "设备未就绪，终止开关机专项", Fore.RED)
         return False
-    
+
     # 推送器件检测脚本
     if not push_device_check_script(device):
         log_print(device, "器件检测脚本推送失败，将跳过器件检测", Fore.YELLOW)
@@ -1774,10 +1868,10 @@ def power_on_off_test(device, loop_count, wait_time_after_boot=60):
     else:
         device_check_enabled = True
         clear_device_check_baseline(device)
-    
+
     # 统计
     check_stats = {'total': 0, 'passed': 0, 'failed': 0, 'failed_iterations': []}
-    
+
     for i in range(loop_count):
         if exit_flag:
             log_print(device, "检测到退出信号，停止测试", Fore.YELLOW)
@@ -1796,37 +1890,38 @@ def power_on_off_test(device, loop_count, wait_time_after_boot=60):
 
                 log_print(device, "设备已恢复，跳过本次循环，继续下一轮测试", Fore.GREEN)
                 continue
-            
+
             # 亮屏并返回桌面
             check_and_turn_on_screen(device)
             time.sleep(CONFIG['timings']['short_wait'])
             subprocess.run(f"adb -s {device} shell input keyevent 3", shell=True)
             time.sleep(CONFIG['timings']['short_wait'])
-            
+
             # 使用 adb shell setprop sys.powerctl reboot 关机
             log_print(device, "执行关机命令...", Fore.BLUE)
             subprocess.run(f"adb -s {device} shell setprop sys.powerctl reboot", shell=True)
-            
+
             # 等待设备断开连接
             if not wait_for_device_disconnect(device, timeout=60):
                 log_print(device, "设备未能在60秒内断开，跳过本次循环", Fore.RED)
                 continue
-            
+
             log_print(device, "设备已关机，等待手动开机...", Fore.YELLOW)
-            
+
             # 等待设备重新连接并完全就绪
             wait_device_ready(device, wait_disconnect=False)
-            if not wait_for_system_ready(device, timeout=CONFIG.get('timings', {}).get('device_ready_timeout', 300), allow_timeout=False):
+            if not wait_for_system_ready(device, timeout=CONFIG.get('timings', {}).get('device_ready_timeout', 300),
+                                         allow_timeout=False):
                 log_print(device, "系统服务未就绪，终止开关机专项", Fore.RED)
                 return False
             if not ensure_home_ready(device, timeout=CONFIG.get('timings', {}).get('device_ready_timeout', 300)):
                 log_print(device, "未进入系统主界面，终止开关机专项", Fore.RED)
                 return False
-            
+
             # 开机后等待预定时间
             log_print(device, f"开机完成，等待 {wait_time_after_boot} 秒后继续...", Fore.CYAN)
             time.sleep(wait_time_after_boot)
-            
+
             # 执行器件检测
             if device_check_enabled:
                 check_stats['total'] += 1
@@ -1843,12 +1938,13 @@ def power_on_off_test(device, loop_count, wait_time_after_boot=60):
         except Exception as e:
             log_print(device, f"开关机第 {i + 1} 次出错: {e}", Fore.RED)
             continue
-    
+
     # 输出器件检测统计
     if device_check_enabled and check_stats['total'] > 0:
         log_print(device, f"【开关机专项】器件检测统计:", Fore.MAGENTA)
-        log_print(device, f"  总次数: {check_stats['total']}, 通过: {check_stats['passed']}, 失败: {check_stats['failed']}", 
-                 Fore.GREEN if check_stats['failed'] == 0 else Fore.RED)
+        log_print(device,
+                  f"  总次数: {check_stats['total']}, 通过: {check_stats['passed']}, 失败: {check_stats['failed']}",
+                  Fore.GREEN if check_stats['failed'] == 0 else Fore.RED)
         if check_stats['failed_iterations']:
             log_print(device, f"  失败的迭代: {check_stats['failed_iterations']}", Fore.RED)
     return True
@@ -1865,20 +1961,21 @@ def open_preinstalled_apps_random(device, count=10, interval_seconds=5):
         if result.returncode != 0:
             log_print(device, "获取应用列表失败", Fore.RED)
             return False
-        
-        packages = [line.replace('package:', '').strip() for line in result.stdout.splitlines() if line.startswith('package:')]
-        
+
+        packages = [line.replace('package:', '').strip() for line in result.stdout.splitlines() if
+                    line.startswith('package:')]
+
         # 过滤掉系统核心包和无界面类包（粗略过滤）
         exclude_keywords = ['com.android.', 'com.google.android.', 'android', 'system']
         candidate_packages = [pkg for pkg in packages if not any(keyword in pkg for keyword in exclude_keywords)]
-        
+
         if not candidate_packages:
             log_print(device, "未找到可用预置应用", Fore.YELLOW)
             return False
-        
+
         selected = random.sample(candidate_packages, k=min(count, len(candidate_packages)))
         log_print(device, f"随机选中 {len(selected)} 个应用，按 {interval_seconds} 秒间隔启动...", Fore.CYAN)
-        
+
         opened_count = 0
         for pkg in selected:
             try:
@@ -1890,8 +1987,9 @@ def open_preinstalled_apps_random(device, count=10, interval_seconds=5):
             except Exception:
                 log_print(device, f"应用 {pkg} 启动失败，继续下一个", Fore.YELLOW)
             time.sleep(interval_seconds)
-        
-        log_print(device, f"已尝试打开 {opened_count}/{len(selected)} 个预置应用", Fore.GREEN if opened_count else Fore.YELLOW)
+
+        log_print(device, f"已尝试打开 {opened_count}/{len(selected)} 个预置应用",
+                  Fore.GREEN if opened_count else Fore.YELLOW)
         return opened_count > 0
     except Exception as e:
         log_print(device, f"打开预置应用异常: {e}", Fore.RED)
@@ -1960,16 +2058,16 @@ def sleep_wake_test(device, loop_count, sleep_time_minutes, wake_time_minutes):
     if not ensure_device_ready_for_test(device, "休眠唤醒专项前置检查"):
         log_print(device, "设备未就绪，终止休眠唤醒专项", Fore.RED)
         return False
-    
+
     # 设置2分钟息屏时间
     log_print(device, "设置息屏时间为2分钟...", Fore.CYAN)
     subprocess.run(['adb', '-s', device, 'shell', 'settings', 'put', 'system', 'screen_off_timeout', '120000'])
-    
+
     # 返回桌面
     log_print(device, "返回桌面...", Fore.CYAN)
     subprocess.run(f"adb -s {device} shell input keyevent 3", shell=True)
     time.sleep(CONFIG['timings']['short_wait'])
-    
+
     for i in range(loop_count):
         if exit_flag:
             log_print(device, "检测到退出信号，停止测试", Fore.YELLOW)
@@ -1981,51 +2079,51 @@ def sleep_wake_test(device, loop_count, sleep_time_minutes, wake_time_minutes):
             if not preinstalled_opened:
                 open_preinstalled_apps_random(device, count=10, interval_seconds=5)
                 preinstalled_opened = True
-            
+
             # 按电源键灭屏
             log_print(device, "按电源键灭屏...", Fore.CYAN)
             subprocess.run(['adb', '-s', device, 'shell', 'input', 'keyevent', '26'])
             time.sleep(post_power_key_wait)
-            
+
             # 检测是否处于息屏状态
             if not check_screen_off(device):
                 log_print(device, "未检测到息屏，再次按电源键...", Fore.YELLOW)
                 subprocess.run(['adb', '-s', device, 'shell', 'input', 'keyevent', '26'])
                 time.sleep(post_power_key_wait)
-                
+
                 if not check_screen_off(device):
                     log_print(device, "无法进入息屏状态，跳过本次循环", Fore.RED)
                     continue
-            
+
             log_print(device, "已进入息屏状态", Fore.GREEN)
-            
+
             # 静置待机预设时间（分钟）
             sleep_seconds = sleep_time_minutes * 60
             log_print(device, f"静置待机 {sleep_time_minutes} 分钟 ({sleep_seconds} 秒)...", Fore.CYAN)
             time.sleep(sleep_seconds)
-            
+
             # 按电源键亮屏
             log_print(device, "按电源键亮屏...", Fore.CYAN)
             subprocess.run(['adb', '-s', device, 'shell', 'input', 'keyevent', '26'])
             time.sleep(2)
-            
+
             # 通过两次 keyevent 82 进入桌面
             log_print(device, "解锁进入桌面...", Fore.CYAN)
             subprocess.run(['adb', '-s', device, 'shell', 'input', 'keyevent', '82'])
             time.sleep(1)
             subprocess.run(['adb', '-s', device, 'shell', 'input', 'keyevent', '82'])
             time.sleep(2)
-            
+
             # 亮屏等待预设时间（分钟）
             wake_seconds = wake_time_minutes * 60
             log_print(device, f"亮屏等待 {wake_time_minutes} 分钟 ({wake_seconds} 秒)...", Fore.CYAN)
             time.sleep(wake_seconds)
-            
+
             log_print(device, f"休眠唤醒第 {i + 1} 次完成", Fore.GREEN)
         except Exception as e:
             log_print(device, f"休眠唤醒第 {i + 1} 次出错: {e}", Fore.RED)
             continue
-    
+
     return True
 
 
@@ -2035,30 +2133,31 @@ def run_all_tests_sequential(device, loop_count):
     log_print(device, "开始执行【连贯全部专项测试】", Fore.MAGENTA)
     log_print(device, f"执行顺序: 恢复出厂设置 -> UI联机重启 -> ADB reboot重启", Fore.MAGENTA)
     log_print(device, f"每个专项循环次数: {loop_count}", Fore.MAGENTA)
-    
+
     # 1. 恢复出厂设置专项
     if not exit_flag:
         if not factory_reset_test(device, loop_count):
             return
-    
+
     # 2. UI联机重启专项
     if not exit_flag:
         if not ui_reboot_test(device, loop_count):
             return
-    
+
     # 3. ADB reboot重启专项
     if not exit_flag:
         if not adb_reboot_test(device, loop_count):
             return
-    
+
     log_print(device, "【连贯全部专项测试】执行完成！", Fore.MAGENTA)
 
-def reboot_and_power_wake_up(device,loop_number,wakeup_time,sleep_time):
+
+def reboot_and_power_wake_up(device, loop_number, wakeup_time, sleep_time):
     """开关机专项：使用adb shell setprop sys.powerctl reboot关机，等待开机后再次重启"""
     """休眠唤醒专项：按电源键灭屏，静置待机，再按电源键亮屏"""
     global exit_flag
     if wakeup_time <= 0 or sleep_time <= 0:
-        log_print(device,"设置【休眠唤醒】休眠时间或者唤醒等待时间小于或等于0分钟",Fore.RED)
+        log_print(device, "设置【休眠唤醒】休眠时间或者唤醒等待时间小于或等于0分钟", Fore.RED)
         return False
     log_print(device, "现在执行开关机+休眠唤醒混合循环专项", Fore.YELLOW)
     log_print(device, "1.开始执行【开关机专项】", Fore.BLUE)
@@ -2128,9 +2227,9 @@ def reboot_and_power_wake_up(device,loop_number,wakeup_time,sleep_time):
                 return False
 
             # 开机后等待预定时间
-            #total_time = (wakeup_time + sleep_time) * 60 + 30
-            #log_print(device, f"开机完成，等待 {total_time} 秒后继续...", Fore.CYAN)
-            #time.sleep(total_time)
+            # total_time = (wakeup_time + sleep_time) * 60 + 30
+            # log_print(device, f"开机完成，等待 {total_time} 秒后继续...", Fore.CYAN)
+            # time.sleep(total_time)
 
             # 执行器件检测
             if device_check_enabled:
@@ -2149,7 +2248,7 @@ def reboot_and_power_wake_up(device,loop_number,wakeup_time,sleep_time):
             log_print(device, f"开关机第 {i + 1} 次出错: {e}", Fore.RED)
             continue
         ################################################################################################################
-        log_print(device,"2.开始进行休眠唤醒操作",Fore.BLUE)
+        log_print(device, "2.开始进行休眠唤醒操作", Fore.BLUE)
         try:
             log_print(device, f"休眠唤醒 第 {i + 1}/{loop_count} 次", Fore.YELLOW)
 
@@ -2201,7 +2300,7 @@ def reboot_and_power_wake_up(device,loop_number,wakeup_time,sleep_time):
         except Exception as e:
             log_print(device, f"休眠唤醒第 {i + 1} 次出错: {e}", Fore.RED)
             continue
-    log_print(device,"开关机+休眠唤醒混合循环专项全部执行完成",Fore.GREEN)
+    log_print(device, "开关机+休眠唤醒混合循环专项全部执行完成", Fore.GREEN)
     # 输出器件检测统计
     if device_check_enabled and check_stats['total'] > 0:
         log_print(device, f"【开关机专项】器件检测统计:", Fore.MAGENTA)
@@ -2307,7 +2406,85 @@ def handle_split_test(devices, loop_count):
     print(f"  - 开关机测试设备数: {len(group1)}")
     print(f"  - 休眠唤醒测试设备数: {len(group2)}")
 
-def handle_device(device, loop_count, switch_value,wakeup_time,sleep_time):
+
+def combo_mode_9_test(device, total_big_loops):
+    """
+    模式 9: 组合专项测试
+    逻辑：
+      1. 开关机 10 次 (间隔 30s)
+      2. 恢复出厂 5 次 (间隔 10s)
+    注意：本函数直接使用全局 CONFIG 变量，与原有函数风格保持一致。
+    """
+    log_print(device, f">>> 启动模式 9: 组合专项 (目标大循环: {total_big_loops}) <<<", Fore.CYAN)
+
+    # 子任务配置 (硬编码，符合需求)
+    REBOOT_SUB_COUNT = 10
+    REBOOT_INTERVAL = 30  # 秒
+    REBOOT_WAIT_AFTER_BOOT = 5
+
+    FACTORY_SUB_COUNT = 5
+    FACTORY_INTERVAL = 10  # 秒
+
+    global exit_flag
+
+    for i in range(1, total_big_loops + 1):
+        if exit_flag:
+            log_print(device, "检测到退出信号，停止模式 9 测试", Fore.YELLOW)
+            break
+
+        log_print(device, f"\n=== 第 {i}/{total_big_loops} 次大循环开始 ===", Fore.YELLOW)
+
+        # --- 阶段 A: 开关机 10 次 ---
+        log_print(device, f"进入阶段 A: 连续开关机 {REBOOT_SUB_COUNT} 次 (间隔 {REBOOT_INTERVAL}s)", Fore.BLUE)
+        for j in range(REBOOT_SUB_COUNT):
+            if exit_flag: break
+            try:
+                # 调用原有的 power_on_off_test (次数=1)
+                # 原函数签名: power_on_off_test(device, loop_count, wait_time_after_boot=60)
+                # 不需要传 config
+                success = power_on_off_test(device, 1, REBOOT_WAIT_AFTER_BOOT)
+
+                if not success:
+                    log_print(device, f"阶段 A 第 {j + 1} 次开关机执行失败/中断", Fore.RED)
+                    break
+
+                log_print(device, f"  -> 完成第 {j + 1}/{REBOOT_SUB_COUNT} 次开关机", Fore.GREEN)
+
+                if j < REBOOT_SUB_COUNT - 1:
+                    time.sleep(REBOOT_INTERVAL)
+            except Exception as e:
+                log_print(device, f"  -> 阶段 A 第 {j + 1} 次发生异常: {e}", Fore.RED)
+                continue
+
+        # --- 阶段 B: 恢复出厂 5 次 ---
+        log_print(device, f"进入阶段 B: 连续恢复出厂 {FACTORY_SUB_COUNT} 次 (间隔 {FACTORY_INTERVAL}s)", Fore.BLUE)
+        for k in range(FACTORY_SUB_COUNT):
+            if exit_flag: break
+            try:
+                # 调用原有的 factory_reset_test (次数=1)
+                # 原函数签名: factory_reset_test(device, loop_count)
+                # 不需要传 config
+                success = factory_reset_test(device, 1)
+
+                if not success:
+                    log_print(device, f"阶段 B 第 {k + 1} 次恢复出厂执行失败/中断", Fore.RED)
+                    break
+
+                log_print(device, f"  -> 完成第 {k + 1}/{FACTORY_SUB_COUNT} 次恢复出厂", Fore.GREEN)
+
+                if k < FACTORY_SUB_COUNT - 1:
+                    time.sleep(FACTORY_INTERVAL)
+            except Exception as e:
+                log_print(device, f"  -> 阶段 B 第 {k + 1} 次发生异常: {e}", Fore.RED)
+                continue
+
+        log_print(device, f"=== 第 {i}/{total_big_loops} 次大循环结束 ===\n", Fore.GREEN)
+
+    log_print(device, "模式 9 组合专项测试全部完成", Fore.MAGENTA)
+    return True
+
+
+def handle_device(device, loop_count, switch_value, wakeup_time, sleep_time):
     """根据选择执行对应的测试专项"""
     if switch_value == 1:
         factory_reset_test(device, loop_count)
@@ -2320,9 +2497,18 @@ def handle_device(device, loop_count, switch_value,wakeup_time,sleep_time):
     elif switch_value == 5:
         power_on_off_test(device, loop_count)
     elif switch_value == 6:
-        sleep_wake_test(device, loop_count,wakeup_time,sleep_time)
+        sleep_wake_test(device, loop_count, wakeup_time, sleep_time)
     elif switch_value == 7:
-        reboot_and_power_wake_up(device, loop_count,wakeup_time,sleep_time)
+        reboot_and_power_wake_up(device, loop_count, wakeup_time, sleep_time)
+    elif switch_value == 9:
+        # 模式 9: 组合专项
+        log_print(device, f"切换到模式 9: 组合专项 (大循环次数: {loop_count})", Fore.CYAN)
+        # 修正：去掉 config 参数，让函数内部直接使用全局 CONFIG
+        combo_mode_9_test(device, loop_count)
+
+    else:
+        log_print(device, f"未知的测试模式: {switch_value}", Fore.RED)
+
 
 # ==================== 主程序入口 ====================
 
@@ -2359,10 +2545,11 @@ def pause_before_exit(skip_pause):
 if __name__ == "__main__":
     args = parse_arguments()
     print(f"\n{Fore.CYAN}[{get_timestamp()}] 脚本启动{Style.RESET_ALL}")
-    print(f"{Fore.YELLOW}提示: 按 Ctrl+C 可安全退出脚本{Style.RESET_ALL}")
-    
+    print(f"{Fore.YELLOW}提示：按 Ctrl+C 可安全退出脚本{Style.RESET_ALL}")
+
     # 获取连接的设备列表
-    devices_output = subprocess.run('adb devices', shell=True, capture_output=True, text=True).stdout.strip().split('\n')[1:]
+    devices_output = subprocess.run('adb devices', shell=True, capture_output=True, text=True).stdout.strip().split(
+        '\n')[1:]
     devices = [device.split('\t')[0] for device in devices_output if device.strip()]
 
     if not devices:
@@ -2380,11 +2567,11 @@ if __name__ == "__main__":
             else:
                 missing.append(d)
         if missing:
-            print(f"{Fore.RED}以下序列号未在当前连接列表中找到: {', '.join(missing)}{Style.RESET_ALL}")
+            print(f"{Fore.RED}以下序列号未在当前连接列表中找到：{', '.join(missing)}{Style.RESET_ALL}")
             pause_before_exit(args.no_pause)
             sys.exit(1)
         devices = selected
-        print(f"{Fore.CYAN}已根据参数筛选设备: {', '.join(devices)}{Style.RESET_ALL}")
+        print(f"{Fore.CYAN}已根据参数筛选设备：{', '.join(devices)}{Style.RESET_ALL}")
 
     # 显示已连接设备
     print(f"\n{Fore.CYAN}[{get_timestamp()}] 当前连接设备列表（支持多设备并发运行）：{Style.RESET_ALL}")
@@ -2401,92 +2588,139 @@ if __name__ == "__main__":
             try:
                 switch_value = int(mode_arg)
             except ValueError:
-                print(f"{Fore.RED}无效的模式参数: {mode_arg}，请使用1-7或all。{Style.RESET_ALL}")
+                print(f"{Fore.RED}无效的模式参数：{mode_arg}，请使用1-9或all。{Style.RESET_ALL}")
                 pause_before_exit(args.no_pause)
                 sys.exit(1)
         if str(switch_value) not in CONFIG['test_modes']:
-            print(f"{Fore.RED}模式 {mode_arg} 不在配置范围内（有效值1-7或all）。{Style.RESET_ALL}")
+            print(f"{Fore.RED}模式 {mode_arg} 不在配置范围内（有效值1-9或all）。{Style.RESET_ALL}")
             pause_before_exit(args.no_pause)
             sys.exit(1)
         print(f"{Fore.CYAN}已通过参数选择模式 {mode_arg}，将跳过交互式选择。{Style.RESET_ALL}")
 
     if switch_value is None:
-        print(f"\n{Fore.CYAN}{'='*50}{Style.RESET_ALL}")
+        print(f"\n{Fore.CYAN}{'=' * 50}{Style.RESET_ALL}")
         print(f"{Fore.YELLOW}选择执行测试项：{Style.RESET_ALL}")
         for key, mode in CONFIG['test_modes'].items():
             print(f"  {key}. {mode['name']}")
             print(f"     {Fore.WHITE}{mode['description']}{Style.RESET_ALL}")
-        print(f"{Fore.CYAN}{'='*50}{Style.RESET_ALL}")
-        switch_value = int(input(f"\n{Fore.CYAN}请输入测试项编号 (1-8)：{Style.RESET_ALL}"))
+        print(f"{Fore.CYAN}{'=' * 50}{Style.RESET_ALL}")
+        switch_value = int(input(f"\n{Fore.CYAN}请输入测试项编号 (1-9)：{Style.RESET_ALL}"))
 
     # 解析或交互获取循环次数
     default_count = CONFIG['general']['default_loop_count']
     ##带mix的参数为选项7开关机+休眠唤醒融合参数
-    # 默认亮屏时间(单位:分钟)
+    # 默认亮屏时间 (单位:分钟)
     default_mix_wakeup_time = CONFIG['general']['default_mix_wakeup_time']
-    # 默认休眠时间(单位:分钟)
+    # 默认休眠时间 (单位:分钟)
     default_mix_sleep_time = CONFIG['general']['default_mix_sleep_time']
-    #不带mix参数为选项6单独休眠唤醒参数
-    # (纯休眠唤醒) 默认唤醒时间(单位:分钟)
+    # 不带mix参数为选项6单独休眠唤醒参数
+    # (纯休眠唤醒) 默认唤醒时间 (单位:分钟)
     default_wakeup_time = CONFIG['general']['default_wakeup_time']
-    # (纯休眠唤醒) 默认休眠时间(单位:分钟)
+    # (纯休眠唤醒) 默认休眠时间 (单位:分钟)
     default_sleep_time = CONFIG['general']['default_sleep_time']
-    #(开关机+休眠唤醒)定义参数
+    # (开关机+休眠唤醒)定义参数
     mix_wakeup_time = default_mix_wakeup_time
     mix_sleep_time = default_mix_sleep_time
-    #(休眠唤醒)定义参数
+    # (休眠唤醒)定义参数
     wakeup_time = default_wakeup_time
     sleep_time = default_sleep_time
+
     if args.loop is not None:
         loop_count = args.loop
     elif args.mode:
-        loop_count = default_count
-        print(f"{Fore.CYAN}未指定循环次数，使用默认值 {default_count}。{Style.RESET_ALL}")
+        # 如果是命令行模式且未指定loop，根据模式判断默认值
+        if switch_value == 9:
+            loop_count = 1000
+            print(f"{Fore.CYAN}模式 9 未指定循环次数，使用默认大循环次数 1000。{Style.RESET_ALL}")
+        else:
+            loop_count = default_count
+            print(f"{Fore.CYAN}未指定循环次数，使用默认值 {default_count}。{Style.RESET_ALL}")
     else:
-        print(f"\n{Fore.WHITE}默认循环次数: {default_count} 次{Style.RESET_ALL}")
-        loop_input = input(f"{Fore.CYAN}请输入循环次数 (直接回车使用默认值)：{Style.RESET_ALL}")
-        loop_count = int(loop_input) if loop_input.strip() else default_count
-        if switch_value == 7:
-            wakeup_input = input(f"{Fore.CYAN}请输入唤醒时间 (直接回车使用默认值:默认值为{default_mix_wakeup_time}分钟)：{Style.RESET_ALL}")
+        # === 交互式输入模式 (核心修改在这里) ===
+
+        # 【关键修改】优先判断模式 9，如果是，直接进入专属流程，绝对不执行下面的通用打印
+        if switch_value == 9:
+            default_loop_9 = 1000
+            print(
+                f"\n{Fore.WHITE}模式 9 说明：先开关机10次(间隔30s)，再恢复出厂5次(间隔10s)。以上整套流程执行 1 次算作 1 个大循环。{Style.RESET_ALL}")
+            input_val = input(f"{Fore.CYAN}请输入模式 9 的大循环次数 (默认 {default_loop_9})：{Style.RESET_ALL}")
+            loop_count = int(input_val) if input_val.strip() else default_loop_9
+            wakeup_time = 0  # 模式 9 不需要时间参数
+            sleep_time = 0
+
+        elif switch_value == 7:
+            # 模式 7：保持原有逻辑（先问次数，再问时间）
+            print(f"\n{Fore.WHITE}默认循环次数：{default_count} 次{Style.RESET_ALL}")
+            loop_input = input(f"{Fore.CYAN}请输入循环次数 (直接回车使用默认值)：{Style.RESET_ALL}")
+            loop_count = int(loop_input) if loop_input.strip() else default_count
+
+            wakeup_input = input(
+                f"{Fore.CYAN}请输入唤醒时间 (直接回车使用默认值：默认值为{default_mix_wakeup_time}分钟)：{Style.RESET_ALL}")
             mix_wakeup_time = int(wakeup_input) if wakeup_input.strip() else default_mix_wakeup_time
-            sleep_input = input(f"{Fore.CYAN}请输入休眠时间 (直接回车使用默认值:默认值为{default_mix_sleep_time}分钟)：{Style.RESET_ALL}")
+            sleep_input = input(
+                f"{Fore.CYAN}请输入休眠时间 (直接回车使用默认值：默认值为{default_mix_sleep_time}分钟)：{Style.RESET_ALL}")
             mix_sleep_time = int(sleep_input) if sleep_input.strip() else default_mix_sleep_time
+
         elif switch_value == 6:
-            wakeup_input = input(f"{Fore.CYAN}请输入唤醒时间 (直接回车使用默认值:默认值为{default_wakeup_time}分钟)：{Style.RESET_ALL}")
+            # 模式 6：保持原有逻辑
+            print(f"\n{Fore.WHITE}默认循环次数：{default_count} 次{Style.RESET_ALL}")
+            loop_input = input(f"{Fore.CYAN}请输入循环次数 (直接回车使用默认值)：{Style.RESET_ALL}")
+            loop_count = int(loop_input) if loop_input.strip() else default_count
+
+            wakeup_input = input(
+                f"{Fore.CYAN}请输入唤醒时间 (直接回车使用默认值：默认值为{default_wakeup_time}分钟)：{Style.RESET_ALL}")
             wakeup_time = int(wakeup_input) if wakeup_input.strip() else default_wakeup_time
-            sleep_input = input(f"{Fore.CYAN}请输入休眠时间 (直接回车使用默认值:默认值为{default_sleep_time}分钟)：{Style.RESET_ALL}")
+            sleep_input = input(
+                f"{Fore.CYAN}请输入休眠时间 (直接回车使用默认值：默认值为{default_sleep_time}分钟)：{Style.RESET_ALL}")
             sleep_time = int(sleep_input) if sleep_input.strip() else default_sleep_time
 
+        else:
+            # 其他模式 (1-5, 8)：保持原有逻辑
+            print(f"\n{Fore.WHITE}默认循环次数：{default_count} 次{Style.RESET_ALL}")
+            loop_input = input(f"{Fore.CYAN}请输入循环次数 (直接回车使用默认值)：{Style.RESET_ALL}")
+            loop_count = int(loop_input) if loop_input.strip() else default_count
 
     mode_info = CONFIG['test_modes'].get(str(switch_value), {})
+
+
     mode_name = mode_info.get('name', f"模式 {switch_value}")
     print(f"\n{Fore.GREEN}[{get_timestamp()}] 即将开始执行测试...{Style.RESET_ALL}")
-    if switch_value < 6:
-        print(f"  测试项: {mode_name}")
-        print(f"  循环次数: {loop_count}")
-        print(f"  设备数量: {len(devices)}")
-    elif switch_value == 6:
-        print(f"  测试项: {mode_name}")
-        print(f"  休眠唤醒循环次数: {loop_count}")
-        print(f"  休眠唤醒-休眠时间: {sleep_time}")
-        print(f"  休眠唤醒-唤醒时间: {wakeup_time}")
-        print(f"  设备数量: {len(devices)}")
-    elif switch_value == 7:
-        print(f"  测试项: {mode_name}")
-        print(f"  开关机和休眠唤醒融合总循环次数: {loop_count}")
-        print(f"  休眠唤醒-休眠时间: {mix_sleep_time}")
-        print(f"  休眠唤醒-唤醒时间: {mix_wakeup_time}")
-        print(f"  设备数量: {len(devices)}")
 
-    # 使用ThreadPoolExecutor并发处理每个设备
+    if switch_value < 6:
+        print(f"  测试项：{mode_name}")
+        print(f"  循环次数：{loop_count}")
+        print(f"  设备数量：{len(devices)}")
+    elif switch_value == 6:
+        print(f"  测试项：{mode_name}")
+        print(f"  休眠唤醒循环次数：{loop_count}")
+        print(f"  休眠唤醒 - 休眠时间：{sleep_time}")
+        print(f"  休眠唤醒 - 唤醒时间：{wakeup_time}")
+        print(f"  设备数量：{len(devices)}")
+    elif switch_value == 7:
+        print(f"  测试项：{mode_name}")
+        print(f"  开关机和休眠唤醒融合总循环次数：{loop_count}")
+        print(f"  休眠唤醒 - 休眠时间：{mix_sleep_time}")
+        print(f"  休眠唤醒 - 唤醒时间：{mix_wakeup_time}")
+        print(f"  设备数量：{len(devices)}")
+    elif switch_value == 9:
+        print(f"  测试项：{mode_name}")
+        print(f"  组合专项大循环次数：{loop_count}")
+        print(f"  单次大循环内容：开关机10次 (间隔30s) + 恢复出厂5次 (间隔10s)")
+        print(f"  设备数量：{len(devices)}")
+
+    # 使用 ThreadPoolExecutor 并发处理每个设备
     try:
-        # 特殊处理模式8（分组测试）
+        # 特殊处理模式 8（分组测试）
         if switch_value == 8:
-            # 模式7需要所有设备一起处理，不能逐个设备调用handle_device
+            # 模式 8 需要所有设备一起处理，不能逐个设备调用 handle_device
+            # 注意：原代码此处调用 handle_split_test，需确保该函数已定义
             handle_split_test(devices, loop_count)
         else:
             with concurrent.futures.ThreadPoolExecutor() as executor:
-                futures = [executor.submit(handle_device, device, loop_count, switch_value,wakeup_time,sleep_time) for device in devices]
+                # 注意：这里保持了原有的参数顺序 (device, loop_count, switch_value, wakeup_time, sleep_time)
+                # 请确保你的 handle_device 函数签名与此一致
+                futures = [executor.submit(handle_device, device, loop_count, switch_value, wakeup_time, sleep_time) for
+                           device in devices]
                 concurrent.futures.wait(futures)
     except KeyboardInterrupt:
         print(f"\n{Fore.YELLOW}[{get_timestamp()}] 用户中断，正在退出...{Style.RESET_ALL}")
