@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from modules.analyse.aee.AnalyseAee import analyse_aee
 from modules.analyse.aee.files.db_file_map import DbFileMap
+from modules.analyse.aee.files.exp_main import ExpMain
 from modules.analyse.aee.files.sys_properties import SysProperties
 from modules.analyse.aee.files.zz_internal import ZZ_internal
 from modules.analyse.tne.AnalyseTne import analyse_tne
@@ -126,6 +127,8 @@ class ScanBase(ABC):
         self._report_history_list = []
         self._new_app_info_list = []
         self._failed_dbg_info_cache = {}
+        self._extract_failed_dbg_reason_map = {}
+        self._extract_failed_dbg_report_status_map = {}
         self._win_to_mnt_dict = {}
         self._ignore_pkglist = False
         self._reporter = None
@@ -1461,6 +1464,96 @@ class ScanBase(ABC):
             TEST_LOGGER.warn("unzip_file_list 为空，未发现符合的zip文件")
         return True
 
+    @staticmethod
+    def _get_dbg_dec_dir(dbg_file):
+        return dbg_file + ".DEC"
+
+    @staticmethod
+    def _get_dbg_file_from_dec_related_path(file_path):
+        regex_rlt = re.search("\\.DEC(?:(?:\\\\|/).*)?$", file_path, re.IGNORECASE)
+        if regex_rlt:
+            return file_path[:regex_rlt.start()]
+        return None
+
+    def _get_dbg_dec_missing_critical_files(self, dbg_file):
+        dec_dir = self._get_dbg_dec_dir(dbg_file)
+        critical_file_list = ["__exp_main.txt", "ZZ_INTERNAL", "SYS_PROPERTIES"]
+        if not os.path.isdir(dec_dir):
+            return list(critical_file_list)
+        missing_file_list = []
+        for critical_file in critical_file_list:
+            if not os.path.isfile(os.path.join(dec_dir, critical_file)):
+                missing_file_list.append(critical_file)
+        return missing_file_list
+
+    def _reset_extract_failed_dbg_tracking(self):
+        self._extract_failed_dbg_reason_map = {}
+        self._extract_failed_dbg_report_status_map = {}
+
+    def _add_extract_failed_dbg_reason(self, dbg_file, reason_code, detail=None):
+        if not dbg_file or not reason_code:
+            return
+        reason_info_list = self._extract_failed_dbg_reason_map.setdefault(dbg_file, [])
+        for reason_info in reason_info_list:
+            if reason_info.get("code") == reason_code and reason_info.get("detail") == detail:
+                return
+        reason_info = {"code": reason_code}
+        if detail:
+            reason_info["detail"] = detail
+        reason_info_list.append(reason_info)
+
+    def _get_extract_failed_dbg_reason_info_list(self, dbg_file):
+        return [dict(reason_info) for reason_info in self._extract_failed_dbg_reason_map.get(dbg_file, [])]
+
+    def _get_extract_failed_dbg_reason_codes(self, dbg_file):
+        return [reason_info.get("code") for reason_info in self._extract_failed_dbg_reason_map.get(dbg_file, []) if reason_info.get("code")]
+
+    def _set_extract_failed_dbg_report_status(self, dbg_file, written_to_report, skip_reason=None, extra_tag=None):
+        report_status = {"written_to_report": written_to_report}
+        if skip_reason:
+            report_status["skip_reason"] = skip_reason
+        if extra_tag is not None:
+            report_status["extra_tag"] = extra_tag
+        self._extract_failed_dbg_report_status_map[dbg_file] = report_status
+
+    def _record_extract_failed_dbg_dec_reasons(self, dbg_file, missing_file_list):
+        dec_dir = self._get_dbg_dec_dir(dbg_file)
+        if not os.path.isdir(dec_dir):
+            self._add_extract_failed_dbg_reason(dbg_file, "dec_dir_missing")
+        reason_code_dict = {"__exp_main.txt": "dec_missing_exp_main", "ZZ_INTERNAL": "dec_missing_zz_internal", "SYS_PROPERTIES": "dec_missing_sys_properties"}
+        for missing_file in missing_file_list:
+            reason_code = reason_code_dict.get(missing_file)
+            if reason_code:
+                self._add_extract_failed_dbg_reason(dbg_file, reason_code)
+
+    def _build_extract_failed_dbg_extra_tag(self, dbg_file):
+        extra_tag_list = []
+        if self._extra_jira_tag:
+            extra_tag_list.append(self._extra_jira_tag)
+        reason_code_list = self._get_extract_failed_dbg_reason_codes(dbg_file)
+        if not reason_code_list:
+            reason_code_list = ["extract_failed_unknown"]
+        extra_tag_list.extend([f"failure_reason:{reason_code}" for reason_code in reason_code_list])
+        return "|".join(dict.fromkeys(extra_tag_list))
+
+    def _get_extract_failed_dbg_metadata(self, dbg_file):
+        dec_dir = self._get_dbg_dec_dir(dbg_file)
+        exp_main_file_path = os.path.join(dec_dir, "__exp_main.txt")
+        exp_detail_path = os.path.join(dec_dir, "_exp_detail.txt")
+        if not os.path.isfile(exp_detail_path) and os.path.basename(dec_dir).startswith("CURRENT."):
+            exp_detail_path = os.path.join(os.path.dirname(dec_dir), "_exp_detail.txt")
+        if os.path.isfile(exp_main_file_path):
+            try:
+                exp_main = ExpMain(exp_main_file_path, exp_detail_path)
+                if exp_main.analyse():
+                    exp_time, exp_class, exp_type, cur_process, package, activity, subject, detail, pid, tid, foreground_no, exp_main_build_version, ne_system_issue, ignore_ke_ne_hwasan = exp_main.get_analyse_rlt()
+                    return {"source": "EXP_MAIN", "exp_time": exp_time, "exp_class": exp_class, "exp_type": exp_type, "cur_process": cur_process, "package": package}
+            except:
+                TEST_LOGGER.warn("读取解压失败 dbg 的 __exp_main.txt 元数据异常：{}\n{}".format(exp_main_file_path, traceback.format_exc()))
+        zz_internal_file_path = os.path.join(os.path.dirname(dbg_file), "ZZ_INTERNAL")
+        zz_internal = ZZ_internal(zz_internal_file_path, dbg_file, self._convert_path_to_win(dbg_file))
+        return {"source": "ZZ_INTERNAL", "exp_time": zz_internal.exp_time, "exp_class": zz_internal.exp_class, "exp_type": zz_internal.exp_type, "cur_process": zz_internal.cur_process, "package": zz_internal.cur_process}
+
     def _extract_dbg(self, dbg_file_list):
         """
         解压dbg文件
@@ -1468,7 +1561,7 @@ class ScanBase(ABC):
         :return:
         """
         TEST_LOGGER.info("******************** 开始解压dbg文件 ********************")
-        extract_timeout_dbg_list = []
+        extract_failed_dbg_list = []
         if dbg_file_list:
             done_count = 1
             all_count = len(dbg_file_list)
@@ -1477,14 +1570,35 @@ class ScanBase(ABC):
                 for future in as_completed(extract_dbg_thread):
                     TEST_LOGGER.info(f"已完成解压dbg文件个数：{done_count}/{all_count} 占比：{done_count * 100 / all_count:.2f}")
                     done_count += 1
-                    expired_dbg_file_path = future.result()
-                    if expired_dbg_file_path:
-                        extract_timeout_dbg_list.append(expired_dbg_file_path)
+                    failed_dbg_result = future.result()
+                    if failed_dbg_result:
+                        if isinstance(failed_dbg_result, dict):
+                            failed_dbg_file_path = failed_dbg_result.get("dbg_file")
+                            reason_code = failed_dbg_result.get("reason_code")
+                            detail = failed_dbg_result.get("detail")
+                        else:
+                            failed_dbg_file_path = failed_dbg_result
+                            reason_code = "extract_failed_unknown"
+                            detail = None
+                        if failed_dbg_file_path:
+                            extract_failed_dbg_list.append(failed_dbg_file_path)
+                            self._add_extract_failed_dbg_reason(failed_dbg_file_path, reason_code, detail)
+
+            for dbg_file in dbg_file_list:
+                missing_file_list = self._get_dbg_dec_missing_critical_files(dbg_file)
+                if missing_file_list:
+                    self._record_extract_failed_dbg_dec_reasons(dbg_file, missing_file_list)
+                    TEST_LOGGER.warn("dbg 文件解压后 .DEC 目录仍缺少关键文件 {}，转入失败兜底链：{}".format(missing_file_list, dbg_file))
+                    extract_failed_dbg_list.append(dbg_file)
+
+            extract_failed_dbg_list = list(dict.fromkeys(extract_failed_dbg_list))
+            if extract_failed_dbg_list:
+                TEST_LOGGER.warn("dbg 文件解压后进入失败兜底链的文件共：{} 个".format(len(extract_failed_dbg_list)))
 
         else:
             TEST_LOGGER.warn("未发现dbg文件，不执行dbg解压")
         TEST_LOGGER.info("******************** 解压dbg文件已完成 ********************\n")
-        return extract_timeout_dbg_list
+        return extract_failed_dbg_list
 
     def _get_extract_failed_dbg_pkglist_candidates(self, exp_class, cur_process):
         candidate_list = []
@@ -1547,16 +1661,17 @@ class ScanBase(ABC):
         return self._failed_dbg_info_cache[cache_key]
 
     def _build_extract_failed_aee_result(self, dbg_file):
-        zz_internal_file_path = os.path.join(os.path.dirname(dbg_file), "ZZ_INTERNAL")
-        zz_internal = ZZ_internal(zz_internal_file_path, dbg_file, self._convert_path_to_win(dbg_file))
-        if not self._should_keep_extract_failed_dbg(zz_internal.exp_class, zz_internal.cur_process):
+        metadata = self._get_extract_failed_dbg_metadata(dbg_file)
+        exp_class = metadata.get("exp_class")
+        exp_type = metadata.get("exp_type")
+        exp_time = metadata.get("exp_time")
+        cur_process = metadata.get("cur_process")
+        package = metadata.get("package") if metadata.get("package") else cur_process
+        extra_tag = self._build_extract_failed_dbg_extra_tag(dbg_file)
+        if not self._should_keep_extract_failed_dbg(exp_class, cur_process):
+            self._set_extract_failed_dbg_report_status(dbg_file, False, skip_reason="pkglist_filtered", extra_tag=extra_tag)
             return None
         build_version, device_id = self._get_failed_dbg_build_version_and_device_id(dbg_file)
-        exp_class = zz_internal.exp_class
-        exp_type = zz_internal.exp_type
-        exp_time = zz_internal.exp_time
-        cur_process = zz_internal.cur_process
-        package = cur_process
         if exp_class == "CLASS_UNKNOWN" and ".ke" in dbg_file.lower():
             exp_class = "Kernel (KE)"
         if exp_class in ('Kernel (KE)', 'HWT', 'HANG_DETECT', 'Kernel API Dump', 'Hardware Reboot'):
@@ -1571,20 +1686,25 @@ class ScanBase(ABC):
         detail_col_text = "Device_id: {}\n{}\n手机版本：['{}']".format(device_id, RECOGNIZE_LIB_VERSION, build_version)
         caused_by_col_text = "当前类型没有获取详细信息方式，请自己查看日志文件，本内容只为了Jira不能去重：\n{}".format(random_str(slen=200))
         TEST_LOGGER.warn("dbg 文件解压失败，已生成兜底结果写入报告：{}".format(dbg_file))
-        return FallbackAeeResult(dbg_file, build_version, exp_time, exp_class, exp_type, cur_process, package, detail_col_text, caused_by_col_text, device_id=device_id)
+        self._set_extract_failed_dbg_report_status(dbg_file, True, extra_tag=extra_tag)
+        return FallbackAeeResult(dbg_file, build_version, exp_time, exp_class, exp_type, cur_process, package, detail_col_text, caused_by_col_text, extra_tag=extra_tag, device_id=device_id)
 
     def _build_extract_failed_aee_result_list(self, extract_failed_dbg_list):
         fallback_aee_result_list = []
         if not extract_failed_dbg_list:
             return fallback_aee_result_list
         for dbg_file in sorted(set(extract_failed_dbg_list)):
-            exp_main_file_path = dbg_file + ".DEC" + os.sep + "__exp_main.txt"
-            if os.path.isfile(exp_main_file_path):
-                TEST_LOGGER.info("dbg 文件虽然解压失败，但已存在 __exp_main.txt，跳过兜底结果：{}".format(dbg_file))
+            missing_file_list = self._get_dbg_dec_missing_critical_files(dbg_file)
+            if not missing_file_list:
+                TEST_LOGGER.info("dbg 文件虽然解压异常，但 .DEC 关键文件完整，跳过兜底结果：{}".format(dbg_file))
+                self._set_extract_failed_dbg_report_status(dbg_file, False, skip_reason="dec_complete_after_retry", extra_tag=self._build_extract_failed_dbg_extra_tag(dbg_file))
                 continue
+            TEST_LOGGER.warn("dbg 文件的 .DEC 目录仍缺少关键文件 {}，按失败兜底写入报告：{}".format(missing_file_list, dbg_file))
             fallback_aee_result = self._build_extract_failed_aee_result(dbg_file)
             if fallback_aee_result:
                 fallback_aee_result_list.append(fallback_aee_result)
+            elif dbg_file not in self._extract_failed_dbg_report_status_map:
+                self._set_extract_failed_dbg_report_status(dbg_file, False, skip_reason="fallback_build_failed", extra_tag=self._build_extract_failed_dbg_extra_tag(dbg_file))
         if fallback_aee_result_list:
             TEST_LOGGER.warn("解压失败后写入报告的兜底 AEE 结果共：{} 个".format(len(fallback_aee_result_list)))
         return fallback_aee_result_list

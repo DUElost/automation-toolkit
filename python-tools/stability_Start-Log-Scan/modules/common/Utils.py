@@ -64,13 +64,13 @@ def aee_extract(aee_extract_tool, dbg_file, timeout=300):
             return None
         else:
             TEST_LOGGER.error(f"aee_extract 解压: {dbg_file}, returncode: {result.returncode}")
-            return dbg_file
+            return {"dbg_file": dbg_file, "reason_code": "extract_returncode_nonzero", "detail": f"returncode={result.returncode}"}
     except subprocess.TimeoutExpired:
         TEST_LOGGER.error(f"aee_extract 解压超时: {dbg_file}")
-        return dbg_file
+        return {"dbg_file": dbg_file, "reason_code": "extract_timeout"}
     except Exception as e:
         TEST_LOGGER.error(f"aee_extract 解压异常: {dbg_file}, 错误: {e}")
-        return dbg_file
+        return {"dbg_file": dbg_file, "reason_code": "extract_exception", "detail": str(e)}
 
 
 def decompress_tne(tne_decompress_tool, tne_file):
