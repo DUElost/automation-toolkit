@@ -37,6 +37,7 @@ class ScanAeeTne(ScanBase):
         self._nas_address = nas_address
         self._special_build_prefix = special_build_prefix
         self._extract_failed_dbg_set = set()
+        self._zero_size_dbg_set = set()
 
     def _get_scan_dir_failed(self, error_msg):
         """扫描目录获取失败处理"""
@@ -73,9 +74,11 @@ class ScanAeeTne(ScanBase):
             fallback_aee_result_count = 0
             aee_result_count_before_filter = 0
             self._extract_failed_dbg_set = set()
+            self._zero_size_dbg_set = set()
             self._reset_extract_failed_dbg_tracking()
             physical_dbg_file_list = self.__get_physical_dbg_file_list()
             dbg_count = len(physical_dbg_file_list)
+            self._zero_size_dbg_set = self.__get_zero_size_dbg_set(physical_dbg_file_list)
 
             # 解压和预处理
             if not self._skip_extract:
@@ -175,6 +178,26 @@ class ScanAeeTne(ScanBase):
                         physical_dbg_file_list.append(file_path)
         return physical_dbg_file_list
 
+    @staticmethod
+    def __is_zero_size_dbg_file(file_path):
+        if not os.path.isfile(file_path):
+            return False
+        try:
+            return os.path.getsize(file_path) == 0
+        except OSError:
+            return False
+
+    def __get_zero_size_dbg_set(self, physical_dbg_file_list):
+        zero_size_dbg_set = set()
+        for file_path in physical_dbg_file_list:
+            if self.__is_zero_size_dbg_file(file_path):
+                zero_size_dbg_set.add(file_path)
+        if zero_size_dbg_set:
+            TEST_LOGGER.warn(f"扫描阶段识别到 0 字节 dbg 文件共：{len(zero_size_dbg_set)} 个，这些文件不会进入 Excel 报告")
+            for file_path in sorted(zero_size_dbg_set):
+                TEST_LOGGER.warn(f"dbg 文件大小为 0，判定为无效源日志，不进入报告：{file_path}")
+        return zero_size_dbg_set
+
     def __get_dbg_list(self, physical_dbg_file_list=None):
         """获取需要重新解析的 dbg 文件列表"""
         TEST_LOGGER.info("******************** 开始扫描dbg文件 ********************")
@@ -184,6 +207,9 @@ class ScanAeeTne(ScanBase):
         TEST_LOGGER.info(f"目录中物理存在的 dbg 文件共：{len(physical_dbg_file_list)} 个")
 
         for file_path in physical_dbg_file_list:
+            if file_path in self._zero_size_dbg_set:
+                TEST_LOGGER.debug(f"跳过 0 字节 dbg 文件：{file_path}")
+                continue
             # 检查对应的 .DEC 目录是否存在且完整
             dec_dir = file_path + ".DEC"
             if os.path.isdir(dec_dir):
@@ -211,6 +237,9 @@ class ScanAeeTne(ScanBase):
                 if file == "__exp_main.txt":
                     if not self._scan_date_formatted_aee or self._scan_date_formatted_aee in file_path:
                         dbg_file_path = self._get_dbg_file_from_dec_related_path(file_path)
+                        if dbg_file_path and dbg_file_path in self._zero_size_dbg_set:
+                            TEST_LOGGER.warn(f"__exp_main.txt 对应的 dbg 文件大小为 0，跳过正常解析且不写入报告：{file_path}")
+                            continue
                         if dbg_file_path and dbg_file_path in self._extract_failed_dbg_set:
                             missing = self._get_dbg_dec_missing_critical_files(dbg_file_path)
                             if missing:
@@ -370,6 +399,7 @@ class ScanAeeTne(ScanBase):
                 "db_file_map_exception_zip_count": "DBFileMap 阶段识别出的异常 zip 数量",
                 "db_file_map_discard_count": "DBFileMap 阶段按规则丢弃的问题数量",
                 "dbg_count": "扫描目录中物理存在的 dbg 文件总数",
+                "zero_size_dbg_count": "扫描阶段识别出的 0 字节 dbg 文件数量；这些文件不会进入 Excel 报告",
                 "dbg_to_extract_count": "本次需要重新解析/解压的 dbg 文件数",
                 "pre_analysed_dbg_count": "dbg 预分析后保留下来的待解析数量",
                 "preanalyse_discard_count": "dbg 预分析阶段被丢弃的问题数量",
@@ -381,6 +411,9 @@ class ScanAeeTne(ScanBase):
                 "aee_result_final_count": "去重后最终报告中的结果数量"
             },
             "failure_reason_counts": "按失败原因码聚合的 dbg 数量统计；同一个 dbg 命中多个原因码时会分别计数",
+            "invalid_dbg": {
+                "zero_size_dbg_files": "扫描阶段识别出的 0 字节 dbg 文件路径列表；这些文件只记录在摘要中，不进入 Excel 报告"
+            },
             "extract_failed_dbg": {
                 "_item_comment": "列表中每一项代表一个进入失败跟踪链路的 dbg 文件",
                 "dbg_file": "原始 dbg 文件路径，保持扫描环境中的原路径格式",
@@ -418,6 +451,7 @@ class ScanAeeTne(ScanBase):
                 "db_file_map_exception_zip_count": db_file_map_exception_zip_count,
                 "db_file_map_discard_count": db_file_map_discard_count,
                 "dbg_count": dbg_count,
+                "zero_size_dbg_count": len(self._zero_size_dbg_set),
                 "dbg_to_extract_count": dbg_to_extract_count,
                 "pre_analysed_dbg_count": pre_analysed_dbg_count,
                 "preanalyse_discard_count": preanalyse_discard_count,
@@ -427,6 +461,9 @@ class ScanAeeTne(ScanBase):
                 "aee_result_count_before_filter": aee_result_count_before_filter,
                 "aee_result_org_count": len(aee_rlt_list_org),
                 "aee_result_final_count": len(aee_rlt_list_final)
+            },
+            "invalid_dbg": {
+                "zero_size_dbg_files": sorted(self._zero_size_dbg_set)
             },
             "failure_reason_counts": self.__get_extract_failed_dbg_reason_count_dict(),
             "extract_failed_dbg": extract_failed_dbg_summary_list
