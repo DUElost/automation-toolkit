@@ -198,7 +198,7 @@ if __name__ == "__main__":
     if scan_mode in [SCAN_MODE_AEE_TNE, SCAN_MODE_AEE, SCAN_MODE_TNE, SCAN_MODE_JENKINS, SCAN_MODE_HWASAN, 
      SCAN_MODE_FUZZ]:
         scanner = ScanAeeTne(scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir, skip_extract, skip_unzip, nas_address, task_tag, special_build_prefix, delete_logs)
-        loggerName = datetime.datetime.now().strftime("LogScanAeeTne_%Y_%m_%d.log")
+        loggerName = datetime.datetime.now().strftime("LogScanAeeTne_%Y_%m_%d_%H_%M_%S.log")
         loggerPath = os.path.join(PathManager.log_folder, loggerName)
         TEST_LOGGER.resetLogFile(loggerPath)
         TEST_LOGGER.info("**************************************************")

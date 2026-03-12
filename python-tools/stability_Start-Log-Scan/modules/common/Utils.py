@@ -54,12 +54,12 @@ def unzip(zip_file, extract_dir):
         return False
 
 
-def aee_extract(aee_extract_tool, dbg_file):
+def aee_extract(aee_extract_tool, dbg_file, timeout=300):
     """使用 aee_extract 工具解压 dbg 文件"""
     try:
         extract_dir = os.path.dirname(dbg_file)
         cmd = [aee_extract_tool, dbg_file]
-        result = subprocess.run(cmd, cwd=extract_dir, capture_output=True, timeout=300)
+        result = subprocess.run(cmd, cwd=extract_dir, capture_output=True, timeout=timeout)
         if result.returncode == 0:
             return None
         else:

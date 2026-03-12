@@ -59,6 +59,7 @@ class ScanAeeTne(ScanBase):
         try:
             unexpected_dbg_count = False
             discard_dbg_info_list = None
+            extract_failed_dbg_list = []
 
             # 解压和预处理
             if not self._skip_extract:
@@ -87,7 +88,7 @@ class ScanAeeTne(ScanBase):
                         else:
                             dbg_file_list = [zz.dbg_path for zz in zz_list_to_be_analysed]
                             if dbg_file_list:
-                                self._extract_dbg(dbg_file_list)
+                                extract_failed_dbg_list = self._extract_dbg(dbg_file_list)
                             else:
                                 TEST_LOGGER.info("预过滤后，dbg文件列表为空")
             else:
@@ -105,6 +106,10 @@ class ScanAeeTne(ScanBase):
                 else:
                     TEST_LOGGER.info("未找到 exp_main 文件")
                     aee_result_list = []
+                fallback_aee_result_list = self._build_extract_failed_aee_result_list(extract_failed_dbg_list)
+                if fallback_aee_result_list:
+                    TEST_LOGGER.warn(f"解压失败的严重问题回填结果数：{len(fallback_aee_result_list)}")
+                    aee_result_list.extend(fallback_aee_result_list)
 
             # 处理结果
             aee_rlt_list_org, aee_rlt_list_final, to_be_deleted = self._aee_to_data_list(

@@ -13,10 +13,36 @@ from modules.common.ExecCmd import exec_cmd
 from modules.common.Path import PathManager
 from modules.common.Logger import TEST_LOGGER
 from modules.common.GlobalAttrs import *
-from modules.common.Utils import unzip, aee_extract, decompress_tne, get_report_history_online, get_package_white_list_online, get_monkey_blacklist_online, get_jira_project_online, post_report_history, sendMail, is_network_connected, extract_expdb, send_msg_by_feishu_robot, get_mixed_md5, walk_with_max_depth, get_str_similar, send_monkey_rlt_by_feishu_robot, get_freeze_version_from_feishu, get_top_app_list_from_feishu, get_tne_tag_info_from_feishu
+from modules.common.Utils import unzip, aee_extract, decompress_tne, get_report_history_online, get_package_white_list_online, get_monkey_blacklist_online, get_jira_project_online, post_report_history, sendMail, is_network_connected, extract_expdb, send_msg_by_feishu_robot, get_mixed_md5, walk_with_max_depth, get_str_similar, send_monkey_rlt_by_feishu_robot, get_freeze_version_from_feishu, get_top_app_list_from_feishu, get_tne_tag_info_from_feishu, random_str
 from modules.common.Version import VERSION
 PATTERN_MAIL = re.compile("[a-z0-9._%+-]+@[a-z0-9.-]+\\.[a-z]{2,4}")
 PATTERN_ANDROID_VERION = re.compile("-([L|M|N|O|P|Q|R|S|T|U|V])-")
+
+class FallbackAeeResult(object):
+
+    def __init__(self, path, version, exp_time, exp_class, exp_type, cur_process, package, detail_col_text, caused_by_col_text, extra_tag="", activity="None", device_id=None, fans_version=False):
+        super(FallbackAeeResult, self).__init__()
+        self._attrs = [
+         path, version, exp_time, exp_class, exp_type, cur_process, package, detail_col_text,
+         caused_by_col_text, extra_tag, 1, activity, device_id, fans_version]
+
+    def get_aee_attrs(self):
+        return list(self._attrs)
+
+    @property
+    def recognize_exception_rlt(self):
+        return True
+
+    @property
+    def handle_recognize_rlt(self):
+        return True
+
+    def is_ignore_ke_ne_hwasan(self):
+        return False
+
+    def is_ne_system_issue(self):
+        return False
+
 
 class ScanBase(ABC):
     __doc__ = "\n    配置文件读取优先级： 平台传入tag值 value > hostname对应 value > default value\n    扫描目录优先级：传入扫描目录参数 > 配置参数配置 > 扫描工具本地目录\n    "
@@ -99,6 +125,7 @@ class ScanBase(ABC):
         self._blacklist = []
         self._report_history_list = []
         self._new_app_info_list = []
+        self._failed_dbg_info_cache = {}
         self._win_to_mnt_dict = {}
         self._ignore_pkglist = False
         self._reporter = None
@@ -1069,9 +1096,8 @@ class ScanBase(ABC):
                         process_count_dict[process_name] = [db_file_map_count, win_path]
                         if db_file_map_count > self._max_single_dbg_number:
                             if process_name == "PROCESS_KE":
-                                TEST_LOGGER.info(f"进程：{process_name} 的个数：{db_file_map_count}，大于单进程最大个数：{self._max_single_dbg_number}")
-                                db_file_map_to_be_analysed.extend(db_file_map_list[:self._max_single_handle_dbg_number])
-                                unhandled_db_file_map.extend(db_file_map_list[self._max_single_handle_dbg_number:])
+                                TEST_LOGGER.info(f"进程：{process_name} 的个数：{db_file_map_count}，大于单进程最大个数：{self._max_single_dbg_number}，当前保留真实数据，不再截断")
+                                db_file_map_to_be_analysed.extend(db_file_map_list)
                             else:
                                 db_file_map_to_be_analysed.extend(db_file_map_list)
                         else:
@@ -1084,9 +1110,8 @@ class ScanBase(ABC):
                     win_path = one_db_file_map.win_path
                     process_count_dict[process_name] = [db_file_map_count, win_path]
                     if db_file_map_count > self._max_single_dbg_number:
-                        TEST_LOGGER.info(f"进程：{process_name} 的个数：{db_file_map_count}，大于单进程最大个数：{self._max_single_dbg_number}")
-                        db_file_map_to_be_analysed.extend(db_file_map_list[:self._max_single_handle_dbg_number])
-                        unhandled_db_file_map.extend(db_file_map_list[self._max_single_handle_dbg_number:])
+                        TEST_LOGGER.info(f"进程：{process_name} 的个数：{db_file_map_count}，大于单进程最大个数：{self._max_single_dbg_number}，当前保留真实数据，不再截断")
+                        db_file_map_to_be_analysed.extend(db_file_map_list)
                     else:
                         db_file_map_to_be_analysed.extend(db_file_map_list)
 
@@ -1100,7 +1125,10 @@ class ScanBase(ABC):
                 else:
                     TEST_LOGGER.info("本次预计处理问题共：{}个".format(to_be_analysed_number))
                     unhandled_number = len(unhandled_db_file_map)
-                    TEST_LOGGER.info("因单个进程问题过多，不做处理问题共：{}个".format(unhandled_number))
+                    if unhandled_number > 0:
+                        TEST_LOGGER.info("因单个进程问题过多，不做处理问题共：{}个".format(unhandled_number))
+                    else:
+                        TEST_LOGGER.info("当前保留全部真实数据，未因单进程阈值丢弃问题")
                     if unhandled_number > 0:
                         send_mail = True
                         scan_status_str = "日志扫描告警"
@@ -1132,7 +1160,7 @@ class ScanBase(ABC):
 
                                                 if dbg_file_path:
                                                     TEST_LOGGER.info("解压dbg文件，并获取版本信息")
-                                                    aee_extract(self._aee_extract, dbg_file_path)
+                                                    aee_extract(self._aee_extract, dbg_file_path, timeout=self._extract_dbg_time_out)
                                                     sys_properties_file_path = None
                                                     for root, dirs, files in os.walk(os.path.dirname(dbg_file_path)):
                                                         for file in files:
@@ -1266,12 +1294,11 @@ class ScanBase(ABC):
                     dbg_file_path_win = zz_internal_list[0].win_path
                     process_count_dict[process_name] = [zz_internal_count, dbg_file_path_win]
                     if zz_internal_count > self._max_single_dbg_number:
-                            if process_name == "PROCESS_KE":
-                                TEST_LOGGER.info("进程：{} 的个数：{}，大于单进程最大个数：{}".format(process_name, zz_internal_count, self._max_single_dbg_number))
-                                zz_list_to_be_analysed.extend(zz_internal_list[:self._max_single_handle_dbg_number])
-                                unhandled_zz_list.extend(zz_internal_list[self._max_single_handle_dbg_number:])
-                            else:
-                                zz_list_to_be_analysed.extend(zz_internal_list)
+                        if process_name == "PROCESS_KE":
+                            TEST_LOGGER.info("进程：{} 的个数：{}，大于单进程最大个数：{}，当前保留真实数据，不再截断".format(process_name, zz_internal_count, self._max_single_dbg_number))
+                            zz_list_to_be_analysed.extend(zz_internal_list)
+                        else:
+                            zz_list_to_be_analysed.extend(zz_internal_list)
                     else:
                         zz_list_to_be_analysed.extend(zz_internal_list)
 
@@ -1284,9 +1311,8 @@ class ScanBase(ABC):
                 dbg_file_path_win = zz_internal_list[0].win_path
                 process_count_dict[process_name] = [zz_internal_count, dbg_file_path_win]
                 if zz_internal_count > self._max_single_dbg_number:
-                    TEST_LOGGER.info("进程：{} 的个数：{}，大于单进程最大个数：{}".format(process_name, zz_internal_count, self._max_single_dbg_number))
-                    zz_list_to_be_analysed.extend(zz_internal_list[:self._max_single_handle_dbg_number])
-                    unhandled_zz_list.extend(zz_internal_list[self._max_single_handle_dbg_number:])
+                    TEST_LOGGER.info("进程：{} 的个数：{}，大于单进程最大个数：{}，当前保留真实数据，不再截断".format(process_name, zz_internal_count, self._max_single_dbg_number))
+                    zz_list_to_be_analysed.extend(zz_internal_list)
                 else:
                     zz_list_to_be_analysed.extend(zz_internal_list)
 
@@ -1300,7 +1326,10 @@ class ScanBase(ABC):
             else:
                 TEST_LOGGER.info("本次预计处理问题共：{}个".format(to_be_analysed_number))
                 unhandled_number = len(unhandled_zz_list)
-                TEST_LOGGER.info("因单个进程问题过多，不做处理问题共：{}个".format(unhandled_number))
+                if unhandled_number > 0:
+                    TEST_LOGGER.info("因单个进程问题过多，不做处理问题共：{}个".format(unhandled_number))
+                else:
+                    TEST_LOGGER.info("当前保留全部真实数据，未因单进程阈值丢弃问题")
                 if unhandled_number > 0:
                     scan_status_str = "日志扫描告警"
                     send_mail = True
@@ -1311,7 +1340,7 @@ class ScanBase(ABC):
                         build_version = "UnknownBuild"
                         try:
                             zz_internal = zz_list_to_be_analysed[0]
-                            aee_extract(self._aee_extract, zz_internal.dbg_path)
+                            aee_extract(self._aee_extract, zz_internal.dbg_path, timeout=self._extract_dbg_time_out)
                             sys_properties_file_path = None
                             for root, dirs, files in os.walk(os.path.dirname(zz_internal.dbg_path)):
                                 for file in files:
@@ -1444,7 +1473,7 @@ class ScanBase(ABC):
             done_count = 1
             all_count = len(dbg_file_list)
             with ThreadPoolExecutor(max_workers=5, thread_name_prefix="aee_extract_thread") as executor:
-                extract_dbg_thread = [executor.submit(aee_extract, self._aee_extract, aee_file_path) for aee_file_path in dbg_file_list]
+                extract_dbg_thread = [executor.submit(aee_extract, self._aee_extract, aee_file_path, self._extract_dbg_time_out) for aee_file_path in dbg_file_list]
                 for future in as_completed(extract_dbg_thread):
                     TEST_LOGGER.info(f"已完成解压dbg文件个数：{done_count}/{all_count} 占比：{done_count * 100 / all_count:.2f}")
                     done_count += 1
@@ -1456,6 +1485,109 @@ class ScanBase(ABC):
             TEST_LOGGER.warn("未发现dbg文件，不执行dbg解压")
         TEST_LOGGER.info("******************** 解压dbg文件已完成 ********************\n")
         return extract_timeout_dbg_list
+
+    def _get_extract_failed_dbg_pkglist_candidates(self, exp_class, cur_process):
+        candidate_list = []
+        if exp_class:
+            candidate_list.append(exp_class)
+        if cur_process:
+            candidate_list.append(cur_process)
+            if ":" in cur_process:
+                candidate_list.append(cur_process.split(":", 1)[0])
+        if exp_class == "Kernel (KE)" or cur_process == "PROCESS_KE":
+            candidate_list.extend(["Kernel (KE)", "Kernel KE"])
+        return [candidate for candidate in candidate_list if candidate]
+
+    def _should_keep_extract_failed_dbg(self, exp_class, cur_process):
+        if self._ignore_pkglist:
+            return True
+        candidate_list = self._get_extract_failed_dbg_pkglist_candidates(exp_class, cur_process)
+        for candidate in candidate_list:
+            if candidate in self._pkglist:
+                return True
+        return False
+
+    def _get_failed_dbg_device_root_and_id(self, dbg_file):
+        normalized_scan_root = self._scan_root_dir.replace("\\", "/").rstrip("/")
+        normalized_dbg_file = dbg_file.replace("\\", "/")
+        if normalized_scan_root and normalized_dbg_file.startswith(normalized_scan_root + "/"):
+            relative_path = normalized_dbg_file[len(normalized_scan_root) + 1:]
+            path_parts = relative_path.split("/", 1)
+            if path_parts and path_parts[0]:
+                device_id = path_parts[0]
+                return (os.path.join(self._scan_root_dir, device_id), device_id)
+        regex_rlt = re.search("/([A-Za-z0-9]{10,})/", normalized_dbg_file)
+        if regex_rlt:
+            device_id = regex_rlt.group(1)
+            return (os.path.join(self._scan_root_dir, device_id), device_id)
+        return (None, None)
+
+    def _get_failed_dbg_build_version_and_device_id(self, dbg_file):
+        device_root, device_id = self._get_failed_dbg_device_root_and_id(dbg_file)
+        cache_key = device_root if device_root else dbg_file
+        cache_rlt = self._failed_dbg_info_cache.get(cache_key)
+        if cache_rlt:
+            return cache_rlt
+        build_version = self._build_version if self._build_version else "VersionNone"
+        fallback_device_id = device_id if device_id else "unknown_device_id"
+        if device_root and os.path.isdir(device_root):
+            for root, dirs, files in os.walk(device_root):
+                if "SYS_PROPERTIES" in files:
+                    sys_properties_path = os.path.join(root, "SYS_PROPERTIES")
+                    try:
+                        sys_properties = SysProperties(sys_properties_path)
+                        if sys_properties.build_version:
+                            build_version = sys_properties.build_version
+                        if sys_properties.device_id:
+                            fallback_device_id = sys_properties.device_id
+                        break
+                    except:
+                        TEST_LOGGER.warn("读取 SYS_PROPERTIES 文件失败：{}\n{}".format(sys_properties_path, traceback.format_exc()))
+        self._failed_dbg_info_cache[cache_key] = (build_version, fallback_device_id)
+        return self._failed_dbg_info_cache[cache_key]
+
+    def _build_extract_failed_aee_result(self, dbg_file):
+        zz_internal_file_path = os.path.join(os.path.dirname(dbg_file), "ZZ_INTERNAL")
+        zz_internal = ZZ_internal(zz_internal_file_path, dbg_file, self._convert_path_to_win(dbg_file))
+        if not self._should_keep_extract_failed_dbg(zz_internal.exp_class, zz_internal.cur_process):
+            return None
+        build_version, device_id = self._get_failed_dbg_build_version_and_device_id(dbg_file)
+        exp_class = zz_internal.exp_class
+        exp_type = zz_internal.exp_type
+        exp_time = zz_internal.exp_time
+        cur_process = zz_internal.cur_process
+        package = cur_process
+        if exp_class == "CLASS_UNKNOWN" and ".ke" in dbg_file.lower():
+            exp_class = "Kernel (KE)"
+        if exp_class in ('Kernel (KE)', 'HWT', 'HANG_DETECT', 'Kernel API Dump', 'Hardware Reboot'):
+            cur_process = exp_class
+            package = exp_class
+        elif cur_process == "PROCESS_KE":
+            exp_class = "Kernel (KE)"
+            cur_process = "Kernel (KE)"
+            package = "Kernel (KE)"
+        if exp_time == "TIME_UNKNOWN":
+            exp_time = "TIME_UNKNOWN"
+        detail_col_text = "Device_id: {}\n{}\n手机版本：['{}']".format(device_id, RECOGNIZE_LIB_VERSION, build_version)
+        caused_by_col_text = "当前类型没有获取详细信息方式，请自己查看日志文件，本内容只为了Jira不能去重：\n{}".format(random_str(slen=200))
+        TEST_LOGGER.warn("dbg 文件解压失败，已生成兜底结果写入报告：{}".format(dbg_file))
+        return FallbackAeeResult(dbg_file, build_version, exp_time, exp_class, exp_type, cur_process, package, detail_col_text, caused_by_col_text, device_id=device_id)
+
+    def _build_extract_failed_aee_result_list(self, extract_failed_dbg_list):
+        fallback_aee_result_list = []
+        if not extract_failed_dbg_list:
+            return fallback_aee_result_list
+        for dbg_file in sorted(set(extract_failed_dbg_list)):
+            exp_main_file_path = dbg_file + ".DEC" + os.sep + "__exp_main.txt"
+            if os.path.isfile(exp_main_file_path):
+                TEST_LOGGER.info("dbg 文件虽然解压失败，但已存在 __exp_main.txt，跳过兜底结果：{}".format(dbg_file))
+                continue
+            fallback_aee_result = self._build_extract_failed_aee_result(dbg_file)
+            if fallback_aee_result:
+                fallback_aee_result_list.append(fallback_aee_result)
+        if fallback_aee_result_list:
+            TEST_LOGGER.warn("解压失败后写入报告的兜底 AEE 结果共：{} 个".format(len(fallback_aee_result_list)))
+        return fallback_aee_result_list
 
     def _decompress_tne(self, tne_file_list):
         """
