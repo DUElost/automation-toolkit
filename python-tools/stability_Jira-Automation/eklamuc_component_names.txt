@@ -1,0 +1,74 @@
+APAC
+Camera - Code Out of ODC
+Camera app
+Camera driver
+Camera KP
+Camera tuning
+Camera tuning YSX
+Carrier Compliance and RFIs
+Carriers compliance & RFIs
+Core - AOSP Launcher
+CUSTOMERREQ
+DFS_BSP
+DFS_Tool
+EKTM
+EMEA
+FIT - Retest
+HW_ANT
+HW_AudioTunning
+HW_BB
+HW_BSP
+HW_Charger
+HW_LCD
+HW_Sensor
+HW_Thermal
+HW_TP
+LATAM
+n/a
+OTA
+Product - GPD - Lamu
+Services - Instrumentation
+SW_APP_Faceunlock
+SW_APP_GMS
+SW_APP_Launcher
+SW_APP_Localizaiton
+SW_APP_OTHER_SYSTEM_APPS
+SW_APP_PAI
+SW_APP_Platform
+SW_APP_Preloads
+SW_APP_Settings
+SW_APP_Stability
+SW_APP_SystemUI
+SW_APP_Third_Apk
+SW_BSP_Audio
+SW_BSP_BT
+SW_BSP_Charger
+SW_BSP_Common
+SW_BSP_Fingerprint
+SW_BSP_GPS
+SW_BSP_LCD
+SW_BSP_Memory
+SW_BSP_NFC
+SW_BSP_SDCard
+SW_BSP_Security
+SW_BSP_Sensor
+SW_BSP_Stability
+SW_BSP_Thermal
+SW_BSP_TP
+SW_BSP_USB
+SW_BSP_Vib
+SW_BSP_WIFI
+SW_Certifaction
+SW_Factory
+SW_Factory Req
+SW_FW_Audio
+SW_FW_Display
+SW_FW_OTA
+SW_FW_SYSTEM
+SW_Modem
+SW_Performance
+SW_Platform
+SW_PowerConsumption
+SW_Telephony
+SW_XTS
+Triage

@@ -1,0 +1,40 @@
+# OpenSSL source tree (vendored, not needed in repo)
+openssl-1.1.1g/
+openssl-1.1.1g.tar.gz
+
+# Certificates and private keys
+*.p12
+*.crt
+*.key
+*.pem
+openssl.cnf
+
+# SQLite databases (local data)
+*.db
+
+# Virtual environments
+venv-jira/
+jira_automation_env/
+
+# Execution result logs
+jira_batch_create_result_*.txt
+jira_motorola_edart_batch_create_result_*.txt
+jira_tinno_batch_create_result_*.txt
+**/log/*.txt
+
+# Temporary output files
+config/output.txt
+config/output_view.txt
+tests/output.txt
+tests/output_view.txt
+
+# JIRA API data dumps
+motorola_createmeta.json
+motorola_eklamuc_components_*.json
+motorola_project_info.json
+
+# Test data (generated)
+tests/pipeline_result.xlsx
+tests/sample_issues.xlsx
+tests/Main_Jira_database.xlsx
+src/test_jira_tinno/*.xlsx
