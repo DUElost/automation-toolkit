@@ -86,3 +86,5 @@ dump.hprof
 nul
 .ace-tool/
 .claude/
+.runtime/
+tmp_*.json
