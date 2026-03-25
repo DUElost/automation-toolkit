@@ -1,0 +1,10 @@
+{
+  "sub_plan_name": "自动化创建子计划示例",
+  "owner_name": "吕代",
+  "start_date": "2026-03-20",
+  "end_date": "2026-03-27",
+  "testsuite_component_name": "稳定性",
+  "task_type": "专项测试计划",
+  "task_sub_type": "monkey专项",
+  "remark": "请根据实际表单字段补充/调整"
+}

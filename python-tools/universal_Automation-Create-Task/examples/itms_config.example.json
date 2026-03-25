@@ -1,0 +1,91 @@
+{
+  "base_url": "http://itms.tinno.com",
+  "workbench_url": "http://itms.tinno.com/#/workbench",
+  "project_center_url": "http://itms.tinno.com/#/projecthub/projects",
+  "project_name": "T726A",
+  "project_overview_url": "http://itms.tinno.com/#/projecthub/projects/259346182071382083/259346182071382084/overview",
+  "plans_url": "http://itms.tinno.com/#/projecthub/projects/259346182071382083/259346182071382084/plans",
+  "main_plan_name": "RC阶段测试",
+  "testsuite_component_name": "稳定性",
+  "task_type": "专项测试计划",
+  "task_sub_type": "monkey专项",
+  "main_plan_content_url": "http://itms.tinno.com/#/projecthub/projects/259346182071382083/259346182071382084/plans/content/277604476741613608",
+  "sub_plan_form_url": "http://itms.tinno.com/#/projecthub/projects/259346182071382083/259346182071382084/plans/content/277604476741613608/316865797144098902",
+  "owner_name": "",
+  "browser": {
+    "headless": false,
+    "slow_mo_ms": 150,
+    "timeout_ms": 20000,
+    "storage_state_path": ".runtime/itms_storage_state.json"
+  },
+  "auth": {
+    "auto_relogin": false,
+    "login_url": "http://itms.tinno.com/#/workbench",
+    "username_env": "ITMS_USERNAME",
+    "password_env": "ITMS_PASSWORD",
+    "username_selector": "",
+    "password_selector": "",
+    "submit_selector": "",
+    "success_url_contains": "#/workbench",
+    "success_wait_ms": 15000
+  },
+  "api": {
+    "enabled": true,
+    "profile_path": ".runtime/itms_create_sub_plan_api.json",
+    "discovery_output_path": ".runtime/itms_api_discovery.json",
+    "create_keywords": [
+      "plan",
+      "sub",
+      "create",
+      "add",
+      "content"
+    ],
+    "body_overrides": {
+      "name": "{{sub_plan_name}}",
+      "startTime": "{{start_time}}",
+      "endTime": "{{end_time}}",
+      "ownerName": "{{owner_name}}",
+      "remark": "{{remark}}"
+    }
+  },
+  "ui": {
+    "prefer_direct_urls": true,
+    "texts": {
+      "project_center": "项目中心",
+      "test_plan": "测试计划",
+      "add_sub_plan": "添加子计划",
+      "submit_buttons": [
+        "确定",
+        "提交",
+        "保存"
+      ]
+    },
+    "field_bindings": [
+      {
+        "field": "sub_plan_name",
+        "label": "子计划名称",
+        "type": "text"
+      },
+      {
+        "field": "owner_name",
+        "label": "Owner",
+        "type": "text"
+      },
+      {
+        "field": "start_date",
+        "label": "开始时间",
+        "type": "date"
+      },
+      {
+        "field": "end_date",
+        "label": "结束时间",
+        "type": "date"
+      },
+      {
+        "field": "remark",
+        "label": "备注",
+        "type": "textarea"
+      }
+    ]
+  }
+}
