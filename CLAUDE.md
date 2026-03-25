@@ -9,6 +9,7 @@
 
 | 日期 | 变更内容 |
 |------|----------|
+| 2026-03-25 | 新增 stability_Start-Log-Scan、stability_FTPserver-Check、universal_Automation-Create-Task 模块 |
 | 2026-02-06 | 新增 Top300 Result Filler、MemoryFusion、Factory-Reset 工具模块 |
 | 2026-02-04 19:23:02 | 初始化 CLAUDE.md 文档，完成全仓扫描与模块识别 |
 
@@ -33,7 +34,10 @@ automation-toolkit/
 │   ├── performance_SMT_ResultFiller/     # SMT 性能测试结果填充工具
 │   ├── performance_Top300_ResultFiller/   # Top300 应用启动时间数据填充工具
 │   ├── system_MemoryFusion/              # 内存融合工具
-│   └── universal_Factory-Reset/          # 通用恢复出厂设置工具
+│   ├── stability_Start-Log-Scan/        # 稳定性测试日志扫描分析工具
+│   ├── stability_FTPserver-Check/       # FTP 服务器日志检查工具
+│   ├── universal_Factory-Reset/          # 通用恢复出厂设置工具
+│   └── universal_Automation-Create-Task/ # ITMS 自动化创建测试任务工具
 ├── shared/                    # 共享资源
 │   └── python-utils/          # 共享 Python 工具库
 ├── android-tools/             # Android 工具集（规划中）
@@ -62,6 +66,9 @@ graph TD
     B --> H["performance_Top300_ResultFiller"];
     B --> I["system_MemoryFusion"];
     B --> J["universal_Factory-Reset"];
+    B --> L["stability_Start-Log-Scan"];
+    B --> M["stability_FTPserver-Check"];
+    B --> N["universal_Automation-Create-Task"];
 
     C --> K["python-utils"];
 
@@ -80,6 +87,9 @@ graph TD
 | [python-tools/performance_Top300_ResultFiller](./python-tools/performance_Top300_ResultFiller/CLAUDE.md) | Python | Top300 应用启动时间数据自动填充 Excel 工具 | 活跃 |
 | [python-tools/system_MemoryFusion](./python-tools/system_MemoryFusion/) | Python | 内存融合工具 | 活跃 |
 | [python-tools/universal_Factory-Reset](./python-tools/universal_Factory-Reset/) | Python | 通用恢复出厂设置工具 | 活跃 |
+| [python-tools/stability_Start-Log-Scan](./python-tools/stability_Start-Log-Scan/) | Python | 稳定性测试日志扫描分析工具（AEE/TNE/KE） | 活跃 |
+| [python-tools/stability_FTPserver-Check](./python-tools/stability_FTPserver-Check/) | Python | FTP 服务器日志检查与未解析 dbg 报告工具 | 活跃 |
+| [python-tools/universal_Automation-Create-Task](./python-tools/universal_Automation-Create-Task/) | Python | ITMS 自动化批量创建测试任务工具 | 活跃 |
 | [shared/python-utils](./shared/python-utils/CLAUDE.md) | Python | 共享 Python 工具库 | 初始 |
 
 ---
