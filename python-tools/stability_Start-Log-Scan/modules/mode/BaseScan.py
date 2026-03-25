@@ -774,6 +774,18 @@ class ScanBase(ABC):
                 current_aee_final_length = len(aee_rlt_list_final)
                 is_duplicate = False
                 for j in range(current_aee_final_length):
+                    final_attrs = aee_rlt_list_final[j]
+                    final_exp_class = final_attrs[3]
+                    final_cur_process = final_attrs[5]
+                    final_package = final_attrs[6]
+
+                    if final_exp_class != attrs_exp_class:
+                        continue
+
+                    # 所有 AEE 类型去重前都必须同包名，避免跨应用误聚合。
+                    if final_package != attrs_package:
+                        continue
+
                     # 版本不同则跳过（但原始代码用 pass，所以这里也不跳过）
                     # 原始代码逻辑：if not attrs_version == "VersionNone": if attrs_version != ...: pass
                     # 这意味着只有当 attrs_version == "VersionNone" 时才跳过版本检查
@@ -784,7 +796,7 @@ class ScanBase(ABC):
                     
                     # 计算相似度
                     try:
-                        str_1 = aee_rlt_list_final[j][8]
+                        str_1 = final_attrs[8]
                         ratio = get_str_similar(str_1, attrs_caused_by)
                         if ratio >= self._ratio_std_aee:
                             aee_rlt_list_final[j][10] = aee_rlt_list_final[j][10] + 1
@@ -1260,6 +1272,9 @@ class ScanBase(ABC):
                                  "discard_ota_ke_dbg_package", "discard_ota_ke_dbg_detail", "discard_ota_ke_dbg_caused_by",
                                  "discard_ota_ke_dbg_extra_tag", 1, "discard_ota_ke_dbg_activity", "discard_device_id"])
                                 continue
+                    if exp_class in ('Kernel API Dump',):
+                        unknown_process_zz_dict.setdefault(f"{exp_class}: {exp_class}", []).append(zz_internal)
+                        continue
                     if cur_process in ('PROCESS_UNKNOWN', 'PROCESS_KE', 'SYSTEM_API_DUMP'):
                         unknown_process_zz_dict.setdefault(f"{cur_process}: {exp_class}", []).append(zz_internal)
                         continue

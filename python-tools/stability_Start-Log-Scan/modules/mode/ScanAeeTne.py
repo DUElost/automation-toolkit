@@ -143,9 +143,8 @@ class ScanAeeTne(ScanBase):
             aee_rlt_list_org, aee_rlt_list_final, to_be_deleted = self._aee_to_data_list(
                 aee_result_list, True, self._special_build_prefix)
 
-            # 注意：不添加 discard_dbg_info_list 到结果中，与原始 exe 行为一致
-            # if discard_dbg_info_list:
-            #     aee_rlt_list_org = self._save_discard_to_org(aee_rlt_list_org, discard_dbg_info_list)
+            if discard_dbg_info_list:
+                aee_rlt_list_org = self._save_discard_to_org(aee_rlt_list_org, discard_dbg_info_list)
 
             # 生成结果
             scan_summary = self.__build_scan_summary(
