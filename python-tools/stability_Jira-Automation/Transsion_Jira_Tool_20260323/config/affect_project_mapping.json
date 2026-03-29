@@ -1,0 +1,19 @@
+{
+  "X6726B": {
+    "jira_project": "X6726BO151",
+    "affect_project": "X6726B"
+  },
+  "X6851": {
+    "jira_project": "X6851OS16",
+    "affect_project": "X6851-P865"
+  },
+  "X6851B": {
+    "jira_project": "X6851BOS16",
+    "affect_project": "X6851B-P865",
+    "monkey_project": "X6851B6AEE"
+  },
+  "X6852": {
+    "jira_project": "X6852OS16",
+    "affect_project": "X6852-P775A"
+  }
+}
