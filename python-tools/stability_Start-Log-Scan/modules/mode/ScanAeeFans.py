@@ -204,7 +204,7 @@ class ScanAeeFans(ScanBase):
                 if aee_rlt_list_final:
                     TEST_LOGGER.info("项目：{} 去重后文件：{}".format(prj, final_excel_path))
                     excel = Excel(final_excel_path)
-                    excel.insertResultAee(aee_rlt_list_final)
+                    excel.insertResultAee(aee_rlt_list_final, deduplicated=True)
                 else:
                     TEST_LOGGER.info(("项目：{}的去重后数据为空，不生成Excel文件".format(prj)), tag=__name__)
             except:
@@ -215,7 +215,7 @@ class ScanAeeFans(ScanBase):
                 if aee_rlt_list_core_and_reboot:
                     TEST_LOGGER.info(f"项目：{prj} 核心应用问题去重后文件：{reboot_excel_path}")
                     excel = Excel(reboot_excel_path)
-                    excel.insertResultAee(aee_rlt_list_core_and_reboot)
+                    excel.insertResultAee(aee_rlt_list_core_and_reboot, deduplicated=True)
                 else:
                     TEST_LOGGER.info(("项目：{}的核心应用问题去重后数据为空，不生成Excel文件".format(prj)), tag=__name__)
             except:
@@ -369,6 +369,7 @@ class ScanAeeFans(ScanBase):
             attrs_caused_by = str(aee_result_attrs[8])
             extra_tag = aee_result_attrs[9]
             attrs_activity = aee_result_attrs[11]
+            attrs_device_id = aee_result_attrs[12] if len(aee_result_attrs) > 12 else None
             attrs_fans_version = aee_result_attrs[13]
             aee_result_attrs[0] = self._convert_path_to_win(attrs_path)
             path_org = aee_result_attrs[0]
@@ -441,7 +442,7 @@ class ScanAeeFans(ScanBase):
                 else:
                     target_aee_rlt_list = aee_rlt_list_final
                 if len(target_aee_rlt_list) == 0:
-                    target_aee_rlt_list.append(aee_result_attrs)
+                    target_aee_rlt_list.append(self._build_aee_final_attrs(aee_result_attrs))
                     continue
                 current_target_aee_rlt_list_length = len(target_aee_rlt_list)
                 for j in range(current_target_aee_rlt_list_length):
@@ -459,12 +460,13 @@ class ScanAeeFans(ScanBase):
                             ratio = get_str_similar(str_1, attrs_caused_by)
                             if ratio >= self._ratio_std_aee:
                                 target_aee_rlt_list[j][10] = target_aee_rlt_list[j][10] + 1
+                                self._merge_aee_final_device_id(target_aee_rlt_list[j], attrs_device_id)
                                 break
                         except:
                             pass
 
                         if j == current_target_aee_rlt_list_length - 1:
-                            target_aee_rlt_list.append(aee_result_attrs)
+                            target_aee_rlt_list.append(self._build_aee_final_attrs(aee_result_attrs))
 
         if aee_rlt_list_final:
             for aee_rlt in aee_rlt_list_final:

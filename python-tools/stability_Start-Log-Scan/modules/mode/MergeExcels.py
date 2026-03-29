@@ -146,7 +146,7 @@ class MergeExcels(ScanBase):
                         TEST_LOGGER.info("累计去重后Excel文件：{}".format(final_excel_path))
                         excel = Excel(final_excel_path)
                         try:
-                            excel.insertResultAee(total_aee_rlt_list_final, priority=(self._MergeExcels__priority))
+                            excel.insertResultAee(total_aee_rlt_list_final, priority=(self._MergeExcels__priority), deduplicated=True)
                         except:
                             TEST_LOGGER.warn(traceback.format_exc())
 

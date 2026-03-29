@@ -302,7 +302,7 @@ class ScanAeeTne(ScanBase):
                 final_excel_path = os.path.join(result_dir, final_excel_name)
                 try:
                     excel_final = Excel(final_excel_path)
-                    excel_final.insertResultAee(aee_rlt_list_final)
+                    excel_final.insertResultAee(aee_rlt_list_final, deduplicated=True)
                     TEST_LOGGER.info(f"去重后结果Excel已生成：{final_excel_path}")
                 except PermissionError:
                     # 如果文件被锁定，添加额外的时间戳
@@ -310,7 +310,7 @@ class ScanAeeTne(ScanBase):
                     final_excel_name = f"Result_{jira_repo}_{reporter}_MonkeyAEE_{self._scan_place}_{date_time_str}_{extra_timestamp}.xls"
                     final_excel_path = os.path.join(result_dir, final_excel_name)
                     excel_final = Excel(final_excel_path)
-                    excel_final.insertResultAee(aee_rlt_list_final)
+                    excel_final.insertResultAee(aee_rlt_list_final, deduplicated=True)
                     TEST_LOGGER.info(f"去重后结果Excel已生成（使用额外时间戳）：{final_excel_path}")
                 generated_files["final_excel"] = final_excel_path
 

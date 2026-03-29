@@ -191,6 +191,35 @@ class ScanBase(ABC):
         self._get_standard_info()
         self._scan()
 
+    def _normalize_aee_device_id(self, device_id):
+        if device_id is None:
+            return None
+        device_id = str(device_id).strip()
+        if not device_id:
+            return None
+        if device_id.lower() in ("none", "undefined", "unknown_device_id", "discard_device_id"):
+            return None
+        return device_id
+
+    def _build_aee_final_attrs(self, aee_result_attrs):
+        final_attrs = list(aee_result_attrs)
+        device_id_set = set()
+        device_id = self._normalize_aee_device_id(final_attrs[12] if len(final_attrs) > 12 else None)
+        if device_id:
+            device_id_set.add(device_id)
+        final_attrs.append(device_id_set)
+        return final_attrs
+
+    def _merge_aee_final_device_id(self, final_attrs, device_id):
+        if final_attrs and isinstance(final_attrs[-1], set):
+            device_id_set = final_attrs[-1]
+        else:
+            device_id_set = set()
+            final_attrs.append(device_id_set)
+        normalized_device_id = self._normalize_aee_device_id(device_id)
+        if normalized_device_id:
+            device_id_set.add(normalized_device_id)
+
     @abstractmethod
     def _get_scan_dir_failed(self, error_msg):
         """
@@ -608,6 +637,7 @@ class ScanBase(ABC):
                 attrs_caused_by = str(aee_result_attrs[8])
                 extra_tag = aee_result_attrs[9]
                 attrs_activity = aee_result_attrs[11]
+                attrs_device_id = aee_result_attrs[12] if len(aee_result_attrs) > 12 else None
                 to_be_deleted_file_path = aee_result_attrs[0]
                 if replace_path:
                     aee_result_attrs[0] = self._convert_path_to_win(attrs_path)
@@ -748,7 +778,7 @@ class ScanBase(ABC):
                     continue
                 # fatal 问题特殊处理
                 if "fatal" in attrs_path and "detailToBeDone" in attrs_caused_by:
-                    aee_rlt_list_final.append(aee_result_attrs)
+                    aee_rlt_list_final.append(self._build_aee_final_attrs(aee_result_attrs))
                     continue
                 # FUZZ 模式过滤
                 if self._scan_mode in [SCAN_MODE_FUZZ, SCAN_MODE_FUZZ_PLATFORM]:
@@ -769,7 +799,7 @@ class ScanBase(ABC):
                 # 注意：原始代码使用 pass 而不是 continue，意味着即使条件不满足也会继续执行相似度计算
                 # 这里保持与原始 exe 一致的行为
                 if len(aee_rlt_list_final) == 0:
-                    aee_rlt_list_final.append(aee_result_attrs)
+                    aee_rlt_list_final.append(self._build_aee_final_attrs(aee_result_attrs))
                     continue
                 current_aee_final_length = len(aee_rlt_list_final)
                 is_duplicate = False
@@ -800,13 +830,14 @@ class ScanBase(ABC):
                         ratio = get_str_similar(str_1, attrs_caused_by)
                         if ratio >= self._ratio_std_aee:
                             aee_rlt_list_final[j][10] = aee_rlt_list_final[j][10] + 1
+                            self._merge_aee_final_device_id(aee_rlt_list_final[j], attrs_device_id)
                             is_duplicate = True
                             break
                     except:
                         pass
                 # 如果不是重复，添加到最终列表
                 if not is_duplicate:
-                    aee_rlt_list_final.append(aee_result_attrs)
+                    aee_rlt_list_final.append(self._build_aee_final_attrs(aee_result_attrs))
 
             if len(self._new_app_info_list) > 0:
                 try:

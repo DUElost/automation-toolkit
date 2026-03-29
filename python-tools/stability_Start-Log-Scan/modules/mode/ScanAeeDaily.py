@@ -269,7 +269,7 @@ class ScanAeeDaily(ScanBase):
             TEST_LOGGER.info("去重后Excel文件：{}".format(final_excel_path))
             excel = Excel(final_excel_path)
             try:
-                excel.insertResultAee(aee_rlt_list_final)
+                excel.insertResultAee(aee_rlt_list_final, deduplicated=True)
             except:
                 TEST_LOGGER.warn(traceback.format_exc())
 

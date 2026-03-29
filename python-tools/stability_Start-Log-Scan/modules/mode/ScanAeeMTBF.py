@@ -199,7 +199,7 @@ class ScanAeeMTBF(ScanBase):
             TEST_LOGGER.info("去重后Excel文件：{}".format(final_excel_path))
             excel = Excel(final_excel_path)
             try:
-                excel.insertResultAee(aee_rlt_list_final, pipeline_id=(self._pipeline_id), utp_tcid=(self._utp_tcid), utp_taskid=(self._utp_taskid))
+                excel.insertResultAee(aee_rlt_list_final, pipeline_id=(self._pipeline_id), utp_tcid=(self._utp_tcid), utp_taskid=(self._utp_taskid), deduplicated=True)
             except:
                 TEST_LOGGER.warn(traceback.format_exc())
 
