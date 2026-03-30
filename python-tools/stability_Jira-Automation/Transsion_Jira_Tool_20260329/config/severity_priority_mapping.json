@@ -1,0 +1,4 @@
+{
+  "deprecated": true,
+  "message": "优先级映射已并入 问题等级定级表.xls 的 sheet: 等级优先级映射。当前脚本不再读取本文件。"
+}
