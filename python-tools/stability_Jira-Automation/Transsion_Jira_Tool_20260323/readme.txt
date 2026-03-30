@@ -214,12 +214,27 @@ python create_transsion_jira_batch_from_excel.py
   当前项目实测会在建单后先处于 `Submitted`
   脚本会在评论和附件处理完成后，自动查找指向 `Open/开放` 的可用 transition 并执行
   为避免模块负责人没有建单审核权限，脚本会在建单时先使用当前登录用户作为 Assignee，流转完成后再回写模板中的目标 Assignee
+- 第二阶段新增回归配置
+  - 配置文件：`config/regression_rules.json`
+  - 读取模块：`transsion_regression_models.py`
+  - 执行前会先按 `jira_export.jql` 导出历史问题单到本地 SQLite
+  - `matching.required_exact_fields` 固定要求 `affect_project`、`environment`、`exp_class`
+  - `matching.cause_similarity_threshold` 默认值为 `0.9`
+  - `regression.required_regression_pass_versions` 默认值为 `2`
+  - `output.sqlite_path` 默认写入 `result/transsion_regression_cache.db`
+  - `output.excel_summary_dir` 默认写入 `result`
+  - `status_rules` 用于定义回归状态归类，后续第二阶段回归比对会按该配置统一判断状态
+  - `open_like` 命中后不会重复提单，会沿用历史单并覆盖更新 `Summary/Description/Priority`
+  - `resolved_fixed` 且本轮未命中时，会按 `required_regression_pass_versions` 做回归 PASS 计数；达到阈值后会尝试执行关单流转
+  - `resolved_fixed` 但 `fixVersion` 为空，或当前版本已达到/超过 `fixVersion` 且再次命中时，会在结果中标记 `MANUAL_REVIEW`
+  - 每次运行都会同时输出 JSON 结果、SQLite 明细和 Excel 摘要
 - --validate-metadata
   只读取 Jira 项目的 create meta 并打印必填字段、字段名映射，不创建问题
   适用场景：第一次接入新项目、确认字段 ID、确认问题类型是否存在、确认必填项是否变化
 - --dry-run
   读取上传模板并做完整字段校验，但不实际创建问题
   适用场景：在真实提单前确认 Components、Versions、Affect Project、优先级和自定义字段值都能通过
+  dry-run 同样会执行历史单匹配和 PASS 判定，并输出 JSON/SQLite/Excel 结果，但不会实际修改 Jira 或累计本地 PASS 状态
 - --add-comments
   实际建单成功后，把模板中的 PS 列追加为评论
 

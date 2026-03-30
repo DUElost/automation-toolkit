@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import os
 import re
+import json
 from typing import Any, Dict, List, Optional, Tuple
 
 from jira import JIRA
@@ -146,6 +147,104 @@ def connect_to_jira(server: str, username: str, password: str) -> JIRA:
         "proxies": {"http": None, "https": None},
     }
     return JIRA(options=options, basic_auth=(username, password))
+
+
+def fetch_issue_snapshot_fields(
+    jira_client: JIRA,
+    issue_key: str,
+    field_mapping: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    issue = jira_client.issue(issue_key)
+    raw_payload = getattr(issue, "raw", {}) or {}
+    fields = raw_payload.get("fields", {}) if isinstance(raw_payload, dict) else {}
+    issue_fields = getattr(issue, "fields", None)
+
+    def pick_value(container: Any, key: str) -> Any:
+        if isinstance(container, dict):
+            return container.get(key)
+        return getattr(container, key, None)
+
+    def normalize_fix_version(value: Any) -> Optional[str]:
+        if value is None:
+            return None
+        if isinstance(value, list):
+            names = []
+            for item in value:
+                if isinstance(item, dict):
+                    name = str(item.get("name") or item.get("value") or "").strip()
+                else:
+                    name = str(item or "").strip()
+                if name:
+                    names.append(name)
+            return ", ".join(names) if names else None
+        if isinstance(value, dict):
+            name = str(value.get("name") or value.get("value") or "").strip()
+            return name or None
+        text = str(value).strip()
+        return text or None
+
+    def normalize_name(value: Any) -> Optional[str]:
+        if value is None:
+            return None
+        if isinstance(value, str):
+            text = value.strip()
+            return text or None
+        name = pick_value(value, "name")
+        if name is not None:
+            text = str(name).strip()
+            return text or None
+        text = str(value).strip()
+        return text or None
+
+    def resolve_field_value(field_name: str) -> Any:
+        mapped_value: Any = None
+        if field_mapping:
+            mapping_value = field_mapping.get(field_name)
+            if isinstance(mapping_value, (list, tuple, set)):
+                candidates = [str(item).strip() for item in mapping_value if str(item).strip()]
+            elif mapping_value:
+                candidates = [str(mapping_value).strip()]
+            else:
+                candidates = []
+            for candidate in candidates:
+                if candidate in fields:
+                    mapped_value = fields.get(candidate)
+                    break
+                if issue_fields is not None and hasattr(issue_fields, candidate):
+                    mapped_value = getattr(issue_fields, candidate)
+                    break
+            if mapped_value is not None:
+                return mapped_value
+        if field_name in fields:
+            return fields.get(field_name)
+        if issue_fields is not None and hasattr(issue_fields, field_name):
+            return getattr(issue_fields, field_name)
+        return None
+
+    status_value = pick_value(fields, "status")
+    resolution_value = pick_value(fields, "resolution")
+    fix_versions = pick_value(fields, "fixVersions") or pick_value(fields, "fix_version") or []
+    raw_payload_text = raw_payload
+    if not isinstance(raw_payload_text, str):
+        raw_payload_text = json.dumps(raw_payload_text, ensure_ascii=False)
+
+    result: Dict[str, Any] = {
+        "jira_key": str(getattr(issue, "key", issue_key) or issue_key),
+        "summary": pick_value(fields, "summary"),
+        "status": normalize_name(pick_value(status_value, "name")) or normalize_name(pick_value(issue_fields, "status")),
+        "resolution": normalize_name(pick_value(resolution_value, "name")) or normalize_name(
+            pick_value(issue_fields, "resolution")
+        ),
+        "fix_version": normalize_fix_version(fix_versions),
+        "raw_payload": raw_payload_text,
+    }
+
+    for field_name in ("affect_project", "environment", "exp_class", "caused_by"):
+        value = resolve_field_value(field_name)
+        if value is not None:
+            result[field_name] = value
+
+    return result
 
 
 def resolve_project_key(
@@ -404,6 +503,15 @@ def assign_issue_to_user(jira_client: JIRA, issue_key: str, assignee_name: Optio
         return True, assignee_text
     except Exception as exc:
         return False, str(exc)
+
+
+def update_issue_fields(jira_client: JIRA, issue_key: str, fields: Dict[str, Any]) -> None:
+    issue = jira_client.issue(issue_key)
+    issue.update(fields=fields)
+
+
+def add_issue_comment(jira_client: JIRA, issue_key: str, comment: str) -> None:
+    jira_client.add_comment(issue_key, comment)
 
 
 def build_issue_fields(

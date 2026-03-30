@@ -79,6 +79,9 @@ backup/
 *.hprof
 dump.hprof
 
+# Runtime output
+result/
+
 # Temporary files
 *.tmp
 *.bak
