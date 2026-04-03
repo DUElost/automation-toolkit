@@ -90,4 +90,5 @@ nul
 .ace-tool/
 .claude/
 .runtime/
+.worktrees/
 tmp_*.json
