@@ -187,6 +187,7 @@ def save_upload_list(rows: List[dict], output_path: str) -> None:
         "Opener",
         "PS",
         "Exp Class",
+        "CausedBy",
         "Package",
         "Count",
         "Device Count",

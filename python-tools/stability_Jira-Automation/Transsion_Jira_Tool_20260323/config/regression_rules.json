@@ -1,7 +1,7 @@
 {
   "jira_export": {
     "enabled": true,
-    "jql": "project = X6852OS16 AND reporter in (dailv.tinno) AND (summary ~ \"【稳定性专项】\" OR summary ~ \"[MonkeyAEE]\")",
+    "jql": "reporter in (dailv.tinno)",
     "max_results": 1000,
     "fields": [
       "key",
@@ -40,7 +40,8 @@
       "处理中"
     ],
     "resolved_statuses": [
-      "已解决"
+      "已解决",
+      "Verified"
     ],
     "resolved_fixed_resolutions": [
       "已修复"
@@ -58,6 +59,7 @@
     ]
   },
   "regression": {
+    "enabled": true,
     "required_regression_pass_versions": 2
   },
   "output": {

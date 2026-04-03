@@ -51,10 +51,7 @@ def test_real_regression_rules_config_matches_contract(regression_module):
     rules = module.load_regression_rules(REAL_CONFIG_PATH)
 
     assert rules.jira_export.enabled is True
-    assert rules.jira_export.jql == (
-        "project = X6852OS16 AND reporter in (dailv.tinno) "
-        "AND (summary ~ \"【稳定性专项】\" OR summary ~ \"[MonkeyAEE]\")"
-    )
+    assert rules.jira_export.jql == "reporter in (dailv.tinno)"
     assert rules.jira_export.max_results == 1000
     assert rules.jira_export.fields == [
         "key",
@@ -86,11 +83,12 @@ def test_real_regression_rules_config_matches_contract(regression_module):
         "exp_class",
     ]
     assert rules.matching.cause_similarity_threshold == 0.9
+    assert rules.regression.enabled is True
     assert rules.regression.required_regression_pass_versions == 2
     assert rules.output.sqlite_path == "result/transsion_regression_cache.db"
     assert rules.output.excel_summary_dir == "result"
     assert rules.status_rules.open_like_statuses == ["Open", "开放", "Reopened", "重新打开", "处理中"]
-    assert rules.status_rules.resolved_statuses == ["已解决"]
+    assert rules.status_rules.resolved_statuses == ["已解决", "Verified"]
     assert rules.status_rules.resolved_fixed_resolutions == ["已修复"]
     assert rules.status_rules.wont_fix_resolutions == ["问题不修改", "非问题", "Won't Fix", "不解决"]
     assert rules.status_rules.closed_statuses == ["Closed", "已关闭", "已关单"]
@@ -120,7 +118,7 @@ def test_load_regression_rules_reads_json(tmp_path, regression_module):
                     "wont_fix_resolutions": ["wont fix"],
                     "closed_statuses": ["closed"],
                 },
-                "regression": {"required_regression_pass_versions": 2},
+                "regression": {"enabled": True, "required_regression_pass_versions": 2},
                 "output": {
                     "sqlite_path": "result/transsion_regression_cache.db",
                     "excel_summary_dir": "result",
@@ -144,9 +142,52 @@ def test_load_regression_rules_reads_json(tmp_path, regression_module):
         "exp_class",
     ]
     assert rules.matching.cause_similarity_threshold == 0.9
+    assert rules.regression.enabled is True
     assert rules.regression.required_regression_pass_versions == 2
     assert rules.output.sqlite_path == "result/transsion_regression_cache.db"
     assert rules.output.excel_summary_dir == "result"
+
+
+def test_load_regression_rules_allows_disabling_regression(tmp_path, regression_module):
+    module = regression_module
+
+    config_path = tmp_path / "regression_rules.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "jira_export": {
+                    "enabled": True,
+                    "jql": "project = TRANSSION AND statusCategory != Done",
+                    "max_results": 100,
+                    "fields": ["key", "summary"],
+                },
+                "matching": {
+                    "required_exact_fields": ["affect_project", "environment", "exp_class"],
+                    "cause_similarity_threshold": 0.9,
+                },
+                "status_rules": {
+                    "open_like_statuses": ["open"],
+                    "resolved_statuses": ["resolved"],
+                    "resolved_fixed_resolutions": ["fixed"],
+                    "wont_fix_resolutions": ["wont fix"],
+                    "closed_statuses": ["closed"],
+                },
+                "regression": {"enabled": False, "required_regression_pass_versions": 2},
+                "output": {
+                    "sqlite_path": "result/transsion_regression_cache.db",
+                    "excel_summary_dir": "result",
+                },
+            },
+            ensure_ascii=True,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+    rules = module.load_regression_rules(config_path)
+
+    assert rules.regression.enabled is False
+    assert rules.regression.required_regression_pass_versions == 2
 
 
 def test_load_regression_rules_rejects_empty_required_exact_fields(tmp_path, regression_module):
@@ -195,7 +236,7 @@ def test_load_regression_rules_rejects_non_contract_required_exact_fields(tmp_pa
                     "wont_fix_resolutions": ["wont fix"],
                     "closed_statuses": ["closed"],
                 },
-                "regression": {"required_regression_pass_versions": 2},
+                "regression": {"enabled": True, "required_regression_pass_versions": 2},
                 "output": {
                     "sqlite_path": "result/transsion_regression_cache.db",
                     "excel_summary_dir": "result",
@@ -235,7 +276,7 @@ def test_load_regression_rules_rejects_empty_status_lists(tmp_path, regression_m
                     "wont_fix_resolutions": [],
                     "closed_statuses": [],
                 },
-                "regression": {"required_regression_pass_versions": 2},
+                "regression": {"enabled": True, "required_regression_pass_versions": 2},
                 "output": {
                     "sqlite_path": "result/transsion_regression_cache.db",
                     "excel_summary_dir": "result",
@@ -275,7 +316,7 @@ def test_load_regression_rules_rejects_unknown_top_level_key(tmp_path, regressio
                     "wont_fix_resolutions": ["wont fix"],
                     "closed_statuses": ["closed"],
                 },
-                "regression": {"required_regression_pass_versions": 2},
+                "regression": {"enabled": True, "required_regression_pass_versions": 2},
                 "output": {
                     "sqlite_path": "result/transsion_regression_cache.db",
                     "excel_summary_dir": "result",
@@ -317,7 +358,7 @@ def test_load_regression_rules_rejects_unknown_section_key(tmp_path, regression_
                     "wont_fix_resolutions": ["wont fix"],
                     "closed_statuses": ["closed"],
                 },
-                "regression": {"required_regression_pass_versions": 2},
+                "regression": {"enabled": True, "required_regression_pass_versions": 2},
                 "output": {
                     "sqlite_path": "result/transsion_regression_cache.db",
                     "excel_summary_dir": "result",

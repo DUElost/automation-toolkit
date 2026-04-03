@@ -18,7 +18,7 @@ SECTION_KEYS = {
         "wont_fix_resolutions",
         "closed_statuses",
     },
-    "regression": {"required_regression_pass_versions"},
+    "regression": {"enabled", "required_regression_pass_versions"},
     "output": {"sqlite_path", "excel_summary_dir"},
 }
 
@@ -48,6 +48,7 @@ class StatusRules:
 
 @dataclass
 class RegressionConfig:
+    enabled: bool = True
     required_regression_pass_versions: int = 2
 
 
@@ -207,6 +208,11 @@ def load_regression_rules(path: Union[str, Path]) -> RegressionRules:
     )
 
     regression = RegressionConfig(
+        enabled=_coerce_bool(
+            regression_data.get("enabled"),
+            "regression.enabled",
+            True,
+        ),
         required_regression_pass_versions=_coerce_int(
             regression_data.get("required_regression_pass_versions"),
             "regression.required_regression_pass_versions",

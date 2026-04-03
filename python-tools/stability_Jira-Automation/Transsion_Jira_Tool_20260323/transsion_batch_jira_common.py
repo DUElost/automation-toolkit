@@ -24,6 +24,7 @@ EXCEL_FIELD_CANDIDATES = {
     "priority": ["Priority", "priority"],
     "severity_level": ["Severity Level", "severity_level", "问题等级"],
     "exp_class": ["Exp Class", "exp_class", "ExpClass"],
+    "caused_by": ["CausedBy", "Cause By", "caused_by"],
     "assignee": ["Assignee", "assignee"],
     "reporter": ["Reporter", "reporter"],
     "components": ["Components", "components", "Module", "module"],
@@ -193,6 +194,10 @@ def fetch_issue_snapshot_fields(
         if name is not None:
             text = str(name).strip()
             return text or None
+        option_value = pick_value(value, "value")
+        if option_value is not None:
+            text = str(option_value).strip()
+            return text or None
         text = str(value).strip()
         return text or None
 
@@ -242,7 +247,7 @@ def fetch_issue_snapshot_fields(
     for field_name in ("affect_project", "environment", "exp_class", "caused_by"):
         value = resolve_field_value(field_name)
         if value is not None:
-            result[field_name] = value
+            result[field_name] = normalize_name(value)
 
     return result
 
@@ -404,6 +409,24 @@ def validate_multi_values(field_name: str, field_id: str, values: List[str], all
         raise ValueError(f"{field_name} 存在无效值: {invalid}")
 
 
+def resolve_components_for_create(values: List[str], allowed_values: Dict[str, Dict[str, Any]]) -> List[str]:
+    if not values:
+        return values
+    field_allowed = allowed_values.get("components")
+    if not field_allowed:
+        return values
+    invalid = [item for item in values if item not in field_allowed]
+    if not invalid:
+        return values
+    fallback_component = "ODM处理"
+    if fallback_component not in field_allowed:
+        raise ValueError(
+            f"Components 存在无效值: {invalid}；尝试回退默认模块 {fallback_component} 失败，"
+            f"当前项目未配置该可选值"
+        )
+    return [fallback_component]
+
+
 def is_field_available(create_fields: Dict[str, Any], field_id: str) -> bool:
     return bool(field_id) and field_id in create_fields
 
@@ -525,6 +548,7 @@ def build_issue_fields(
     user_cache: Dict[str, str],
     project_cache: Dict[str, str],
     create_assignee_override: Optional[str] = None,
+    create_reporter_override: Optional[str] = None,
 ) -> Dict[str, Any]:
     field_ids = defaults.get("field_ids", {})
     project_key = resolve_project_key(jira_client, find_first_value(row, "project", defaults.get("project_key")), project_cache)
@@ -542,7 +566,11 @@ def build_issue_fields(
     environment = find_first_value(row, "environment", "")
     reporter_raw = find_first_value(row, "reporter", defaults.get("default_reporter"))
     assignee_raw = find_first_value(row, "assignee", defaults.get("default_assignee"))
-    reporter = resolve_user_name(jira_client, reporter_raw, user_cache, fallback=defaults.get("default_reporter"))
+    reporter = (
+        resolve_user_name(jira_client, create_reporter_override, user_cache, fallback=defaults.get("default_reporter"))
+        if create_reporter_override
+        else resolve_user_name(jira_client, reporter_raw, user_cache, fallback=defaults.get("default_reporter"))
+    )
     assignee = resolve_user_name(jira_client, assignee_raw, user_cache, fallback=defaults.get("default_assignee"))
     create_assignee = resolve_user_name(jira_client, create_assignee_override, user_cache, fallback=assignee) if create_assignee_override else assignee
 
@@ -551,6 +579,7 @@ def build_issue_fields(
     if not versions:
         raise ValueError("Versions 不能为空")
 
+    components = resolve_components_for_create(components, allowed_values)
     validate_multi_values("Components", "components", components, allowed_values)
     validate_multi_values("Versions", "versions", versions, allowed_values)
 
@@ -575,13 +604,18 @@ def build_issue_fields(
     affect_project_value = find_first_value(row, "affect_project", "")
     case_no_value = find_first_value(row, "case_no", "NA")
     exp_class_value = find_first_value(row, "exp_class", "")
+    caused_by_value = find_first_value(row, "caused_by", "")
     clients_value = find_first_value(row, "clients", ",".join(defaults.get("default_clients", [])))
     fix_way_value = find_first_value(row, "fix_way", defaults.get("default_fix_way"))
     focus_value = find_first_value(row, "focus", defaults.get("default_focus"))
     importance_value = find_first_value(row, "importance", defaults.get("default_importance"))
     security_value = find_first_value(row, "security_level", defaults.get("default_security_level"))
     opener_raw = find_first_value(row, "opener", reporter_raw)
-    opener_value = resolve_user_name(jira_client, opener_raw, user_cache, fallback=reporter)
+    opener_value = (
+        resolve_user_name(jira_client, create_reporter_override, user_cache, fallback=reporter)
+        if create_reporter_override
+        else resolve_user_name(jira_client, opener_raw, user_cache, fallback=reporter)
+    )
 
     if is_field_available(create_fields, field_ids.get("risk", "")):
         validate_single_value("Risk", field_ids["risk"], risk_value, allowed_values)
@@ -607,6 +641,8 @@ def build_issue_fields(
             issue_fields[exp_class_field_id] = option_payload(exp_class_field_id, exp_class_value, allowed_values)
         else:
             issue_fields[exp_class_field_id] = str(exp_class_value)
+    if is_field_available(create_fields, field_ids.get("caused_by", "")) and clean_cell_value(caused_by_value):
+        issue_fields[field_ids["caused_by"]] = str(caused_by_value)
 
     if is_field_available(create_fields, field_ids.get("clients", "")) and clean_cell_value(clients_value):
         issue_fields[field_ids["clients"]] = option_payload(field_ids["clients"], clients_value, allowed_values, multi=True)
