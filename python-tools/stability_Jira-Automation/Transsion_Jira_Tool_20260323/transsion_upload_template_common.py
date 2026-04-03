@@ -804,6 +804,7 @@ def prepare_issue_record(
         "Opener": reporter,
         "PS": build_ps_text(issue_data, reporter),
         "Exp Class": normalize_exp_class_display(issue_data["exp_class"]),
+        "CausedBy": issue_data["caused_by"],
         "Package": issue_data["package"],
         "Count": issue_data["count"],
         "Device Count": issue_data["device_count"],

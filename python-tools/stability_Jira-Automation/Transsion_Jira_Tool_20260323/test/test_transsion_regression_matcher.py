@@ -261,3 +261,40 @@ def test_fetch_issue_snapshot_fields_supports_custom_field_mapping(batch_common_
     assert result["environment"] == "PR1-A1"
     assert result["exp_class"] == "Crash"
     assert result["caused_by"] == "NullPointerException at 0x7fff"
+
+
+def test_fetch_issue_snapshot_fields_normalizes_mapped_option_objects(batch_common_module):
+    module = batch_common_module
+
+    fake_issue = SimpleNamespace(
+        key="TRANSSION-790",
+        raw={
+            "fields": {
+                "summary": "Mapped summary",
+                "status": {"name": "Resolved"},
+                "resolution": {"name": "Fixed"},
+                "customfield_14205": {"value": "X6851-P865"},
+                "customfield_14202": {"name": "ANR"},
+                "customfield_14203": {"value": "Input dispatching timed out"},
+            }
+        },
+    )
+
+    class FakeJiraClient:
+        def issue(self, issue_key):
+            assert issue_key == "TRANSSION-790"
+            return fake_issue
+
+    result = module.fetch_issue_snapshot_fields(
+        FakeJiraClient(),
+        "TRANSSION-790",
+        field_mapping={
+            "affect_project": "customfield_14205",
+            "exp_class": "customfield_14202",
+            "caused_by": "customfield_14203",
+        },
+    )
+
+    assert result["affect_project"] == "X6851-P865"
+    assert result["exp_class"] == "ANR"
+    assert result["caused_by"] == "Input dispatching timed out"

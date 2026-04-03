@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib
 import json
+import logging
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -46,6 +47,7 @@ def _make_args(tmp_path: Path, **overrides):
         "dry_run": False,
         "validate_metadata": False,
         "add_comments": True,
+        "disable_regression": False,
     }
     base.update(overrides)
     return SimpleNamespace(**base)
@@ -94,6 +96,389 @@ def _make_rules(tmp_path: Path, result_dir: Path):
             excel_summary_dir=str(result_dir),
         ),
     )
+
+
+def test_collect_regression_summary_keywords_uses_monkey_keyword_for_monkey_rows(batch_entry_module):
+    module = batch_entry_module
+    df = pd.DataFrame(
+        [
+            _make_row(
+                Summary="【天珑团队】【BUG】【X6852OS16】【稳定性专项】【Monkey专项】执行Monkey专项过程中，发生异常"
+            )
+        ]
+    )
+
+    assert module.collect_regression_summary_keywords(df) == ["[MonkeyAEE]"]
+
+
+def test_collect_regression_summary_keywords_uses_stability_keyword_for_non_monkey_rows(batch_entry_module):
+    module = batch_entry_module
+    df = pd.DataFrame(
+        [
+            _make_row(
+                Summary="【天珑团队】【BUG】【X6852OS16】【稳定性专项】【开关机专项】执行开关机专项过程中，发生异常"
+            )
+        ]
+    )
+
+    assert module.collect_regression_summary_keywords(df) == ["【稳定性专项】"]
+
+
+def test_build_regression_export_jql_combines_keywords_for_mixed_rows(batch_entry_module):
+    module = batch_entry_module
+    base_jql = "project = X6852OS16 AND reporter in (dailv.tinno)"
+    keywords = ["【稳定性专项】", "[MonkeyAEE]"]
+
+    assert module.build_regression_export_jql(base_jql, keywords) == (
+        "project = X6852OS16 AND reporter in (dailv.tinno) "
+        "AND (summary ~ \"【稳定性专项】\" OR summary ~ \"\\\\[MonkeyAEE\\\\]\")"
+    )
+
+
+def test_collect_batch_project_key_returns_single_project(batch_entry_module):
+    module = batch_entry_module
+    df = pd.DataFrame(
+        [
+            _make_row(Project="X6851OS16"),
+            _make_row(Project="X6851OS16", Summary="另一个问题"),
+        ]
+    )
+
+    class FakeJira:
+        pass
+
+    assert module.collect_batch_project_key(FakeJira(), df, {}) == "X6851OS16"
+
+
+def test_collect_batch_project_key_raises_for_multiple_projects(batch_entry_module):
+    module = batch_entry_module
+    df = pd.DataFrame(
+        [
+            _make_row(Project="X6851OS16"),
+            _make_row(Project="X6852OS16", Summary="另一个问题"),
+        ]
+    )
+
+    class FakeJira:
+        pass
+
+    with pytest.raises(ValueError, match="多个 Jira 项目"):
+        module.collect_batch_project_key(FakeJira(), df, {})
+
+
+def test_export_jira_snapshot_logs_export_jql(batch_entry_module, caplog: pytest.LogCaptureFixture):
+    module = batch_entry_module
+    caplog.set_level(logging.INFO)
+
+    class FakeJira:
+        def search_issues(self, jql: str, maxResults: int = 50, fields: str | None = None):
+            assert jql == 'project = X6852OS16 AND reporter in (dailv.tinno) AND (summary ~ "【稳定性专项】")'
+            return []
+
+    rules = SimpleNamespace(
+        jira_export=SimpleNamespace(
+            enabled=True,
+            jql="reporter in (dailv.tinno)",
+            max_results=50,
+        )
+    )
+
+    rows = module.export_jira_snapshot(
+        FakeJira(),
+        rules,
+        base_jql="project = X6852OS16 AND reporter in (dailv.tinno)",
+        summary_keywords=["【稳定性专项】"],
+    )
+
+    assert rows == []
+    assert '历史问题单导出 JQL: project = X6852OS16 AND reporter in (dailv.tinno) AND (summary ~ "【稳定性专项】")' in caplog.text
+
+
+def test_run_batch_create_uses_current_user_in_regression_export_jql(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    batch_entry_module,
+):
+    module = batch_entry_module
+    args = _make_args(tmp_path, dry_run=True)
+    df = pd.DataFrame([_make_row()])
+    captured_jql: list[str] = []
+
+    class FakeJira:
+        def current_user(self) -> str:
+            return "qimingwang.tinno"
+
+        def search_issues(self, jql: str, maxResults: int = 50, fields: str | None = None):
+            captured_jql.append(jql)
+            return []
+
+    monkeypatch.setattr(module, "load_defaults", lambda _: {"jira_server": "http://jira.example.com", "project_key": "X6852OS16", "issue_type": "故障"})
+    monkeypatch.setattr(module, "load_priority_mapping_from_rules_excel", lambda _: {"severity_to_priority": {}, "priority_aliases": {}})
+    monkeypatch.setattr(module, "read_excel_smart", lambda _: df)
+    monkeypatch.setattr(module, "connect_to_jira", lambda *_: FakeJira())
+    monkeypatch.setattr(
+        module,
+        "load_regression_rules",
+        lambda _: SimpleNamespace(
+            jira_export=SimpleNamespace(enabled=True, jql="reporter in (dailv.tinno)", max_results=50, fields=["key"]),
+            matching=SimpleNamespace(
+                required_exact_fields=["affect_project", "environment", "exp_class"],
+                cause_similarity_threshold=0.9,
+            ),
+            regression=SimpleNamespace(enabled=True, required_regression_pass_versions=2),
+            output=SimpleNamespace(
+                sqlite_path=str(tmp_path / "regression.db"),
+                excel_summary_dir=str(tmp_path / "result"),
+            ),
+        ),
+    )
+    monkeypatch.setattr(
+        module,
+        "RegressionStore",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            save_sync_run=lambda *_a, **_k: None,
+            save_snapshot=lambda *_a, **_k: None,
+            save_execution_result=lambda *_a, **_k: None,
+        ),
+    )
+    monkeypatch.setattr(module, "get_meta_bundle", lambda *_: {"create_fields": {}, "allowed_values": {}, "field_name_lookup": {}})
+    monkeypatch.setattr(module, "build_issue_fields", lambda **_: {"summary": "stub"})
+
+    exit_code = module.run_batch_create(args)
+
+    assert exit_code == 0
+    assert captured_jql == ['project = TRANSSION AND reporter in (qimingwang.tinno) AND (summary ~ "【稳定性专项】")']
+
+
+def test_run_batch_create_passes_current_user_as_create_reporter_override(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    batch_entry_module,
+):
+    module = batch_entry_module
+    args = _make_args(tmp_path, dry_run=True)
+    df = pd.DataFrame([_make_row()])
+    captured_kwargs: dict[str, object] = {}
+
+    class FakeJira:
+        def current_user(self) -> str:
+            return "qimingwang.tinno"
+
+        def search_issues(self, *_args, **_kwargs):
+            return []
+
+    monkeypatch.setattr(module, "load_defaults", lambda _: {"jira_server": "http://jira.example.com", "project_key": "TRANSSION", "issue_type": "故障"})
+    monkeypatch.setattr(module, "load_priority_mapping_from_rules_excel", lambda _: {"severity_to_priority": {}, "priority_aliases": {}})
+    monkeypatch.setattr(module, "read_excel_smart", lambda _: df)
+    monkeypatch.setattr(module, "connect_to_jira", lambda *_: FakeJira())
+    monkeypatch.setattr(
+        module,
+        "load_regression_rules",
+        lambda _: SimpleNamespace(
+            jira_export=SimpleNamespace(enabled=False, jql="", max_results=50, fields=["key"]),
+            matching=SimpleNamespace(
+                required_exact_fields=["affect_project", "environment", "exp_class"],
+                cause_similarity_threshold=0.9,
+            ),
+            regression=SimpleNamespace(enabled=False, required_regression_pass_versions=2),
+            output=SimpleNamespace(
+                sqlite_path=str(tmp_path / "regression.db"),
+                excel_summary_dir=str(tmp_path / "result"),
+            ),
+        ),
+    )
+    monkeypatch.setattr(module, "get_meta_bundle", lambda *_: {"create_fields": {}, "allowed_values": {}, "field_name_lookup": {}})
+
+    def fake_build_issue_fields(**kwargs):
+        captured_kwargs.update(kwargs)
+        return {"summary": "stub"}
+
+    monkeypatch.setattr(module, "build_issue_fields", fake_build_issue_fields)
+
+    exit_code = module.run_batch_create(args)
+
+    assert exit_code == 0
+    assert captured_kwargs["create_reporter_override"] == "qimingwang.tinno"
+
+
+def test_export_jira_snapshot_passes_snapshot_field_mapping(batch_entry_module, monkeypatch: pytest.MonkeyPatch):
+    module = batch_entry_module
+    captured: list[dict[str, object]] = []
+
+    def fake_fetch_issue_snapshot_fields(_jira_client, issue_key: str, field_mapping=None):
+        captured.append({"issue_key": issue_key, "field_mapping": field_mapping})
+        return {"jira_key": issue_key}
+
+    class FakeJira:
+        def search_issues(self, *_args, **_kwargs):
+            return [SimpleNamespace(key="X6851OS16-607")]
+
+    rules = SimpleNamespace(
+        jira_export=SimpleNamespace(
+            enabled=True,
+            jql="reporter in (dailv.tinno)",
+            max_results=50,
+        )
+    )
+
+    monkeypatch.setattr(module, "fetch_issue_snapshot_fields", fake_fetch_issue_snapshot_fields)
+
+    rows = module.export_jira_snapshot(
+        FakeJira(),
+        rules,
+        base_jql="project = X6851OS16 AND reporter in (dailv.tinno)",
+        summary_keywords=["【稳定性专项】"],
+        field_mapping={"caused_by": "customfield_14203"},
+    )
+
+    assert rows == [{"jira_key": "X6851OS16-607"}]
+    assert captured == [
+        {
+            "issue_key": "X6851OS16-607",
+            "field_mapping": {"caused_by": "customfield_14203"},
+        }
+    ]
+
+
+def test_run_batch_create_dry_run_logs_decision_summary(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    batch_entry_module,
+    caplog: pytest.LogCaptureFixture,
+):
+    module = batch_entry_module
+    result_dir = tmp_path / "result"
+    caplog.set_level(logging.INFO)
+    args = _make_args(tmp_path, dry_run=True)
+    df = pd.DataFrame([_make_row()])
+
+    class FakeJira:
+        def current_user(self) -> str:
+            return "robot"
+
+        def search_issues(self, *_args, **_kwargs):
+            return []
+
+    class FakeStore:
+        def __init__(self, _db_path):
+            pass
+
+        def save_sync_run(self, _record):
+            return None
+
+        def save_snapshot(self, _run_id, _rows):
+            return None
+
+        def save_execution_result(self, _result):
+            return None
+
+    monkeypatch.setattr(module, "RESULT_DIR", result_dir)
+    monkeypatch.setattr(
+        module,
+        "load_defaults",
+        lambda _: {
+            "jira_server": "http://jira.example.com",
+            "default_wait_between_issues_seconds": 0,
+            "project_key": "TRANSSION",
+            "issue_type": "故障",
+        },
+    )
+    monkeypatch.setattr(
+        module,
+        "load_priority_mapping_from_rules_excel",
+        lambda _: {"severity_to_priority": {}, "priority_aliases": {}},
+    )
+    monkeypatch.setattr(module, "read_excel_smart", lambda _: df)
+    monkeypatch.setattr(module, "connect_to_jira", lambda *_: FakeJira())
+    monkeypatch.setattr(module, "RegressionStore", FakeStore)
+    monkeypatch.setattr(
+        module,
+        "load_regression_rules",
+        lambda _: SimpleNamespace(
+            jira_export=SimpleNamespace(
+                enabled=True,
+                jql="project = TRANSSION",
+                max_results=50,
+                fields=["key"],
+            ),
+            matching=SimpleNamespace(
+                required_exact_fields=["affect_project", "environment", "exp_class"],
+                cause_similarity_threshold=0.9,
+            ),
+            regression=SimpleNamespace(enabled=True, required_regression_pass_versions=2),
+            output=SimpleNamespace(
+                sqlite_path=str(tmp_path / "regression.db"),
+                excel_summary_dir=str(result_dir),
+            ),
+        ),
+    )
+    monkeypatch.setattr(module, "get_meta_bundle", lambda *_: {"create_fields": {}, "allowed_values": {}, "field_name_lookup": {}})
+    monkeypatch.setattr(module, "build_issue_fields", lambda **_: {"summary": "stub"})
+
+    exit_code = module.run_batch_create(args)
+
+    assert exit_code == 0
+    assert "第 1 行 dry-run结果: matched_jira_key=NONE action=CREATE_NEW reason=未命中历史单" in caplog.text
+
+
+def test_run_batch_create_returns_error_for_multiple_projects(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    batch_entry_module,
+    caplog: pytest.LogCaptureFixture,
+):
+    module = batch_entry_module
+    caplog.set_level(logging.ERROR)
+    args = _make_args(tmp_path, dry_run=True)
+    df = pd.DataFrame(
+        [
+            _make_row(Project="X6851OS16"),
+            _make_row(Project="X6852OS16", Summary="第二行"),
+        ]
+    )
+
+    class FakeJira:
+        def current_user(self) -> str:
+            return "robot"
+
+    monkeypatch.setattr(
+        module,
+        "load_defaults",
+        lambda _: {
+            "jira_server": "http://jira.example.com",
+            "default_wait_between_issues_seconds": 0,
+            "project_key": "TRANSSION",
+            "issue_type": "故障",
+        },
+    )
+    monkeypatch.setattr(
+        module,
+        "load_priority_mapping_from_rules_excel",
+        lambda _: {"severity_to_priority": {}, "priority_aliases": {}},
+    )
+    monkeypatch.setattr(module, "read_excel_smart", lambda _: df)
+    monkeypatch.setattr(module, "connect_to_jira", lambda *_: FakeJira())
+    monkeypatch.setattr(
+        module,
+        "load_regression_rules",
+        lambda _: SimpleNamespace(
+            jira_export=SimpleNamespace(enabled=True, jql="reporter in (dailv.tinno)", max_results=50, fields=["key"]),
+            matching=SimpleNamespace(
+                required_exact_fields=["affect_project", "environment", "exp_class"],
+                cause_similarity_threshold=0.9,
+            ),
+            regression=SimpleNamespace(enabled=True, required_regression_pass_versions=2),
+            output=SimpleNamespace(
+                sqlite_path=str(tmp_path / "regression.db"),
+                excel_summary_dir=str(tmp_path / "result"),
+            ),
+        ),
+    )
+
+    exit_code = module.run_batch_create(args)
+
+    assert exit_code == 1
+    assert "当前上传模板包含多个 Jira 项目" in caplog.text
 
 
 def test_run_batch_create_dry_run_writes_regression_decision_result_json(
@@ -253,6 +638,146 @@ def test_run_batch_create_dry_run_writes_regression_decision_result_json(
     payload = json.loads(result_files[-1].read_text(encoding="utf-8"))
     assert payload[0]["decision"]["action"] == "MANUAL_REVIEW"
     assert payload[0]["matched_jira_key"] == "TRANSSION-1"
+
+
+def test_run_batch_create_skips_regression_flow_when_regression_disabled(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    batch_entry_module,
+):
+    module = batch_entry_module
+    result_dir = tmp_path / "result"
+    args = _make_args(tmp_path, dry_run=True)
+    df = pd.DataFrame([_make_row()])
+
+    class FakeJira:
+        def current_user(self) -> str:
+            return "robot"
+
+        def search_issues(self, *args, **kwargs):
+            raise AssertionError("回归关闭时不应导出历史 Jira 单")
+
+    monkeypatch.setattr(module, "RESULT_DIR", result_dir)
+    monkeypatch.setattr(
+        module,
+        "load_defaults",
+        lambda _: {
+            "jira_server": "http://jira.example.com",
+            "default_wait_between_issues_seconds": 0,
+            "project_key": "TRANSSION",
+            "issue_type": "故障",
+        },
+    )
+    monkeypatch.setattr(
+        module,
+        "load_priority_mapping_from_rules_excel",
+        lambda _: {"severity_to_priority": {}, "priority_aliases": {}},
+    )
+    monkeypatch.setattr(module, "read_excel_smart", lambda _: df)
+    monkeypatch.setattr(module, "connect_to_jira", lambda *_: FakeJira())
+    monkeypatch.setattr(
+        module,
+        "load_regression_rules",
+        lambda _: SimpleNamespace(
+            jira_export=SimpleNamespace(enabled=True, jql="project = TRANSSION", max_results=50, fields=["key"]),
+            matching=SimpleNamespace(
+                required_exact_fields=["affect_project", "environment", "exp_class"],
+                cause_similarity_threshold=0.9,
+            ),
+            regression=SimpleNamespace(enabled=False, required_regression_pass_versions=2),
+            output=SimpleNamespace(
+                sqlite_path=str(tmp_path / "regression.db"),
+                excel_summary_dir=str(result_dir),
+            ),
+        ),
+    )
+    monkeypatch.setattr(
+        module,
+        "RegressionStore",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("回归关闭时不应初始化 RegressionStore")),
+    )
+    monkeypatch.setattr(module, "get_meta_bundle", lambda *_: {"create_fields": {}, "allowed_values": {}, "field_name_lookup": {}})
+    monkeypatch.setattr(module, "build_issue_fields", lambda **_: {"summary": "stub"})
+
+    exit_code = module.run_batch_create(args)
+
+    assert exit_code == 0
+    result_files = sorted(result_dir.glob("transsion_jira_batch_create_result_*.json"))
+    assert result_files, "应写出结果 JSON"
+    summary_files = sorted(result_dir.glob("transsion_jira_batch_create_summary_*.xlsx"))
+    assert not summary_files, "回归关闭时不应输出 Excel 摘要"
+    payload = json.loads(result_files[-1].read_text(encoding="utf-8"))
+    assert payload[0]["decision"]["action"] == "CREATE_NEW"
+    assert payload[0]["matched_jira_key"] is None
+
+
+def test_run_batch_create_cli_disable_regression_overrides_enabled_config(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    batch_entry_module,
+):
+    module = batch_entry_module
+    result_dir = tmp_path / "result"
+    args = _make_args(tmp_path, dry_run=True, disable_regression=True)
+    df = pd.DataFrame([_make_row()])
+
+    class FakeJira:
+        def current_user(self) -> str:
+            return "robot"
+
+        def search_issues(self, *args, **kwargs):
+            raise AssertionError("命令行关闭回归后不应导出历史 Jira 单")
+
+    monkeypatch.setattr(module, "RESULT_DIR", result_dir)
+    monkeypatch.setattr(
+        module,
+        "load_defaults",
+        lambda _: {
+            "jira_server": "http://jira.example.com",
+            "default_wait_between_issues_seconds": 0,
+            "project_key": "TRANSSION",
+            "issue_type": "故障",
+        },
+    )
+    monkeypatch.setattr(
+        module,
+        "load_priority_mapping_from_rules_excel",
+        lambda _: {"severity_to_priority": {}, "priority_aliases": {}},
+    )
+    monkeypatch.setattr(module, "read_excel_smart", lambda _: df)
+    monkeypatch.setattr(module, "connect_to_jira", lambda *_: FakeJira())
+    monkeypatch.setattr(
+        module,
+        "load_regression_rules",
+        lambda _: SimpleNamespace(
+            jira_export=SimpleNamespace(enabled=True, jql="project = TRANSSION", max_results=50, fields=["key"]),
+            matching=SimpleNamespace(
+                required_exact_fields=["affect_project", "environment", "exp_class"],
+                cause_similarity_threshold=0.9,
+            ),
+            regression=SimpleNamespace(enabled=True, required_regression_pass_versions=2),
+            output=SimpleNamespace(
+                sqlite_path=str(tmp_path / "regression.db"),
+                excel_summary_dir=str(result_dir),
+            ),
+        ),
+    )
+    monkeypatch.setattr(
+        module,
+        "RegressionStore",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("命令行关闭回归后不应初始化 RegressionStore")),
+    )
+    monkeypatch.setattr(module, "get_meta_bundle", lambda *_: {"create_fields": {}, "allowed_values": {}, "field_name_lookup": {}})
+    monkeypatch.setattr(module, "build_issue_fields", lambda **_: {"summary": "stub"})
+
+    exit_code = module.run_batch_create(args)
+
+    assert exit_code == 0
+    result_files = sorted(result_dir.glob("transsion_jira_batch_create_result_*.json"))
+    assert result_files, "应写出结果 JSON"
+    payload = json.loads(result_files[-1].read_text(encoding="utf-8"))
+    assert payload[0]["decision"]["action"] == "CREATE_NEW"
+    assert payload[0]["matched_jira_key"] is None
 
 
 def test_run_batch_create_non_dry_run_executes_update_and_comment_for_open_like_match(
@@ -435,7 +960,8 @@ def test_run_batch_create_non_dry_run_executes_update_and_comment_for_open_like_
     assert comment_calls[0][0] == "TRANSSION-2"
     assert comment_calls[0][1]
     assert comment_calls[0][1] != "需要补充说明"
-    assert comment_calls[1] == ("TRANSSION-2", "需要补充说明")
+    assert comment_calls[1][0] == "TRANSSION-2"
+    assert comment_calls[1][1] == "*Reporter:* robot\n需要补充说明"
     assert store_events["execution_results"][0]["action"] == "OPEN_LIKE_UPDATE"
 
 
@@ -736,6 +1262,16 @@ def test_build_regression_row_uses_max_version_as_current_version(batch_entry_mo
 
     assert regression_row["versions"] == ["V2", "V4"]
     assert regression_row["current_version"] == "V4"
+
+
+def test_build_regression_row_reads_caused_by_from_excel_column_alias(batch_entry_module):
+    module = batch_entry_module
+
+    regression_row = module.build_regression_row(
+        pd.Series(_make_row(caused_by=None, CausedBy="Input dispatching timed out"))
+    )
+
+    assert regression_row["caused_by"] == "Input dispatching timed out"
 
 
 def test_find_regression_match_prefers_latest_updated_then_created(batch_entry_module):
@@ -1240,3 +1776,71 @@ def test_run_batch_create_history_ps_comment_respects_add_comments_flag(
     assert len(comment_calls) == 1
     assert comment_calls[0][0] == "TRANSSION-7"
     assert "只应在 add_comments=true 时追加" not in comment_calls[0][1]
+
+
+def test_run_batch_create_history_ps_comment_uses_current_user_as_reporter(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    batch_entry_module,
+):
+    module = batch_entry_module
+    result_dir = tmp_path / "result"
+    comment_calls: list[tuple[str, str]] = []
+
+    class FakeJira:
+        def current_user(self) -> str:
+            return "qimingwang.tinno"
+
+        def search_issues(self, jql: str, maxResults: int = 50, fields: str | None = None):
+            return [SimpleNamespace(key="TRANSSION-8")]
+
+    monkeypatch.setattr(module, "RESULT_DIR", result_dir)
+    monkeypatch.setattr(module, "load_defaults", lambda _: {"jira_server": "http://jira.example.com", "project_key": "TRANSSION", "issue_type": "故障"})
+    monkeypatch.setattr(module, "load_priority_mapping_from_rules_excel", lambda _: {"severity_to_priority": {}, "priority_aliases": {}})
+    monkeypatch.setattr(
+        module,
+        "read_excel_smart",
+        lambda _: pd.DataFrame([_make_row(PS="*Reporter:* dailv.tinno\n*Version:* V2\n*Path:* /tmp/log")]),
+    )
+    monkeypatch.setattr(module, "connect_to_jira", lambda *_: FakeJira())
+    monkeypatch.setattr(module, "load_regression_rules", lambda _: _make_rules(tmp_path, result_dir))
+    monkeypatch.setattr(
+        module,
+        "RegressionStore",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            save_sync_run=lambda *_a, **_k: None,
+            save_snapshot=lambda *_a, **_k: None,
+            save_execution_result=lambda *_a, **_k: None,
+        ),
+    )
+    monkeypatch.setattr(module, "get_meta_bundle", lambda *_: {"create_fields": {}, "allowed_values": {}, "field_name_lookup": {}})
+    monkeypatch.setattr(module, "build_issue_fields", lambda **_: {"summary": "stub", "description": "stub-desc", "priority": {"name": "Major"}})
+    monkeypatch.setattr(module, "fetch_issue_snapshot_fields", lambda *_args, **_kwargs: {
+        "jira_key": "TRANSSION-8",
+        "summary": "历史问题",
+        "status": "Open",
+        "resolution": "",
+        "fix_version": "",
+        "affect_project": "ProjectA",
+        "environment": "userdebug",
+        "exp_class": "AEE",
+        "caused_by": "java.lang.RuntimeException",
+        "raw_payload": "{}",
+    })
+    monkeypatch.setattr(module, "is_strong_match", lambda *_args, **_kwargs: True)
+    monkeypatch.setattr(module, "decide_action", lambda *_args, **_kwargs: SimpleNamespace(
+        action="OPEN_LIKE_UPDATE",
+        update_jira=True,
+        manual_review=False,
+        comment_required=True,
+        recreate_issue=False,
+    ))
+    monkeypatch.setattr(module, "update_issue_fields", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(module, "add_issue_comment", lambda jira, issue_key, comment: comment_calls.append((issue_key, comment)))
+
+    exit_code = module.run_batch_create(_make_args(tmp_path, add_comments=True))
+
+    assert exit_code == 0
+    assert len(comment_calls) == 2
+    assert comment_calls[1][0] == "TRANSSION-8"
+    assert "*Reporter:* qimingwang.tinno" in comment_calls[1][1]

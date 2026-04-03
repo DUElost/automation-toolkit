@@ -62,6 +62,9 @@ DEFAULT_REGRESSION_RULES_FILE = CONFIG_DIR / "regression_rules.json"
 DEFAULT_SEVERITY_RULES = CONFIG_DIR / "问题等级定级表.xls"
 DEFAULT_BUG_SEVERITY_IMAGE_DIR = CONFIG_DIR / "bug_severity_priority_image"
 DEFAULT_INPUT_FILE = CURRENT_DIR / "JIRA_Upload_List_Transsion_开关机专项_20260325_115150.xlsx"
+MONKEY_SUMMARY_KEYWORD = "[MonkeyAEE]"
+STABILITY_SUMMARY_KEYWORD = "【稳定性专项】"
+DEFAULT_CATEGORY_TAG = "稳定性专项"
 
 
 def setup_logging() -> None:
@@ -105,6 +108,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dry-run", action="store_true", help="仅校验数据，不实际建单")
     parser.add_argument("--validate-metadata", action="store_true", help="打印项目元数据后退出")
     parser.add_argument("--add-comments", action="store_true", help="创建成功后把 PS 列追加为评论")
+    parser.add_argument("--disable-regression", action="store_true", help="单次执行关闭新增回归验证功能")
     return parser.parse_args()
 
 
@@ -175,13 +179,142 @@ def _get_raw_row_value(row: Any, field_name: str) -> Any:
     return None
 
 
-def export_jira_snapshot(jira_client, regression_rules: Any) -> List[Dict[str, Any]]:
+def collect_regression_summary_keywords(df: pd.DataFrame) -> list[str]:
+    has_monkey_rows = False
+    has_non_monkey_rows = False
+    for _, row in df.iterrows():
+        summary_text = str(find_first_value(row, "summary", "") or "").strip()
+        if not summary_text:
+            continue
+        if "【Monkey专项】" in summary_text or "执行Monkey专项过程中" in summary_text:
+            has_monkey_rows = True
+        else:
+            has_non_monkey_rows = True
+
+    keywords: list[str] = []
+    if has_non_monkey_rows:
+        keywords.append(STABILITY_SUMMARY_KEYWORD)
+    if has_monkey_rows:
+        keywords.append(MONKEY_SUMMARY_KEYWORD)
+    return keywords
+
+
+def extract_specialty_from_summary(summary: Any, category_tag: str = DEFAULT_CATEGORY_TAG) -> str:
+    summary_text = str(summary or "").strip()
+    if not summary_text:
+        return ""
+    tags = re.findall(r"【([^】]+)】", summary_text)
+    if not tags:
+        return ""
+    for index, tag in enumerate(tags):
+        if tag == category_tag and index + 1 < len(tags):
+            return str(tags[index + 1]).strip()
+    return ""
+
+
+def collect_batch_specialties(df: pd.DataFrame, category_tag: str = DEFAULT_CATEGORY_TAG) -> set[str]:
+    specialties: set[str] = set()
+    for _, row in df.iterrows():
+        specialty = extract_specialty_from_summary(find_first_value(row, "summary", ""), category_tag=category_tag)
+        if specialty:
+            specialties.add(specialty)
+    return specialties
+
+
+def collect_batch_project_key(jira_client, df: pd.DataFrame, project_cache: Dict[str, str]) -> str:
+    unique_project_keys: set[str] = set()
+    for index, row in df.iterrows():
+        project_text = str(find_first_value(row, "project", "") or "").strip()
+        if not project_text:
+            raise ValueError(f"第 {index + 1} 行缺少 Project，当前上传模板必须只包含一个 Jira 项目")
+        project_key = str(resolve_project_key(jira_client, project_text, project_cache) or "").strip()
+        if not project_key:
+            raise ValueError(f"第 {index + 1} 行 Project 无法解析为有效 Jira 项目: {project_text}")
+        unique_project_keys.add(project_key)
+
+    if not unique_project_keys:
+        raise ValueError("当前上传模板未解析到任何 Jira 项目")
+    if len(unique_project_keys) > 1:
+        raise ValueError(f"当前上传模板包含多个 Jira 项目: {', '.join(sorted(unique_project_keys))}")
+    return next(iter(unique_project_keys))
+
+
+def _escape_jql_text_keyword(keyword: str) -> str:
+    escaped = str(keyword or "").replace("\\", "\\\\").replace('"', '\\"')
+    return escaped.replace("[", "\\\\[").replace("]", "\\\\]")
+
+
+def build_regression_base_jql(project_key: str, extra_jql: str) -> str:
+    normalized_project_key = str(project_key or "").strip()
+    if not normalized_project_key:
+        raise ValueError("project_key 不能为空")
+
+    normalized_extra_jql = str(extra_jql or "").strip()
+    if normalized_extra_jql:
+        normalized_extra_jql = re.sub(
+            r'^\s*project\s*=\s*(?:"[^"]+"|[^\s]+)\s*(?:AND\s*)?',
+            "",
+            normalized_extra_jql,
+            flags=re.IGNORECASE,
+        ).strip()
+
+    project_clause = f"project = {normalized_project_key}"
+    if not normalized_extra_jql:
+        return project_clause
+    if normalized_extra_jql.upper().startswith("ORDER BY "):
+        return f"{project_clause} {normalized_extra_jql}"
+    return f"{project_clause} AND {normalized_extra_jql}"
+
+
+def override_reporter_in_jql(jql_text: str, current_user: str) -> str:
+    normalized_jql = str(jql_text or "").strip()
+    normalized_user = str(current_user or "").strip()
+    if not normalized_jql or not normalized_user:
+        return normalized_jql
+
+    reporter_in_pattern = re.compile(r"\breporter\s+in\s*\([^)]*\)", flags=re.IGNORECASE)
+    reporter_equals_pattern = re.compile(r'\breporter\s*=\s*(?:"[^"]+"|[^\s)]+)', flags=re.IGNORECASE)
+    if reporter_in_pattern.search(normalized_jql):
+        return reporter_in_pattern.sub(f"reporter in ({normalized_user})", normalized_jql, count=1)
+    if reporter_equals_pattern.search(normalized_jql):
+        return reporter_equals_pattern.sub(f"reporter in ({normalized_user})", normalized_jql, count=1)
+    return normalized_jql
+
+
+def build_regression_export_jql(base_jql: str, keywords: list[str]) -> str:
+    normalized_base_jql = str(base_jql or "").strip()
+    if not normalized_base_jql or not keywords:
+        return normalized_base_jql
+
+    escaped_keywords = [f'summary ~ "{_escape_jql_text_keyword(keyword)}"' for keyword in keywords if str(keyword).strip()]
+    if not escaped_keywords:
+        return normalized_base_jql
+    summary_clause = f"({' OR '.join(escaped_keywords)})"
+
+    upper_base_jql = normalized_base_jql.upper()
+    order_by_marker = " ORDER BY "
+    order_by_index = upper_base_jql.find(order_by_marker)
+    if order_by_index >= 0:
+        return f"{normalized_base_jql[:order_by_index]} AND {summary_clause}{normalized_base_jql[order_by_index:]}"
+    return f"{normalized_base_jql} AND {summary_clause}"
+
+
+def export_jira_snapshot(
+    jira_client,
+    regression_rules: Any,
+    *,
+    base_jql: str,
+    summary_keywords: list[str] | None = None,
+    field_mapping: Dict[str, Any] | None = None,
+) -> List[Dict[str, Any]]:
     jira_export = getattr(regression_rules, "jira_export", None)
     if not jira_export or not getattr(jira_export, "enabled", False):
         return []
 
+    export_jql = build_regression_export_jql(base_jql, summary_keywords or [])
+    logger.info("历史问题单导出 JQL: %s", export_jql)
     issues = jira_client.search_issues(
-        getattr(jira_export, "jql", ""),
+        export_jql,
         maxResults=int(getattr(jira_export, "max_results", 500)),
         fields="*all",
     )
@@ -189,7 +322,7 @@ def export_jira_snapshot(jira_client, regression_rules: Any) -> List[Dict[str, A
     for issue in issues:
         issue_key = str(getattr(issue, "key", "") or "").strip()
         if issue_key:
-            snapshot_rows.append(fetch_issue_snapshot_fields(jira_client, issue_key))
+            snapshot_rows.append(fetch_issue_snapshot_fields(jira_client, issue_key, field_mapping=field_mapping))
     return snapshot_rows
 
 
@@ -260,11 +393,21 @@ def build_regression_row(row: Any) -> Dict[str, Any]:
         "affect_project": find_first_value(row, "affect_project", ""),
         "environment": find_first_value(row, "environment", ""),
         "exp_class": find_first_value(row, "exp_class", ""),
-        "caused_by": clean_cell_value(_get_raw_row_value(row, "caused_by")) or "",
+        "caused_by": find_first_value(row, "caused_by", "") or "",
         "ps": find_first_value(row, "ps", ""),
         "versions": version_items,
         "current_version": select_current_version(version_items),
     }
+
+
+def build_snapshot_field_mapping(defaults: Dict[str, Any]) -> Dict[str, Any]:
+    field_ids = defaults.get("field_ids", {})
+    mapping: Dict[str, Any] = {}
+    for field_name in ("affect_project", "exp_class", "caused_by"):
+        field_id = str(field_ids.get(field_name, "") or "").strip()
+        if field_id:
+            mapping[field_name] = field_id
+    return mapping
 
 
 def find_regression_match(
@@ -330,6 +473,18 @@ def build_history_issue_main_comment(action: str, row: Any, matched_row: Dict[st
     if action == "RESOLVED_FIXED_WAIT_NEW_VERSION":
         return f"自动化回归命中历史单 {history_key}，当前版本 {current_version} 早于修复版本，先保留记录并继续观察。"
     return f"自动化回归命中历史单 {history_key}，请关注当前版本 {current_version} 的复现情况。"
+
+
+def override_reporter_in_ps_text(ps_text: Any, current_user: str) -> str:
+    normalized_ps_text = str(clean_cell_value(ps_text) or "").strip()
+    normalized_user = str(current_user or "").strip()
+    if not normalized_ps_text or not normalized_user:
+        return normalized_ps_text
+
+    reporter_pattern = re.compile(r"^\*Reporter:\*\s*.*$", flags=re.IGNORECASE | re.MULTILINE)
+    if reporter_pattern.search(normalized_ps_text):
+        return reporter_pattern.sub(f"*Reporter:* {normalized_user}", normalized_ps_text, count=1)
+    return f"*Reporter:* {normalized_user}\n{normalized_ps_text}"
 
 
 def add_history_issue_comments(
@@ -500,12 +655,13 @@ def _get_regression_pass_candidates(
     snapshot_rows: List[Dict[str, Any]],
     regression_rules: Any,
     matched_jira_keys: set[str],
+    allowed_specialties: set[str] | None = None,
 ) -> List[Dict[str, Any]]:
     status_rules = getattr(regression_rules, "status_rules", None)
     resolved_statuses = list(getattr(status_rules, "resolved_statuses", []) or [])
     resolved_fixed_resolutions = list(getattr(status_rules, "resolved_fixed_resolutions", []) or [])
     if hasattr(store, "fetch_regression_pass_candidates"):
-        return list(
+        candidates = list(
             store.fetch_regression_pass_candidates(
                 run_id,
                 resolved_statuses,
@@ -513,6 +669,13 @@ def _get_regression_pass_candidates(
                 excluded_jira_keys=sorted(matched_jira_keys),
             )
         )
+        if not allowed_specialties:
+            return candidates
+        return [
+            dict(row)
+            for row in candidates
+            if extract_specialty_from_summary((row or {}).get("summary", "")) in allowed_specialties
+        ]
 
     resolved_status_set = {str(item).strip() for item in resolved_statuses if str(item).strip()}
     resolved_resolution_set = {
@@ -527,6 +690,10 @@ def _get_regression_pass_candidates(
             continue
         if str(row.get("resolution") or "").strip() not in resolved_resolution_set:
             continue
+        if allowed_specialties:
+            specialty = extract_specialty_from_summary(row.get("summary", ""))
+            if specialty not in allowed_specialties:
+                continue
         candidates.append(dict(row))
     return candidates
 
@@ -540,6 +707,7 @@ def process_regression_pass_candidates(
     regression_rules: Any,
     snapshot_rows: List[Dict[str, Any]],
     matched_jira_keys: set[str],
+    allowed_specialties: set[str] | None,
     args: argparse.Namespace,
     results: List[Dict[str, Any]],
     summary_rows: List[Dict[str, Any]],
@@ -553,6 +721,7 @@ def process_regression_pass_candidates(
         snapshot_rows=snapshot_rows,
         regression_rules=regression_rules,
         matched_jira_keys=matched_jira_keys,
+        allowed_specialties=allowed_specialties,
     )
 
     for history_row in pass_candidates:
@@ -670,7 +839,7 @@ def execute_decision(
 ) -> Dict[str, Any]:
     action = str(getattr(decision, "action", "") or "")
     issue_key = str((matched_row or {}).get("jira_key") or "").strip() or None
-    ps_text = clean_cell_value(find_first_value(row, "ps"))
+    ps_text = override_reporter_in_ps_text(find_first_value(row, "ps"), current_user)
     result_message = action
 
     try:
@@ -789,10 +958,16 @@ def execute_decision(
         return {"status": "FAILED", "issue_key": issue_key, "result_message": str(exc), "reason": "EXCEPTION"}
 
 
+def is_regression_enabled(regression_rules: Any) -> bool:
+    regression_config = getattr(regression_rules, "regression", None)
+    return bool(getattr(regression_config, "enabled", True))
+
+
 def run_batch_create(args: argparse.Namespace) -> int:
     defaults = load_defaults(args.config_file)
     priority_mapping_config = load_priority_mapping_from_rules_excel(args.severity_rules_file)
     regression_rules = load_regression_rules(DEFAULT_REGRESSION_RULES_FILE)
+    regression_enabled = is_regression_enabled(regression_rules) and not bool(getattr(args, "disable_regression", False))
     jira_server = args.jira_server or defaults.get("jira_server")
     wait_between_issues = float(
         args.wait_between_issues
@@ -807,26 +982,47 @@ def run_batch_create(args: argparse.Namespace) -> int:
     logger.info("已读取上传模板 %d 条，列: %s", len(df), list(df.columns))
     if not validate_upload_excel(df):
         return 1
+    summary_keywords = collect_regression_summary_keywords(df)
+    batch_specialties = collect_batch_specialties(df)
 
     jira = connect_to_jira(jira_server, args.jira_username, args.jira_password)
     current_user = str(jira.current_user() or "").strip()
     logger.info("Jira 连接成功，当前用户: %s", current_user)
-
-    store = RegressionStore(CURRENT_DIR / getattr(regression_rules.output, "sqlite_path", "result/transsion_regression_cache.db"))
-    run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
-    snapshot_rows = export_jira_snapshot(jira, regression_rules)
-    store.save_sync_run(
-        {
-            "run_id": run_id,
-            "started_at": datetime.now().isoformat(timespec="seconds"),
-            "jql": getattr(regression_rules.jira_export, "jql", ""),
-        }
+    project_cache: Dict[str, str] = {}
+    try:
+        batch_project_key = collect_batch_project_key(jira, df, project_cache)
+    except ValueError as exc:
+        logger.error(str(exc))
+        return 1
+    regression_base_jql = build_regression_base_jql(
+        batch_project_key,
+        override_reporter_in_jql(getattr(getattr(regression_rules, "jira_export", None), "jql", ""), current_user),
     )
-    store.save_snapshot(run_id, snapshot_rows)
+
+    run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+    store = None
+    snapshot_rows: List[Dict[str, Any]] = []
+    if regression_enabled:
+        store = RegressionStore(CURRENT_DIR / getattr(regression_rules.output, "sqlite_path", "result/transsion_regression_cache.db"))
+        snapshot_field_mapping = build_snapshot_field_mapping(defaults)
+        snapshot_rows = export_jira_snapshot(
+            jira,
+            regression_rules,
+            base_jql=regression_base_jql,
+            summary_keywords=summary_keywords,
+            field_mapping=snapshot_field_mapping,
+        )
+        store.save_sync_run(
+            {
+                "run_id": run_id,
+                "started_at": datetime.now().isoformat(timespec="seconds"),
+                "jql": build_regression_export_jql(regression_base_jql, summary_keywords),
+            }
+        )
+        store.save_snapshot(run_id, snapshot_rows)
 
     meta_cache: Dict[Tuple[str, str], Dict[str, Any]] = {}
     user_cache: Dict[str, str] = {}
-    project_cache: Dict[str, str] = {}
     results: List[Dict[str, Any]] = []
     summary_rows: List[Dict[str, Any]] = []
     matched_history_keys: set[str] = set()
@@ -860,9 +1056,10 @@ def run_batch_create(args: argparse.Namespace) -> int:
 
         try:
             regression_row = build_regression_row(row)
-            matched_row = find_regression_match(regression_row, snapshot_rows, regression_rules.matching)
-            if matched_row and str((matched_row or {}).get("jira_key") or "").strip():
-                matched_history_keys.add(str(matched_row.get("jira_key")).strip())
+            if regression_enabled:
+                matched_row = find_regression_match(regression_row, snapshot_rows, regression_rules.matching)
+                if matched_row and str((matched_row or {}).get("jira_key") or "").strip():
+                    matched_history_keys.add(str(matched_row.get("jira_key")).strip())
             decision = decide_action(
                 regression_row,
                 matched_row or {},
@@ -893,36 +1090,45 @@ def run_batch_create(args: argparse.Namespace) -> int:
                     user_cache=user_cache,
                     project_cache=project_cache,
                     create_assignee_override=current_user,
+                    create_reporter_override=current_user,
                 )
             reason = "命中历史单" if matched_row else "未命中历史单"
             logger.info("第 %d 行准备处理: [%s] %s", row_number, project_key, summary)
 
             if args.dry_run:
                 dry_run_message = f"dry-run: {getattr(decision, 'action', '')}"
-                store.save_execution_result(
-                    build_execution_result(
-                        run_id=run_id,
-                        row_number=row_number,
-                        matched_row=matched_row,
-                        action=getattr(decision, "action", ""),
-                        manual_review=bool(getattr(decision, "manual_review", False)),
-                        success=True,
-                        reason=reason,
-                        result_message=dry_run_message,
-                    )
+                logger.info(
+                    "第 %d 行 dry-run结果: matched_jira_key=%s action=%s reason=%s",
+                    row_number,
+                    str((matched_row or {}).get("jira_key") or "").strip() or "NONE",
+                    str(getattr(decision, "action", "") or ""),
+                    reason,
                 )
-                summary_rows.append(
-                    build_summary_row(
-                        row_number=row_number,
-                        matched_row=matched_row,
-                        matched_jira_key=str((matched_row or {}).get("jira_key") or ""),
-                        action=str(getattr(decision, "action", "") or ""),
-                        success=True,
-                        manual_review=bool(getattr(decision, "manual_review", False)),
-                        reason=reason,
-                        result_message=dry_run_message,
+                if regression_enabled and store is not None:
+                    store.save_execution_result(
+                        build_execution_result(
+                            run_id=run_id,
+                            row_number=row_number,
+                            matched_row=matched_row,
+                            action=getattr(decision, "action", ""),
+                            manual_review=bool(getattr(decision, "manual_review", False)),
+                            success=True,
+                            reason=reason,
+                            result_message=dry_run_message,
+                        )
                     )
-                )
+                    summary_rows.append(
+                        build_summary_row(
+                            row_number=row_number,
+                            matched_row=matched_row,
+                            matched_jira_key=str((matched_row or {}).get("jira_key") or ""),
+                            action=str(getattr(decision, "action", "") or ""),
+                            success=True,
+                            manual_review=bool(getattr(decision, "manual_review", False)),
+                            reason=reason,
+                            result_message=dry_run_message,
+                        )
+                    )
                 append_result(
                     results,
                     row_number=row_number,
@@ -959,32 +1165,33 @@ def run_batch_create(args: argparse.Namespace) -> int:
                 or (issue_key or "")
             )
 
-            store.save_execution_result(
-                build_execution_result(
-                    run_id=run_id,
-                    row_number=row_number,
-                    matched_row=matched_row if matched_row else ({"jira_key": issue_key} if issue_key else None),
-                    action=getattr(decision, "action", ""),
-                    manual_review=bool(getattr(decision, "manual_review", False)),
-                    success=success_flag,
-                    reason=outcome_reason,
-                    result_message=result_message,
+            if regression_enabled and store is not None:
+                store.save_execution_result(
+                    build_execution_result(
+                        run_id=run_id,
+                        row_number=row_number,
+                        matched_row=matched_row if matched_row else ({"jira_key": issue_key} if issue_key else None),
+                        action=getattr(decision, "action", ""),
+                        manual_review=bool(getattr(decision, "manual_review", False)),
+                        success=success_flag,
+                        reason=outcome_reason,
+                        result_message=result_message,
+                    )
                 )
-            )
-            summary_rows.append(
-                build_summary_row(
-                    row_number=row_number,
-                    matched_row=matched_row,
-                    matched_jira_key=matched_jira_key,
-                    action=str(getattr(decision, "action", "") or ""),
-                    success=success_flag,
-                    manual_review=bool(getattr(decision, "manual_review", False)),
-                    reason=outcome_reason,
-                    result_message=result_message,
-                    comment_status=str(execution_outcome.get("comment_status") or ""),
-                    ps_comment_status=str(execution_outcome.get("ps_comment_status") or ""),
+                summary_rows.append(
+                    build_summary_row(
+                        row_number=row_number,
+                        matched_row=matched_row,
+                        matched_jira_key=matched_jira_key,
+                        action=str(getattr(decision, "action", "") or ""),
+                        success=success_flag,
+                        manual_review=bool(getattr(decision, "manual_review", False)),
+                        reason=outcome_reason,
+                        result_message=result_message,
+                        comment_status=str(execution_outcome.get("comment_status") or ""),
+                        ps_comment_status=str(execution_outcome.get("ps_comment_status") or ""),
+                    )
                 )
-            )
             append_result(
                 results,
                 row_number=row_number,
@@ -999,30 +1206,31 @@ def run_batch_create(args: argparse.Namespace) -> int:
         except JIRAError as exc:
             error_text = getattr(exc, "text", "") or str(exc)
             logger.error("第 %d 行 Jira 创建失败: %s", row_number, error_text)
-            store.save_execution_result(
-                build_execution_result(
-                    run_id=run_id,
-                    row_number=row_number,
-                    matched_row=matched_row,
-                    action=str(getattr(decision, "action", "FAILED") or "FAILED"),
-                    manual_review=bool(getattr(decision, "manual_review", False)),
-                    success=False,
-                    reason="JIRA_ERROR",
-                    result_message=error_text,
+            if regression_enabled and store is not None:
+                store.save_execution_result(
+                    build_execution_result(
+                        run_id=run_id,
+                        row_number=row_number,
+                        matched_row=matched_row,
+                        action=str(getattr(decision, "action", "FAILED") or "FAILED"),
+                        manual_review=bool(getattr(decision, "manual_review", False)),
+                        success=False,
+                        reason="JIRA_ERROR",
+                        result_message=error_text,
+                    )
                 )
-            )
-            summary_rows.append(
-                build_summary_row(
-                    row_number=row_number,
-                    matched_row=matched_row,
-                    matched_jira_key=str((matched_row or {}).get("jira_key") or ""),
-                    action=str(getattr(decision, "action", "FAILED") or "FAILED"),
-                    success=False,
-                    manual_review=bool(getattr(decision, "manual_review", False)),
-                    reason="JIRA_ERROR",
-                    result_message=error_text,
+                summary_rows.append(
+                    build_summary_row(
+                        row_number=row_number,
+                        matched_row=matched_row,
+                        matched_jira_key=str((matched_row or {}).get("jira_key") or ""),
+                        action=str(getattr(decision, "action", "FAILED") or "FAILED"),
+                        success=False,
+                        manual_review=bool(getattr(decision, "manual_review", False)),
+                        reason="JIRA_ERROR",
+                        result_message=error_text,
+                    )
                 )
-            )
             append_result(
                 results,
                 row_number=row_number,
@@ -1036,30 +1244,31 @@ def run_batch_create(args: argparse.Namespace) -> int:
             )
         except Exception as exc:
             logger.exception("第 %d 行处理失败", row_number)
-            store.save_execution_result(
-                build_execution_result(
-                    run_id=run_id,
-                    row_number=row_number,
-                    matched_row=matched_row,
-                    action=str(getattr(decision, "action", "FAILED") or "FAILED"),
-                    manual_review=bool(getattr(decision, "manual_review", False)),
-                    success=False,
-                    reason="EXCEPTION",
-                    result_message=str(exc),
+            if regression_enabled and store is not None:
+                store.save_execution_result(
+                    build_execution_result(
+                        run_id=run_id,
+                        row_number=row_number,
+                        matched_row=matched_row,
+                        action=str(getattr(decision, "action", "FAILED") or "FAILED"),
+                        manual_review=bool(getattr(decision, "manual_review", False)),
+                        success=False,
+                        reason="EXCEPTION",
+                        result_message=str(exc),
+                    )
                 )
-            )
-            summary_rows.append(
-                build_summary_row(
-                    row_number=row_number,
-                    matched_row=matched_row,
-                    matched_jira_key=str((matched_row or {}).get("jira_key") or ""),
-                    action=str(getattr(decision, "action", "FAILED") or "FAILED"),
-                    success=False,
-                    manual_review=bool(getattr(decision, "manual_review", False)),
-                    reason="EXCEPTION",
-                    result_message=str(exc),
+                summary_rows.append(
+                    build_summary_row(
+                        row_number=row_number,
+                        matched_row=matched_row,
+                        matched_jira_key=str((matched_row or {}).get("jira_key") or ""),
+                        action=str(getattr(decision, "action", "FAILED") or "FAILED"),
+                        success=False,
+                        manual_review=bool(getattr(decision, "manual_review", False)),
+                        reason="EXCEPTION",
+                        result_message=str(exc),
+                    )
                 )
-            )
             append_result(
                 results,
                 row_number=row_number,
@@ -1076,20 +1285,22 @@ def run_batch_create(args: argparse.Namespace) -> int:
             logger.info("第 %d 行处理完成，等待 %.1f 秒后继续下一条", row_number, wait_between_issues)
             time.sleep(wait_between_issues)
 
-    process_regression_pass_candidates(
-        jira_client=jira,
-        store=store,
-        run_id=run_id,
-        current_version=select_current_version(
-            [str(find_first_value(row, "versions", "") or "").strip() for _, row in df.iterrows()]
-        ),
-        regression_rules=regression_rules,
-        snapshot_rows=snapshot_rows,
-        matched_jira_keys=matched_history_keys,
-        args=args,
-        results=results,
-        summary_rows=summary_rows,
-    )
+    if regression_enabled and store is not None:
+        process_regression_pass_candidates(
+            jira_client=jira,
+            store=store,
+            run_id=run_id,
+            current_version=select_current_version(
+                [str(find_first_value(row, "versions", "") or "").strip() for _, row in df.iterrows()]
+            ),
+            regression_rules=regression_rules,
+            snapshot_rows=snapshot_rows,
+            matched_jira_keys=matched_history_keys,
+            allowed_specialties=batch_specialties,
+            args=args,
+            results=results,
+            summary_rows=summary_rows,
+        )
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     RESULT_DIR.mkdir(parents=True, exist_ok=True)
@@ -1097,18 +1308,19 @@ def run_batch_create(args: argparse.Namespace) -> int:
     with open(result_path, "w", encoding="utf-8") as fp:
         json.dump(results, fp, ensure_ascii=False, indent=2)
     logger.info("结果已写入: %s", result_path)
-    excel_summary_dir = Path(getattr(regression_rules.output, "excel_summary_dir", RESULT_DIR))
-    if not excel_summary_dir.is_absolute():
-        excel_summary_dir = CURRENT_DIR / excel_summary_dir
-    summary_path = excel_summary_dir / f"transsion_jira_batch_create_summary_{timestamp}.xlsx"
-    write_excel_summary(summary_path, summary_rows)
-    logger.info("Excel 摘要已写入: %s", summary_path)
-    store.save_sync_run(
-        {
-            "run_id": run_id,
-            "finished_at": datetime.now().isoformat(timespec="seconds"),
-        }
-    )
+    if regression_enabled and store is not None:
+        excel_summary_dir = Path(getattr(regression_rules.output, "excel_summary_dir", RESULT_DIR))
+        if not excel_summary_dir.is_absolute():
+            excel_summary_dir = CURRENT_DIR / excel_summary_dir
+        summary_path = excel_summary_dir / f"transsion_jira_batch_create_summary_{timestamp}.xlsx"
+        write_excel_summary(summary_path, summary_rows)
+        logger.info("Excel 摘要已写入: %s", summary_path)
+        store.save_sync_run(
+            {
+                "run_id": run_id,
+                "finished_at": datetime.now().isoformat(timespec="seconds"),
+            }
+        )
 
     success_count = sum(1 for item in results if item["status"] in {"SUCCESS", "DRY_RUN"})
     failed_count = sum(1 for item in results if item["status"] == "FAILED")

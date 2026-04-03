@@ -188,6 +188,7 @@ python create_transsion_jira_batch_from_excel.py
 						--validate-metadata
 						--dry-run
 						--add-comments
+						--disable-regression
 
 第二阶段参数说明：
 - --add-excel-file
@@ -217,6 +218,7 @@ python create_transsion_jira_batch_from_excel.py
 - 第二阶段新增回归配置
   - 配置文件：`config/regression_rules.json`
   - 读取模块：`transsion_regression_models.py`
+  - `regression.enabled` 用于控制是否启用第二阶段新增的回归验证链路，默认 `true`
   - 执行前会先按 `jira_export.jql` 导出历史问题单到本地 SQLite
   - `matching.required_exact_fields` 固定要求 `affect_project`、`environment`、`exp_class`
   - `matching.cause_similarity_threshold` 默认值为 `0.9`
@@ -228,6 +230,7 @@ python create_transsion_jira_batch_from_excel.py
   - `resolved_fixed` 且本轮未命中时，会按 `required_regression_pass_versions` 做回归 PASS 计数；达到阈值后会尝试执行关单流转
   - `resolved_fixed` 但 `fixVersion` 为空，或当前版本已达到/超过 `fixVersion` 且再次命中时，会在结果中标记 `MANUAL_REVIEW`
   - 每次运行都会同时输出 JSON 结果、SQLite 明细和 Excel 摘要
+  - 当 `regression.enabled=false` 时，脚本会完全跳过历史单导出、强命中、PASS/关单、SQLite 和 Excel 摘要，只保留原有第二阶段建单流程和 JSON 结果
 - --validate-metadata
   只读取 Jira 项目的 create meta 并打印必填字段、字段名映射，不创建问题
   适用场景：第一次接入新项目、确认字段 ID、确认问题类型是否存在、确认必填项是否变化
@@ -237,6 +240,10 @@ python create_transsion_jira_batch_from_excel.py
   dry-run 同样会执行历史单匹配和 PASS 判定，并输出 JSON/SQLite/Excel 结果，但不会实际修改 Jira 或累计本地 PASS 状态
 - --add-comments
   实际建单成功后，把模板中的 PS 列追加为评论
+- --disable-regression
+  单次执行时临时关闭第二阶段新增的回归验证功能
+  优先级高于 `config/regression_rules.json` 里的 `regression.enabled`
+  开启后会跳过历史单导出、强命中、PASS/关单、SQLite 和 Excel 摘要，仅保留原有第二阶段建单流程和 JSON 结果
 
 示例：
 python create_transsion_jira_batch_from_excel.py --add-excel-file JIRA_Upload_List_Transsion_开关机专项_20260325_120728.xlsx --jira-username your_user --jira-password your_password --validate-metadata

@@ -29,6 +29,7 @@
     "issue_nature": "customfield_10202",
     "affect_project": "customfield_14205",
     "exp_class": "customfield_14202",
+    "caused_by": "customfield_14203",
     "case_no": "customfield_13800",
     "focus": "customfield_12415",
     "clients": "customfield_12617",
