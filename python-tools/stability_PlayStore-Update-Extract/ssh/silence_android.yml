@@ -1,0 +1,93 @@
+---
+- name: 静音所有 Android 设备
+  hosts: linux_hosts
+  remote_user: android
+  gather_facts: no
+  tasks:
+    - name: 执行并校验 ADB 静音指令
+      raw: |
+        failed=0
+        device_count=0
+        serial_list="$(adb devices | awk '/device$/&&!/List/{print $1}')"
+
+        while read -r serial; do
+          [ -n "$serial" ] || continue
+          device_count=$((device_count + 1))
+
+          adb_shell() {
+            adb -s "$serial" "$@" </dev/null
+          }
+
+          set_volume() {
+            stream="$1"
+            target="$2"
+            stream_name="$3"
+
+            set_output="$(adb_shell shell cmd media_session volume --stream "$stream" --set "$target" 2>&1 || true)"
+            current_value=""
+            one_line=""
+            try_count=0
+
+            while [ "$try_count" -lt 3 ]; do
+              get_output="$(adb_shell shell cmd media_session volume --stream "$stream" --get 2>&1 || true)"
+              one_line="$(printf '%s' "$get_output" | tr '\r\n' ' ' | sed 's/[[:space:]]\+/ /g')"
+              current_value="$(printf '%s' "$one_line" | sed -n 's/.*volume is \([0-9][0-9]*\).*/\1/p' | tail -n 1)"
+              if [ -n "$current_value" ] && [ "$current_value" -le "$target" ]; then
+                break
+              fi
+              try_count=$((try_count + 1))
+              sleep 1
+            done
+
+            if [ -n "$current_value" ] && [ "$current_value" -le "$target" ]; then
+              printf 'verify_ok serial=%s stream=%s(%s) target_max=%s current=%s\n' \
+                "$serial" "$stream_name" "$stream" "$target" "$current_value"
+            else
+              failed=1
+              printf 'verify_fail serial=%s stream=%s(%s) target_max=%s current=%s set_output=%s get_output=%s\n' \
+                "$serial" "$stream_name" "$stream" "$target" "${current_value:-unknown}" \
+                "$(printf '%s' "$set_output" | tr '\r\n' ' ' | sed 's/[[:space:]]\+/ /g')" \
+                "$one_line"
+            fi
+          }
+
+          set_volume 5 0 STREAM_NOTIFICATION
+          set_volume 4 1 STREAM_ALARM
+          set_volume 3 0 STREAM_MUSIC
+          set_volume 2 0 STREAM_RING
+
+          mute_keyevent_output="$(adb_shell shell input keyevent KEYCODE_VOLUME_MUTE 2>&1 || true)"
+          mute_keyevent_output="$(printf '%s' "$mute_keyevent_output" | tr '\r\n' ' ' | sed 's/[[:space:]]\+/ /g')"
+          if [ -z "$mute_keyevent_output" ]; then
+            printf 'mute_keyevent_ok serial=%s keycode=%s\n' "$serial" 'KEYCODE_VOLUME_MUTE'
+          else
+            printf 'mute_keyevent_warn serial=%s keycode=%s output=%s\n' \
+              "$serial" 'KEYCODE_VOLUME_MUTE' "$mute_keyevent_output"
+          fi
+
+          dnd_set_output="$(adb_shell shell cmd notification set_dnd none 2>&1 || true)"
+          dnd_mode="$(adb_shell shell settings get global zen_mode 2>&1 || true)"
+          dnd_mode="$(printf '%s' "$dnd_mode" | tr '\r\n' ' ' | sed 's/[[:space:]]\+/ /g')"
+
+          if [ "$dnd_mode" = "0" ]; then
+            printf 'dnd_ok serial=%s zen_mode=%s\n' "$serial" "$dnd_mode"
+          else
+            printf 'dnd_warn serial=%s zen_mode=%s set_output=%s\n' \
+              "$serial" "${dnd_mode:-unknown}" \
+              "$(printf '%s' "$dnd_set_output" | tr '\r\n' ' ' | sed 's/[[:space:]]\+/ /g')"
+          fi
+        done <<EOF
+        $serial_list
+        EOF
+
+        if [ "$device_count" -eq 0 ]; then
+          echo 'no_devices_found'
+          exit 2
+        fi
+
+        if [ "$failed" -ne 0 ]; then
+          exit 1
+        fi
+      register: silence_result
+      changed_when: false
+      failed_when: silence_result.rc != 0

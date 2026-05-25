@@ -1,0 +1,115 @@
+---
+- name: 通用更新远端文件
+  hosts: linux_hosts
+  remote_user: android
+  gather_facts: no
+  vars:
+    ansible_remote_tmp: /tmp/.ansible-android/tmp
+    update_file_src_resolved: "{{ update_file_src | default('') }}"
+    update_file_dest_resolved: "{{ update_file_dest | default('') }}"
+    update_file_mode_resolved: "{{ update_file_mode | default('0644') }}"
+    update_file_backup_resolved: "{{ update_file_backup | default(true) | bool }}"
+    update_file_content: "{{ lookup('ansible.builtin.file', update_file_src_resolved, rstrip=false) }}"
+    update_file_sha256: "{{ update_file_content | hash('sha256') }}"
+    update_file_size_bytes: "{{ update_file_content | length }}"
+
+  pre_tasks:
+    - name: 校验必填参数
+      assert:
+        that:
+          - update_file_src_resolved | length > 0
+          - update_file_dest_resolved | length > 0
+        fail_msg: 必须通过 -e 传入 update_file_src 和 update_file_dest。
+
+    - name: 准备远端临时目录和目标目录
+      raw: |
+        set -eu
+        mkdir -p "{{ ansible_remote_tmp }}"
+        mkdir -p "$(dirname "{{ update_file_dest_resolved }}")"
+      changed_when: false
+
+  tasks:
+    - name: 读取远端文件摘要
+      raw: |
+        if [ -f "{{ update_file_dest_resolved }}" ]; then
+          sha256sum "{{ update_file_dest_resolved }}" | awk '{print $1}'
+        else
+          echo MISSING
+        fi
+      register: remote_file_before
+      changed_when: false
+      failed_when: false
+
+    - name: 读取远端文件当前大小
+      raw: |
+        if [ -f "{{ update_file_dest_resolved }}" ]; then
+          stat -c %s "{{ update_file_dest_resolved }}"
+        else
+          echo 0
+        fi
+      register: remote_file_current_bytes
+      changed_when: false
+      failed_when: false
+
+    - name: 检查目标目录剩余空间
+      raw: |
+        df -B1 --output=avail "$(dirname "{{ update_file_dest_resolved }}")" 2>/dev/null | tail -n 1 | tr -d ' '
+      register: remote_file_target_free_bytes
+      changed_when: false
+      failed_when: false
+
+    - name: 检查远端临时目录剩余空间
+      raw: |
+        df -B1 --output=avail "{{ ansible_remote_tmp }}" 2>/dev/null | tail -n 1 | tr -d ' '
+      register: remote_file_tmp_free_bytes
+      changed_when: false
+      failed_when: false
+
+    - name: 目标目录剩余空间不足时直接失败
+      fail:
+        msg: >-
+          节点 {{ inventory_hostname }} 目标目录所在分区剩余空间不足，无法安全更新
+          {{ update_file_dest_resolved }}。当前可用
+          {{ remote_file_target_free_bytes.stdout | trim | default('0') }} 字节，
+          源文件大小 {{ update_file_size_bytes }} 字节。
+      when:
+        - remote_file_before.stdout | trim != update_file_sha256
+        - (remote_file_target_free_bytes.stdout | trim | default('0') | int) < (update_file_size_bytes | int)
+
+    - name: 远端临时目录剩余空间不足时直接失败
+      fail:
+        msg: >-
+          节点 {{ inventory_hostname }} 远端临时目录 {{ ansible_remote_tmp }} 所在分区剩余空间不足，
+          无法安全更新 {{ update_file_dest_resolved }}。当前可用
+          {{ remote_file_tmp_free_bytes.stdout | trim | default('0') }} 字节，
+          源文件大小 {{ update_file_size_bytes }} 字节。
+      when:
+        - remote_file_before.stdout | trim != update_file_sha256
+        - (remote_file_tmp_free_bytes.stdout | trim | default('0') | int) < (update_file_size_bytes | int)
+
+    - name: 备份开启但目标目录无法容纳备份时直接失败
+      fail:
+        msg: >-
+          节点 {{ inventory_hostname }} 目标目录所在分区剩余空间不足，无法为
+          {{ update_file_dest_resolved }} 创建备份。当前可用
+          {{ remote_file_target_free_bytes.stdout | trim | default('0') }} 字节，
+          远端原文件大小 {{ remote_file_current_bytes.stdout | trim | default('0') }} 字节。
+      when:
+        - update_file_backup_resolved
+        - remote_file_before.stdout | trim not in ['', 'MISSING']
+        - remote_file_before.stdout | trim != update_file_sha256
+        - (remote_file_target_free_bytes.stdout | trim | default('0') | int) < (remote_file_current_bytes.stdout | trim | default('0') | int)
+
+    - name: 复制文件到远端
+      copy:
+        src: "{{ update_file_src_resolved }}"
+        dest: "{{ update_file_dest_resolved }}"
+        mode: "{{ update_file_mode_resolved }}"
+        backup: "{{ update_file_backup_resolved }}"
+      when: remote_file_before.stdout | trim != update_file_sha256
+
+    - name: 校验远端文件摘要
+      raw: sha256sum "{{ update_file_dest_resolved }}" | awk '{print $1}'
+      register: remote_file_after
+      changed_when: false
+      failed_when: remote_file_after.stdout | trim != update_file_sha256

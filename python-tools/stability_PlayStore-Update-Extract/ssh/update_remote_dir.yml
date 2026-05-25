@@ -1,0 +1,136 @@
+---
+- name: 通用更新远端目录
+  hosts: linux_hosts
+  remote_user: android
+  gather_facts: no
+  vars:
+    ansible_remote_tmp: /tmp/.ansible-android/tmp
+    update_dir_dest_resolved: "{{ update_dir_dest | default('') }}"
+    update_dir_archive_src_resolved: "{{ update_dir_archive_src | default('') }}"
+    update_dir_archive_sha256_resolved: "{{ update_dir_archive_sha256 | default('') }}"
+    update_dir_archive_size_bytes_resolved: "{{ update_dir_archive_size_bytes | default(0) | int }}"
+    update_dir_source_total_bytes_resolved: "{{ update_dir_source_total_bytes | default(0) | int }}"
+    update_dir_remote_archive_resolved: "{{ ansible_remote_tmp }}/{{ inventory_hostname | regex_replace('[^A-Za-z0-9_.-]', '_') }}-{{ update_dir_dest_resolved | basename }}.tar.gz"
+    update_dir_marker_resolved: "{{ update_dir_dest_resolved | dirname }}/.{{ update_dir_dest_resolved | basename }}.sync.sha256"
+
+  pre_tasks:
+    - name: 校验必填参数
+      assert:
+        that:
+          - update_dir_dest_resolved | length > 0
+          - update_dir_dest_resolved != '/'
+          - update_dir_archive_src_resolved | length > 0
+          - update_dir_archive_sha256_resolved | length > 0
+        fail_msg: 必须通过 -e 传入 update_dir_dest、update_dir_archive_src 和 update_dir_archive_sha256。
+
+    - name: 准备远端临时目录和目标父目录
+      raw: |
+        set -eu
+        mkdir -p "{{ ansible_remote_tmp }}"
+        mkdir -p "$(dirname "{{ update_dir_dest_resolved }}")"
+      changed_when: false
+
+  tasks:
+    - name: 读取远端目录同步标记
+      raw: |
+        if [ -d "{{ update_dir_dest_resolved }}" ] && [ -f "{{ update_dir_marker_resolved }}" ]; then
+          cat "{{ update_dir_marker_resolved }}"
+        else
+          echo MISSING
+        fi
+      register: remote_dir_marker_before
+      changed_when: false
+      failed_when: false
+
+    - name: 读取远端目录当前大小
+      raw: |
+        if [ -d "{{ update_dir_dest_resolved }}" ]; then
+          du -sb "{{ update_dir_dest_resolved }}" 2>/dev/null | awk '{print $1}'
+        else
+          echo 0
+        fi
+      register: remote_dir_current_bytes
+      changed_when: false
+      failed_when: false
+
+    - name: 检查目标目录剩余空间
+      raw: |
+        df -B1 --output=avail "$(dirname "{{ update_dir_dest_resolved }}")" 2>/dev/null | tail -n 1 | tr -d ' '
+      register: remote_dir_target_free_bytes
+      changed_when: false
+      failed_when: false
+
+    - name: 检查远端临时目录剩余空间
+      raw: |
+        df -B1 --output=avail "{{ ansible_remote_tmp }}" 2>/dev/null | tail -n 1 | tr -d ' '
+      register: remote_dir_tmp_free_bytes
+      changed_when: false
+      failed_when: false
+
+    - name: 目标目录剩余空间不足时直接失败
+      fail:
+        msg: >-
+          节点 {{ inventory_hostname }} 目标目录所在分区剩余空间不足，无法安全更新目录
+          {{ update_dir_dest_resolved }}。当前可用
+          {{ remote_dir_target_free_bytes.stdout | trim | default('0') }} 字节，
+          远端目录当前大小 {{ remote_dir_current_bytes.stdout | trim | default('0') }} 字节，
+          源目录文件总大小 {{ update_dir_source_total_bytes_resolved }} 字节。
+      when:
+        - remote_dir_marker_before.stdout | trim != update_dir_archive_sha256_resolved
+        - ((remote_dir_target_free_bytes.stdout | trim | default('0') | int) + (remote_dir_current_bytes.stdout | trim | default('0') | int)) < update_dir_source_total_bytes_resolved
+
+    - name: 远端临时目录剩余空间不足时直接失败
+      fail:
+        msg: >-
+          节点 {{ inventory_hostname }} 远端临时目录 {{ ansible_remote_tmp }} 所在分区剩余空间不足，
+          无法安全更新目录 {{ update_dir_dest_resolved }}。当前可用
+          {{ remote_dir_tmp_free_bytes.stdout | trim | default('0') }} 字节，
+          压缩包大小 {{ update_dir_archive_size_bytes_resolved }} 字节。
+      when:
+        - remote_dir_marker_before.stdout | trim != update_dir_archive_sha256_resolved
+        - (remote_dir_tmp_free_bytes.stdout | trim | default('0') | int) < update_dir_archive_size_bytes_resolved
+
+    - name: 复制目录压缩包到远端
+      copy:
+        src: "{{ update_dir_archive_src_resolved }}"
+        dest: "{{ update_dir_remote_archive_resolved }}"
+        mode: '0600'
+      when: remote_dir_marker_before.stdout | trim != update_dir_archive_sha256_resolved
+
+    - name: 校验远端目录压缩包摘要
+      raw: sha256sum "{{ update_dir_remote_archive_resolved }}" | awk '{print $1}'
+      register: remote_dir_archive_after
+      changed_when: false
+      failed_when:
+        - remote_dir_marker_before.stdout | trim != update_dir_archive_sha256_resolved
+        - remote_dir_archive_after.stdout | trim != update_dir_archive_sha256_resolved
+      when: remote_dir_marker_before.stdout | trim != update_dir_archive_sha256_resolved
+
+    - name: 解压目录压缩包到目标父目录
+      unarchive:
+        src: "{{ update_dir_remote_archive_resolved }}"
+        dest: "{{ update_dir_dest_resolved | dirname }}"
+        remote_src: true
+      when: remote_dir_marker_before.stdout | trim != update_dir_archive_sha256_resolved
+
+    - name: 清理远端目录压缩包
+      raw: rm -f "{{ update_dir_remote_archive_resolved }}"
+      changed_when: false
+      when: remote_dir_marker_before.stdout | trim != update_dir_archive_sha256_resolved
+
+    - name: 写入远端目录同步标记
+      raw: |
+        printf '%s\n' '{{ update_dir_archive_sha256_resolved }}' > "{{ update_dir_marker_resolved }}"
+      changed_when: false
+      when: remote_dir_marker_before.stdout | trim != update_dir_archive_sha256_resolved
+
+    - name: 校验远端目录同步标记
+      raw: |
+        if [ -d "{{ update_dir_dest_resolved }}" ] && [ -f "{{ update_dir_marker_resolved }}" ]; then
+          cat "{{ update_dir_marker_resolved }}"
+        else
+          echo MISSING
+        fi
+      register: remote_dir_marker_after
+      changed_when: false
+      failed_when: remote_dir_marker_after.stdout | trim != update_dir_archive_sha256_resolved

@@ -1,0 +1,359 @@
+[
+  {
+    "pkg": "beatmaker.edm.musicgames.PianoGames",
+    "success": true,
+    "pre_vc": 242,
+    "post_vc": 242,
+    "skipped": true
+  },
+  {
+    "pkg": "cn.xender",
+    "success": true,
+    "pre_vc": 1000290,
+    "post_vc": 1000290,
+    "skipped": true
+  },
+  {
+    "pkg": "com.alibaba.intl.android.apps.poseidon",
+    "success": true,
+    "pre_vc": 261400,
+    "post_vc": 261400,
+    "skipped": true
+  },
+  {
+    "pkg": "com.bigwinepot.nwdn.international",
+    "success": true,
+    "pre_vc": 202520815,
+    "post_vc": 202520815,
+    "skipped": true
+  },
+  {
+    "pkg": "com.commsource.beautyplus",
+    "success": true,
+    "pre_vc": 78169,
+    "post_vc": 78169,
+    "skipped": true
+  },
+  {
+    "pkg": "com.daraz.android",
+    "success": true,
+    "pre_vc": 555,
+    "post_vc": 555,
+    "skipped": true
+  },
+  {
+    "pkg": "com.facebook.katana",
+    "success": true,
+    "pre_vc": 470619314,
+    "post_vc": 470619314,
+    "skipped": true
+  },
+  {
+    "pkg": "com.facebook.orca",
+    "success": true,
+    "pre_vc": 341612586,
+    "post_vc": 341612586,
+    "skipped": true
+  },
+  {
+    "pkg": "com.firsttouchgames.dls7",
+    "success": true,
+    "pre_vc": 148,
+    "post_vc": 148,
+    "skipped": true
+  },
+  {
+    "pkg": "com.flipkart.android",
+    "success": true,
+    "pre_vc": 3120400,
+    "post_vc": 3120400,
+    "skipped": true
+  },
+  {
+    "pkg": "com.google.android.calculator",
+    "success": true,
+    "pre_vc": 85011599,
+    "post_vc": 85011599,
+    "skipped": true
+  },
+  {
+    "pkg": "com.heartrate.monitorhealth.tracker",
+    "success": true,
+    "pre_vc": 45,
+    "post_vc": 45,
+    "skipped": true
+  },
+  {
+    "pkg": "com.imo.android.imoim",
+    "success": true,
+    "pre_vc": 26041031,
+    "post_vc": 26041031,
+    "skipped": true
+  },
+  {
+    "pkg": "com.instagram.android",
+    "success": true,
+    "pre_vc": 383309233,
+    "post_vc": 383309233,
+    "skipped": true
+  },
+  {
+    "pkg": "com.jazz.jazzworld",
+    "success": true,
+    "pre_vc": 152,
+    "post_vc": 152,
+    "skipped": true
+  },
+  {
+    "pkg": "com.jrzheng.supervpnfree",
+    "success": true,
+    "pre_vc": 144,
+    "post_vc": 144,
+    "skipped": true
+  },
+  {
+    "pkg": "com.jumia.android",
+    "success": true,
+    "pre_vc": null,
+    "post_vc": 359,
+    "error": ""
+  },
+  {
+    "pkg": "com.king.candycrushsaga",
+    "success": true,
+    "pre_vc": 13260011,
+    "post_vc": 13260011,
+    "skipped": true
+  },
+  {
+    "pkg": "com.lazada.android",
+    "success": true,
+    "pre_vc": 5160,
+    "post_vc": 5160,
+    "skipped": true
+  },
+  {
+    "pkg": "com.lemon.lvoverseas",
+    "success": true,
+    "pre_vc": 17601600,
+    "post_vc": 17601600,
+    "skipped": true
+  },
+  {
+    "pkg": "com.lenovo.anyshare.gps",
+    "success": true,
+    "pre_vc": 4062678,
+    "post_vc": 4062678,
+    "skipped": true
+  },
+  {
+    "pkg": "com.linkedin.android",
+    "success": true,
+    "pre_vc": null,
+    "post_vc": 210400,
+    "error": ""
+  },
+  {
+    "pkg": "com.martinvillar.android.bibliaenfrances",
+    "success": true,
+    "pre_vc": 47,
+    "post_vc": 47,
+    "skipped": true
+  },
+  {
+    "pkg": "com.meesho.supply",
+    "success": true,
+    "pre_vc": 825,
+    "post_vc": 825,
+    "skipped": true
+  },
+  {
+    "pkg": "com.meitu.meiyancamera",
+    "success": true,
+    "pre_vc": null,
+    "post_vc": 13135,
+    "error": ""
+  },
+  {
+    "pkg": "com.myliushisi.wogan",
+    "success": true,
+    "pre_vc": 30020,
+    "post_vc": 30020,
+    "skipped": true
+  },
+  {
+    "pkg": "com.niksoftware.snapseed",
+    "success": true,
+    "pre_vc": 1435392,
+    "post_vc": 1435392,
+    "skipped": true
+  },
+  {
+    "pkg": "com.opera.app.news",
+    "success": true,
+    "pre_vc": 139082548,
+    "post_vc": 139082548,
+    "skipped": true
+  },
+  {
+    "pkg": "com.opera.browser",
+    "success": true,
+    "pre_vc": 1909712408,
+    "post_vc": 1909712408,
+    "skipped": true
+  },
+  {
+    "pkg": "com.opera.mini.native",
+    "success": true,
+    "pre_vc": 998588871,
+    "post_vc": 998588871,
+    "skipped": true
+  },
+  {
+    "pkg": "com.phonepe.app",
+    "success": true,
+    "pre_vc": 26031308,
+    "post_vc": 26031308,
+    "skipped": true
+  },
+  {
+    "pkg": "com.picsart.studio",
+    "success": true,
+    "pre_vc": 993829709,
+    "post_vc": 993829709,
+    "skipped": true
+  },
+  {
+    "pkg": "com.resultadosfutbol.mobile",
+    "success": true,
+    "pre_vc": 23005449,
+    "post_vc": 23005449,
+    "skipped": true
+  },
+  {
+    "pkg": "com.roblox.client",
+    "success": true,
+    "pre_vc": 2204,
+    "post_vc": 2204,
+    "skipped": true
+  },
+  {
+    "pkg": "com.shazam.android",
+    "success": true,
+    "pre_vc": 1603900,
+    "post_vc": 1603900,
+    "skipped": true
+  },
+  {
+    "pkg": "com.shopee.id",
+    "success": true,
+    "pre_vc": 37232,
+    "post_vc": 37232,
+    "skipped": true
+  },
+  {
+    "pkg": "com.snapchat.android",
+    "success": true,
+    "pre_vc": 285022,
+    "post_vc": 285022,
+    "skipped": true
+  },
+  {
+    "pkg": "com.spotify.music",
+    "success": true,
+    "pre_vc": 140785734,
+    "post_vc": 140785734,
+    "skipped": true
+  },
+  {
+    "pkg": "com.tencent.ig",
+    "success": true,
+    "pre_vc": 20925,
+    "post_vc": 20925,
+    "skipped": true
+  },
+  {
+    "pkg": "com.truecaller",
+    "success": true,
+    "pre_vc": 2615006,
+    "post_vc": 2615006,
+    "skipped": true
+  },
+  {
+    "pkg": "com.twitter.android",
+    "success": true,
+    "pre_vc": 311860000,
+    "post_vc": 311860000,
+    "skipped": true
+  },
+  {
+    "pkg": "com.UCMobile.intl",
+    "success": true,
+    "pre_vc": null,
+    "post_vc": 50509,
+    "error": ""
+  },
+  {
+    "pkg": "com.whatsapp",
+    "success": true,
+    "pre_vc": 261607200,
+    "post_vc": 261607200,
+    "skipped": true
+  },
+  {
+    "pkg": "com.whereismytrain.android",
+    "success": true,
+    "pre_vc": 2023564,
+    "post_vc": 2023564,
+    "skipped": true
+  },
+  {
+    "pkg": "com.yandex.yango",
+    "success": true,
+    "pre_vc": 50128094,
+    "post_vc": 50128094,
+    "skipped": true
+  },
+  {
+    "pkg": "com.zhiliaoapp.musically",
+    "success": true,
+    "pre_vc": 2024409030,
+    "post_vc": 2024409030,
+    "skipped": true
+  },
+  {
+    "pkg": "com.zzkko",
+    "success": true,
+    "pre_vc": null,
+    "post_vc": 2652,
+    "error": ""
+  },
+  {
+    "pkg": "in.amazon.mShop.android.shopping",
+    "success": true,
+    "pre_vc": null,
+    "post_vc": 1241315216,
+    "error": ""
+  },
+  {
+    "pkg": "org.telegram.messenger",
+    "success": true,
+    "pre_vc": 66662,
+    "post_vc": 66662,
+    "skipped": true
+  },
+  {
+    "pkg": "ridmik.keyboard",
+    "success": true,
+    "pre_vc": null,
+    "post_vc": 276,
+    "error": ""
+  },
+  {
+    "pkg": "vsin.t16_funny_photo",
+    "success": true,
+    "pre_vc": 10744,
+    "post_vc": 10744,
+    "skipped": true
+  }
+]

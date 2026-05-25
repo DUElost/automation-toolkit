@@ -1,0 +1,241 @@
+---
+- name: 批量安装 APK 到所有 Android 设备
+  hosts: linux_hosts
+  remote_user: android
+  gather_facts: no
+  vars:
+    ansible_remote_tmp: /tmp/.ansible-android/tmp
+    # 以下变量需通过 -e 传入
+    apk_archive_src: "{{ apk_archive_src | default('') }}"
+    apk_archive_sha256: "{{ apk_archive_sha256 | default('') }}"
+    apk_dest_dir: "{{ apk_dest_dir | default('/home/android/apks') }}"
+    # 远端临时路径
+    _remote_archive: "{{ ansible_remote_tmp }}/{{ inventory_hostname }}-apks.tar.gz"
+    _apk_marker: "{{ apk_dest_dir }}/.{{ apk_dest_dir | basename }}.sync.sha256"
+
+  tasks:
+    # ------------------------------------------------------------------
+    # Phase 1: 分发 APK 目录到本节点
+    # ------------------------------------------------------------------
+
+    - name: 准备远端临时目录和目标目录
+      raw: |
+        set -eu
+        mkdir -p "{{ ansible_remote_tmp }}"
+        mkdir -p "{{ apk_dest_dir }}"
+      changed_when: false
+
+    - name: 读取远端 APK 目录同步标记
+      raw: |
+        if [ -f "{{ _apk_marker }}" ]; then
+          cat "{{ _apk_marker }}"
+        else
+          echo MISSING
+        fi
+      register: apk_marker_before
+      changed_when: false
+      failed_when: false
+
+    - name: 推送 APK 压缩包到远端
+      copy:
+        src: "{{ apk_archive_src }}"
+        dest: "{{ _remote_archive }}"
+        mode: '0600'
+      when: apk_marker_before.stdout | trim != apk_archive_sha256
+
+    - name: 校验远端压缩包摘要
+      raw: sha256sum "{{ _remote_archive }}" | awk '{print $1}'
+      register: apk_archive_checksum
+      changed_when: false
+      failed_when:
+        - apk_marker_before.stdout | trim != apk_archive_sha256
+        - apk_archive_checksum.stdout | trim != apk_archive_sha256
+      when: apk_marker_before.stdout | trim != apk_archive_sha256
+
+    - name: 解压 APK 到目标目录（保留已有文件，仅覆盖同名）
+      unarchive:
+        src: "{{ _remote_archive }}"
+        dest: "{{ apk_dest_dir | dirname }}"
+        remote_src: true
+      when: apk_marker_before.stdout | trim != apk_archive_sha256
+
+    - name: 清理远端压缩包
+      raw: rm -f "{{ _remote_archive }}"
+      changed_when: false
+      when: apk_marker_before.stdout | trim != apk_archive_sha256
+
+    - name: 写入同步标记
+      raw: printf '%s\n' '{{ apk_archive_sha256 }}' > "{{ _apk_marker }}"
+      changed_when: false
+      when: apk_marker_before.stdout | trim != apk_archive_sha256
+
+    # ------------------------------------------------------------------
+    # Phase 2: 在本节点所有已连接设备上安装 APK（含版本校验）
+    # ------------------------------------------------------------------
+
+    - name: 读取应用清单（包名 + 期望版本号）
+      raw: |
+        for d in "{{ apk_dest_dir }}"/*/; do
+          [ -d "$d" ] || continue
+          meta="${d}metadata.json"
+          pkg=""
+          ver=""
+          if [ -f "$meta" ]; then
+            pkg=$(sed -n 's/.*"package": *"\([^"]*\)".*/\1/p' "$meta" | head -1)
+            ver=$(sed -n 's/.*"version_code": *"\([^"]*\)".*/\1/p' "$meta" | head -1)
+          fi
+          [ -z "$pkg" ] && pkg=$(basename "$d" | sed 's/_/./g')
+          printf '%s|%s|%s\n' "$d" "$pkg" "${ver:-unknown}"
+        done | awk -F'|' '{pri=($2~/trichrome/)?0:1; print pri, $0}' | sort -n | cut -d' ' -f2-
+      register: app_manifest
+      changed_when: false
+
+    - name: 批量安装 APK 并校验版本
+      raw: |
+        device_count=0
+        total=0
+        upgraded=0
+        already=0
+        fail=0
+        mismatch=0
+        failed_list=""
+
+        # 获取已连接设备列表
+        serial_list="$(adb devices | awk '/device$/&&!/List/{print $1}')"
+        if [ -z "$serial_list" ]; then
+          echo "no_devices host={{ inventory_hostname }}"
+          exit 0
+        fi
+
+        # 解析应用清单: dir|pkg|expected_ver
+        app_count=0
+        app_dirs=""; app_pkgs=""; app_vers=""
+        while IFS='|' read -r d p v; do
+          [ -n "$d" ] || continue
+          app_count=$((app_count + 1))
+          app_dirs="${app_dirs}${d}
+        "
+          app_pkgs="${app_pkgs}${p}
+        "
+          app_vers="${app_vers}${v}
+        "
+        done <<MANIFEST
+        {{ app_manifest.stdout }}
+        MANIFEST
+
+        if [ "$app_count" -eq 0 ]; then
+          echo "no_apk_dirs host={{ inventory_hostname }} dir={{ apk_dest_dir }}"
+          exit 2
+        fi
+
+        # ---- 每个设备独立处理 ----
+        while read -r serial; do
+          [ -n "$serial" ] || continue
+          device_count=$((device_count + 1))
+          echo "=== device=${serial} ==="
+
+          # ----- 安装前版本快照 -----
+          snap_before="$(adb -s "$serial" shell pm list packages --show-versioncode 2>/dev/null | tr -d '\r' || true)"
+
+          # 解析快照为 pkg→ver 映射（只关注清单中的应用）
+          # 共享库（如 Trichrome）不在 pm list packages 中，回退到 dumpsys
+          _find_ver() {
+            _pkg="$1"
+            _escaped=$(echo "$_pkg" | sed 's/\./\\./g')
+            _ver=$(echo "$snap_before" | grep "^package:${_escaped} versionCode:" | head -1 | sed 's/.* versionCode://')
+            if [ -z "$_ver" ]; then
+              _ver=$(adb -s "$serial" shell dumpsys package "$_pkg" 2>/dev/null | tr -d '\r' | grep 'versionCode=' | head -1 | sed 's/.*versionCode=\([0-9]*\).*/\1/' || true)
+            fi
+            echo "${_ver:-NOT_INSTALLED}"
+          }
+
+          # ----- 逐个安装 -----
+          # 将三个列表合并迭代
+          _dirs="$app_dirs"; _pkgs="$app_pkgs"; _vers="$app_vers"
+          idx=0
+          while [ $idx -lt $app_count ]; do
+            idx=$((idx + 1))
+            app_dir=$(echo "$_dirs" | sed -n "${idx}p")
+            pkg=$(echo "$_pkgs" | sed -n "${idx}p")
+            expected_ver=$(echo "$_vers" | sed -n "${idx}p")
+            app_name=$(basename "$app_dir")
+
+            # 收集 APK 文件
+            apk_args=""; apk_count=0
+            for apk in "$app_dir"/*.apk; do
+              [ -f "$apk" ] || continue
+              apk_args="$apk_args $apk"
+              apk_count=$((apk_count + 1))
+            done
+
+            if [ "$apk_count" -eq 0 ]; then
+              echo "skip_no_apk serial=${serial} app=${app_name}"
+              continue
+            fi
+
+            total=$((total + 1))
+            old_ver=$(_find_ver "$pkg")
+
+            # 执行安装
+            install_out="$(adb -s "$serial" install-multiple -r -g -d $apk_args 2>&1)" || true
+            install_rc=$?
+
+            # 安装后版本（包名中 . 需转义；共享库用 dumpsys）
+            _escaped=$(echo "$pkg" | sed 's/\./\\./g')
+            new_ver=$(adb -s "$serial" shell pm list packages --show-versioncode 2>/dev/null | tr -d '\r' | grep "^package:${_escaped} versionCode:" | head -1 | sed 's/.* versionCode://' || true)
+            if [ -z "$new_ver" ]; then
+              new_ver=$(adb -s "$serial" shell dumpsys package "$pkg" 2>/dev/null | tr -d '\r' | grep 'versionCode=' | head -1 | sed 's/.*versionCode=\([0-9]*\).*/\1/' || true)
+            fi
+            new_ver="${new_ver:-NOT_FOUND}"
+
+            # 判断结果
+            if ! echo "$install_out" | grep -qi 'Success'; then
+              failed_list="${failed_list} ${serial}:${app_name}"
+              fail=$((fail + 1))
+              first_line=$(echo "$install_out" | head -1)
+              echo "FAIL serial=${serial} app=${app_name} rc=${install_rc} old=${old_ver} output=${first_line}"
+
+            elif [ "$new_ver" != "$old_ver" ] && [ "$new_ver" != "NOT_FOUND" ]; then
+              upgraded=$((upgraded + 1))
+              echo "UPGRADED serial=${serial} app=${app_name} old=${old_ver} new=${new_ver} expected=${expected_ver}"
+
+            elif [ "$new_ver" = "$old_ver" ]; then
+              already=$((already + 1))
+              echo "ALREADY_SAME serial=${serial} app=${app_name} version=${new_ver} expected=${expected_ver}"
+
+            else
+              # new_ver == NOT_FOUND → 安装后包消失了
+              mismatch=$((mismatch + 1))
+              echo "VANISHED serial=${serial} app=${app_name} old=${old_ver} expected=${expected_ver}"
+            fi
+          done
+        done <<DEVICES
+        $serial_list
+        DEVICES
+
+        # 汇总
+        echo "=== summary host={{ inventory_hostname }} ==="
+        echo "devices=${device_count} apps=${app_count} total_ops=${total}"
+        echo "UPGRADED=${upgraded} ALREADY_SAME=${already} FAIL=${fail} VANISHED=${mismatch}"
+
+        if [ "$device_count" -eq 0 ]; then
+          echo "no_devices host={{ inventory_hostname }}"
+          exit 0
+        fi
+
+        if [ "$fail" -gt 0 ] || [ "$mismatch" -gt 0 ]; then
+          [ "$fail" -gt 0 ] && echo "failed_packages:${failed_list}"
+          [ "$mismatch" -gt 0 ] && echo "version_mismatch"
+          exit 1
+        fi
+
+        echo "all_ok host={{ inventory_hostname }}"
+      register: install_result
+      changed_when: false
+      failed_when: install_result.rc != 0
+
+    - name: 输出安装摘要
+      debug:
+        msg: |
+          {{ install_result.stdout.split('\n')[-10:] | join('\n') }}
+      when: install_result.stdout | default('') | length > 0
