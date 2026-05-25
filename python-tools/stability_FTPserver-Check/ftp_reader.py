@@ -172,26 +172,324 @@ def list_remote_dir(ftp: FTP, remote_dir: str, decode_encoding: str = "auto") ->
     return lines, used_encoding
 
 
+@dataclass
+class RemotePathInfo:
+    path: str
+    path_type: str
+    entries: Optional[List[str]] = None
+    size: Optional[int] = None
+
+
+@dataclass
+class DownloadResult:
+    remote_path: str
+    local_path: Path
+    path_type: str
+    file_count: int = 0
+    dir_count: int = 0
+
+
+def normalize_remote_path(remote_path: str) -> str:
+    normalized = (remote_path or "").strip()
+    if not normalized:
+        return "/"
+    if normalized == "/":
+        return normalized
+    return normalized.rstrip("/")
+
+
+def split_remote_path(remote_path: str) -> Tuple[str, str]:
+    normalized = normalize_remote_path(remote_path)
+    if normalized == "/":
+        return "/", ""
+    if "/" not in normalized:
+        return ".", normalized
+    parent, name = normalized.rsplit("/", 1)
+    return parent or "/", name
+
+
+def join_remote_path(parent: str, name: str) -> str:
+    if parent in ("", "."):
+        return name
+    if parent == "/":
+        return f"/{name}"
+    return f"{parent.rstrip('/')}/{name}"
+
+
+def parse_list_entry_name(entry: str) -> str:
+    parts = entry.split(maxsplit=8)
+    if len(parts) >= 9:
+        name = parts[8]
+        if parts[0].startswith("l") and " -> " in name:
+            return name.split(" -> ", 1)[0]
+        return name
+    return entry.strip()
+
+
+def is_remote_dir_entry(entry: str) -> bool:
+    return bool(entry) and entry.startswith("d")
+
+
+def is_remote_path_entry(entry: str) -> bool:
+    return bool(entry) and entry[:1] in ("d", "-", "l")
+
+
+def remote_path_basename(remote_path: str) -> str:
+    _, name = split_remote_path(remote_path)
+    return name or "ftp_root"
+
+
+def build_remote_file_examples(remote_dir: str, entries: Optional[List[str]], limit: int = 3) -> List[str]:
+    if not entries:
+        return []
+
+    examples: List[str] = []
+    for entry in entries:
+        if not is_remote_path_entry(entry) or is_remote_dir_entry(entry):
+            continue
+        entry_name = parse_list_entry_name(entry)
+        if not entry_name:
+            continue
+        examples.append(join_remote_path(remote_dir, entry_name))
+        if len(examples) >= limit:
+            break
+    return examples
+
+
+def inspect_remote_path(ftp: FTP, remote_path: str) -> RemotePathInfo:
+    normalized = normalize_remote_path(remote_path)
+    original_dir: Optional[str] = None
+
+    try:
+        original_dir = ftp.pwd()
+    except all_errors:
+        original_dir = None
+
+    is_directory = False
+    try:
+        ftp.cwd(normalized)
+        is_directory = True
+    except all_errors:
+        is_directory = False
+    finally:
+        if original_dir is not None:
+            try:
+                ftp.cwd(original_dir)
+            except all_errors:
+                pass
+
+    if is_directory:
+        try:
+            entries, _ = list_remote_dir(ftp, normalized, ftp.encoding)
+        except all_errors:
+            entries = []
+        return RemotePathInfo(path=normalized, path_type="directory", entries=entries)
+
+    try:
+        ftp.voidcmd("TYPE I")
+        size = ftp.size(normalized)
+        if size is not None:
+            return RemotePathInfo(path=normalized, path_type="file", size=size)
+    except all_errors:
+        pass
+
+    parent_dir, expected_name = split_remote_path(normalized)
+    try:
+        entries, _ = list_remote_dir(ftp, parent_dir, ftp.encoding)
+    except all_errors:
+        return RemotePathInfo(path=normalized, path_type="missing")
+
+    for entry in entries:
+        if not is_remote_path_entry(entry):
+            continue
+        if parse_list_entry_name(entry) != expected_name:
+            continue
+        if is_remote_dir_entry(entry):
+            try:
+                child_entries, _ = list_remote_dir(ftp, normalized, ftp.encoding)
+            except all_errors:
+                child_entries = []
+            return RemotePathInfo(path=normalized, path_type="directory", entries=child_entries)
+        return RemotePathInfo(path=normalized, path_type="file")
+
+    return RemotePathInfo(path=normalized, path_type="missing")
+
+
+def ensure_remote_file(ftp: FTP, remote_path: str, action: str) -> str:
+    info = inspect_remote_path(ftp, remote_path)
+    if info.path_type == "file":
+        return info.path
+
+    if info.path_type == "directory":
+        examples = build_remote_file_examples(info.path, info.entries)
+        hint = ""
+        if examples:
+            hint = "。请改用目录中的具体文件，例如：{}".format("；".join(examples))
+        raise RuntimeError(f"远程路径是目录，不能直接{action}：{info.path}{hint}")
+
+    raise RuntimeError(f"远程路径不存在，或当前账号无权访问：{info.path}")
+
+
 def read_remote_file(ftp: FTP, remote_file: str) -> bytes:
+    remote_file = ensure_remote_file(ftp, remote_file, "读取文件")
     buffer = BytesIO()
     ftp.retrbinary(f"RETR {remote_file}", buffer.write)
     return buffer.getvalue()
 
 
-def download_remote_file(ftp: FTP, remote_file: str, local_file: Path) -> None:
+def download_single_file(ftp: FTP, remote_file: str, local_file: Path) -> None:
     local_file.parent.mkdir(parents=True, exist_ok=True)
-    with local_file.open("wb") as file_obj:
-        ftp.retrbinary(f"RETR {remote_file}", file_obj.write)
+    temp_file = local_file.with_name(f"{local_file.name}.part")
+    try:
+        with temp_file.open("wb") as file_obj:
+            ftp.retrbinary(f"RETR {remote_file}", file_obj.write)
+        temp_file.replace(local_file)
+    except Exception:
+        if temp_file.exists():
+            temp_file.unlink()
+        raise
+
+
+def resolve_local_download_path(remote_info: RemotePathInfo, local_path: Optional[Path]) -> Path:
+    default_name = remote_path_basename(remote_info.path)
+    if remote_info.path_type == "directory":
+        target_dir = local_path if local_path is not None else Path(default_name)
+        if target_dir.exists() and not target_dir.is_dir():
+            raise RuntimeError(f"本地目标路径已存在且不是目录：{target_dir.resolve()}")
+        return target_dir
+
+    if local_path is None:
+        return Path(default_name)
+    if local_path.exists() and local_path.is_dir():
+        return local_path / default_name
+    return local_path
+
+
+def download_remote_directory(
+    ftp: FTP,
+    remote_dir: str,
+    local_dir: Path,
+    entries: Optional[List[str]] = None,
+) -> Tuple[int, int]:
+    local_dir.mkdir(parents=True, exist_ok=True)
+    file_count = 0
+    dir_count = 1
+
+    current_entries = entries
+    if current_entries is None:
+        current_entries, _ = list_remote_dir(ftp, remote_dir, ftp.encoding)
+
+    for entry in current_entries:
+        if not is_remote_path_entry(entry):
+            continue
+
+        entry_name = parse_list_entry_name(entry)
+        if not entry_name or entry_name in (".", ".."):
+            continue
+
+        child_remote_path = join_remote_path(remote_dir, entry_name)
+        child_local_path = local_dir / entry_name
+
+        if is_remote_dir_entry(entry):
+            child_file_count, child_dir_count = download_remote_directory(
+                ftp,
+                child_remote_path,
+                child_local_path,
+            )
+            file_count += child_file_count
+            dir_count += child_dir_count
+            continue
+
+        download_single_file(ftp, child_remote_path, child_local_path)
+        file_count += 1
+
+    return file_count, dir_count
+
+
+def download_remote_file(ftp: FTP, remote_path: str, local_path: Optional[Path] = None) -> DownloadResult:
+    remote_info = inspect_remote_path(ftp, remote_path)
+    if remote_info.path_type == "missing":
+        raise RuntimeError(f"远程路径不存在，或当前账号无权访问：{remote_info.path}")
+
+    target_path = resolve_local_download_path(remote_info, local_path)
+    if remote_info.path_type == "directory":
+        file_count, dir_count = download_remote_directory(
+            ftp,
+            remote_info.path,
+            target_path,
+            remote_info.entries,
+        )
+        return DownloadResult(
+            remote_path=remote_info.path,
+            local_path=target_path,
+            path_type="directory",
+            file_count=file_count,
+            dir_count=dir_count,
+        )
+
+    download_single_file(ftp, remote_info.path, target_path)
+    return DownloadResult(
+        remote_path=remote_info.path,
+        local_path=target_path,
+        path_type="file",
+        file_count=1,
+    )
+
+
+def format_download_message(result: DownloadResult) -> str:
+    resolved_local_path = result.local_path.resolve()
+    if result.path_type == "directory":
+        return (
+            f"递归下载完成：{resolved_local_path} "
+            f"(目录 {result.dir_count} 个，文件 {result.file_count} 个)"
+        )
+    return f"下载完成：{resolved_local_path}"
+
+
+def build_ftp_config_from_args(args: argparse.Namespace) -> FTPConfig:
+    return FTPConfig(
+        host=args.ftp_host,
+        port=args.ftp_port,
+        username=args.ftp_username,
+        password=args.ftp_password,
+        ftp_encoding=args.ftp_encoding,
+        timeout=args.timeout,
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="FTP 文件读取脚本，支持列目录、读取文本文件、下载文件。"
     )
-    parser.add_argument("--host", default=DEFAULT_CONFIG.host, help="FTP 服务器地址")
-    parser.add_argument("--port", type=int, default=DEFAULT_CONFIG.port, help="FTP 端口")
-    parser.add_argument("--user", default=DEFAULT_CONFIG.username, help="FTP 用户名")
-    parser.add_argument("--password", default=DEFAULT_CONFIG.password, help="FTP 密码")
+    parser.add_argument(
+        "--ftp-host",
+        "--host",
+        dest="ftp_host",
+        default=DEFAULT_CONFIG.host,
+        help="FTP 服务器 IP 或域名",
+    )
+    parser.add_argument(
+        "--ftp-port",
+        "--port",
+        dest="ftp_port",
+        type=int,
+        default=DEFAULT_CONFIG.port,
+        help="FTP 端口号",
+    )
+    parser.add_argument(
+        "--ftp-username",
+        "--user",
+        dest="ftp_username",
+        default=DEFAULT_CONFIG.username,
+        help="FTP 账户名",
+    )
+    parser.add_argument(
+        "--ftp-password",
+        "--password",
+        dest="ftp_password",
+        default=DEFAULT_CONFIG.password,
+        help="FTP 密码",
+    )
     parser.add_argument(
         "--ftp-encoding",
         default=DEFAULT_CONFIG.ftp_encoding,
@@ -216,12 +514,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="可选：将读取到的文件同时保存到本地，例如 .\\output.txt",
     )
 
-    download_parser = subparsers.add_parser("download", help="下载远程文件到本地")
-    download_parser.add_argument("remote_file", help="远程文件路径")
+    download_parser = subparsers.add_parser("download", help="下载远程文件或目录到本地")
+    download_parser.add_argument("remote_path", help="远程文件或目录路径")
     download_parser.add_argument(
         "local_file",
         nargs="?",
-        help="本地保存路径，未传时默认保存到当前目录并沿用远程文件名",
+        help="本地保存路径。远程文件默认保存为同名文件，远程目录默认递归保存为同名目录",
     )
 
     return parser
@@ -231,14 +529,7 @@ def safe_main() -> int:
     parser = build_parser()
     args = parser.parse_args()
 
-    config = FTPConfig(
-        host=args.host,
-        port=args.port,
-        username=args.user,
-        password=args.password,
-        ftp_encoding=args.ftp_encoding,
-        timeout=args.timeout,
-    )
+    config = build_ftp_config_from_args(args)
 
     try:
         if args.command == "list":
@@ -274,12 +565,12 @@ def safe_main() -> int:
             return 0
 
         if args.command == "download":
-            local_file = Path(args.local_file) if args.local_file else Path(Path(args.remote_file).name)
-            run_ftp_operation(
+            local_path = Path(args.local_file) if args.local_file else None
+            download_result, _ = run_ftp_operation(
                 config,
-                lambda ftp: download_remote_file(ftp, args.remote_file, local_file),
+                lambda ftp: download_remote_file(ftp, args.remote_path, local_path),
             )
-            print(f"下载完成：{local_file.resolve()}")
+            print(format_download_message(download_result))
             return 0
 
         parser.print_help()
@@ -299,14 +590,7 @@ def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
 
-    config = FTPConfig(
-        host=args.host,
-        port=args.port,
-        username=args.user,
-        password=args.password,
-        ftp_encoding=args.ftp_encoding,
-        timeout=args.timeout,
-    )
+    config = build_ftp_config_from_args(args)
 
     try:
         with ftp_connection(config) as ftp:
@@ -331,9 +615,9 @@ def main() -> int:
                 return 0
 
             if args.command == "download":
-                local_file = Path(args.local_file) if args.local_file else Path(Path(args.remote_file).name)
-                download_remote_file(ftp, args.remote_file, local_file)
-                print(f"下载完成：{local_file.resolve()}")
+                local_path = Path(args.local_file) if args.local_file else None
+                download_result = download_remote_file(ftp, args.remote_path, local_path)
+                print(format_download_message(download_result))
                 return 0
 
             parser.print_help()
