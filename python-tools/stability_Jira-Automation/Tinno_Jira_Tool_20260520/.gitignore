@@ -1,0 +1,6 @@
+.ace-tool/
+.env.local
+*.p12
+*.pem
+*.crt
+*.key

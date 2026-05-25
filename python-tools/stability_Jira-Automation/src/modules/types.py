@@ -68,6 +68,7 @@ class JiraIssueDict(TypedDict, total=False):
     source_file: Optional[str]
     raw_data: Optional[Dict[str, Any]]
     fix_version: Optional[str]
+    build_version: Optional[str]
     regression_pass_count: int
     verified_versions: Optional[str]
 

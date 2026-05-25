@@ -1,0 +1,74 @@
+{
+  "jira_export": {
+    "enabled": true,
+    "jql": "reporter in (dai.lv)",
+    "max_results": 1000,
+    "fields": [
+      "key",
+      "summary",
+      "status",
+      "resolution",
+      "reporter",
+      "assignee",
+      "created",
+      "updated",
+      "comment",
+      "fixVersions",
+      "components",
+      "priority",
+      "description",
+      "environment",
+      "customfield_10500"
+    ]
+  },
+  "matching": {
+    "required_exact_fields": [
+      "affect_project",
+      "environment",
+      "exp_class"
+    ],
+    "cause_similarity_threshold": 0.9
+  },
+  "status_rules": {
+    "open_like_statuses": [
+      "Open",
+      "开放",
+      "Reopened",
+      "重新打开",
+      "处理中"
+    ],
+    "resolved_statuses": [
+      "已解决",
+      "Resolved",
+      "Verified"
+    ],
+    "resolved_fixed_resolutions": [
+      "完成"
+    ],
+    "wont_fix_resolutions": [
+      "问题不修改",
+      "Won't Fix",
+      "Won't Do",
+      "不解决",
+      "非问题"
+    ],
+    "closed_statuses": [
+      "Closed",
+      "已关闭",
+      "已关单"
+    ]
+  },
+  "regression": {
+    "enabled": true,
+    "required_regression_pass_versions": 2,
+    "enable_duplicate_followups": false,
+    "write_audit_report": true,
+    "strict_version_project_keys": [
+      "VFFCA"
+    ]
+  },
+  "output": {
+    "sqlite_path": "result/tinno_regression_cache",
+    "excel_summary_dir": "result"
+  }
+}

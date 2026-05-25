@@ -1,0 +1,9 @@
+{
+  "common": {
+    "device_mark": "PR1",
+    "tester_contact": "吕代+18379465576",
+    "pass_test_count": "0/1000"
+  },
+  "pass_template": "验证结果：PASS\n测试次数：{test_count}\n验证步骤：{specialty}\n验证版本：{current_version}\n样机标识：{device_mark}\n应用版本：/\n测试人员及联系方式：{tester_contact}\n备注：{remark}",
+  "fail_template": "验证结果：FAIL\n测试次数：{test_count}\n验证步骤：{specialty}\n验证版本：{current_version}\n样机标识：{device_mark}\n应用版本：{app_version}\n测试人员及联系方式：{tester_contact}\n备注：{remark}"
+}

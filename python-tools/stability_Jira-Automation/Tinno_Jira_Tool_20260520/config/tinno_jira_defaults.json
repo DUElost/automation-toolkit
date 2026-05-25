@@ -1,0 +1,49 @@
+{
+  "jira_server": "https://jira.tinno.com",
+  "project_key": "VCAME",
+  "issue_type": "Bug",
+  "default_reporter": "dai.lv",
+  "default_assignee": "dai.lv",
+  "default_priority": "Medium",
+  "default_bug_severity": "B",
+  "default_affect_project": "VCAME",
+  "default_component": "AUTOTEST",
+  "default_previous_version_status": "Previous version exists",
+  "default_previous_version_text": "100%",
+  "labels": [
+    "MonkeyAEE"
+  ],
+  "default_test_case": "Monkey专项",
+  "test_case_label_mapping": {
+    "Monkey专项": "MonkeyAEE",
+    "MTBF专项": "MTBF",
+    "休眠唤醒专项": "休眠唤醒",
+    "开关机专项": "开关机",
+    "联机UI重启专项": "联机UI重启",
+    "ADB重启+Monkey专项": "ADB重启+Monkey",
+    "恢复出厂专项": "恢复出厂",
+    "内存泄漏Stress专项": "内存泄漏Stress",
+    "DDR专项": "DDR",
+    "GPU压力专项": "GPU压力"
+  },
+  "verify": false,
+  "summary_prefix": "[自动化]",
+  "auth": {
+    "mode": "p12",
+    "p12_path_env": "JIRA_P12_PATH",
+    "p12_password_env": "JIRA_P12_PASSWORD",
+    "username_env": "JIRA_USERNAME",
+    "password_env": "JIRA_PASSWORD",
+    "cookie_string_env": "JIRA_COOKIE_STRING",
+    "cookie_jsessionid_env": "JIRA_COOKIE_JSESSIONID",
+    "cookie_xsrf_token_env": "JIRA_COOKIE_XSRF_TOKEN",
+    "cookie_rememberme_env": "JIRA_COOKIE_REMEMBERME",
+    "cookie_crowd_token_env": "JIRA_COOKIE_CROWD_TOKEN"
+  },
+  "field_ids": {
+    "bug_severity": "customfield_10120",
+    "key_information": "customfield_10500",
+    "previous_version_status": "customfield_10123",
+    "previous_version_text": "customfield_10124"
+  }
+}

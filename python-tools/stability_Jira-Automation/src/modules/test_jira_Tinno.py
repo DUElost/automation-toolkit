@@ -2,7 +2,17 @@ from jira import JIRA
 from jira.exceptions import JIRAError
 import requests
 import json
+import os
+import sys
 import urllib3
+from pathlib import Path
+from urllib.parse import urljoin, urlparse
+
+CURRENT_DIR = Path(__file__).resolve().parent
+if str(CURRENT_DIR) not in sys.path:
+    sys.path.insert(0, str(CURRENT_DIR))
+
+from jira_p12_client import JiraP12Client
 
 # 禁用SSL警告
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -11,8 +21,16 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 # 1. 配置你的 JIRA 信息
 # ==========================================================
 JIRA_SERVER = 'https://jira.tinno.com'  # 你的 JIRA 服务器地址
-JIRA_USER = 'dai.lv'              # 你的邮箱
-JIRA_PASSWORD = 'l,74926520'        # <-- 在这里输入你的JIRA登录密码
+JIRA_USER = os.getenv("JIRA_USERNAME", 'dai.lv')              # 你的邮箱
+JIRA_PASSWORD = os.getenv("JIRA_PASSWORD", 'l,74926520')        # <-- 在这里输入你的JIRA登录密码
+JIRA_P12_PATH = os.getenv("JIRA_P12_PATH")
+JIRA_P12_PASSWORD = os.getenv("JIRA_P12_PASSWORD")
+PROJECT_KEY = os.getenv("JIRA_PROJECT_KEY", "VCAME")
+JIRA_COOKIE_STRING = os.getenv("JIRA_COOKIE_STRING", "")
+JIRA_COOKIE_JSESSIONID = os.getenv("JIRA_COOKIE_JSESSIONID", "")
+JIRA_COOKIE_XSRF_TOKEN = os.getenv("JIRA_COOKIE_XSRF_TOKEN", "")
+JIRA_COOKIE_REMEMBERME = os.getenv("JIRA_COOKIE_REMEMBERME", "")
+JIRA_COOKIE_CROWD_TOKEN = os.getenv("JIRA_COOKIE_CROWD_TOKEN", "")
 
 # self.jira_server = 'http://jira-ex.transsion.com:6001'
 # self.jira_user = 'dailv.tinno'
@@ -23,7 +41,7 @@ ISSUE_KEY_TO_COMMENT = 'VFFBA-738'
 COMMENT_TEXT = 'Monkey自动化回归调试用，不做关注'
 
 # 读取VFFBA-2606的备注内容
-ISSUE_KEY_TO_READ = 'VFFBA-2606'
+ISSUE_KEY_TO_READ = os.getenv("TINNO_READ_ISSUE_KEY", "")
 
 ISSUE_KEY_TO_CLOSE = 'VFFBA-2311'
 # 我们将寻找包含这些关键字的转换名称
@@ -32,6 +50,184 @@ TARGET_TRANSITION_KEYWORDS = ['关闭', 'close', 'done', '已关闭']
 # ==========================================================
 # 2. 定义功能函数
 # ==========================================================
+def _try_parse_json_response(response):
+    """安全解析 JSON，失败时返回 None。"""
+    try:
+        return response.json()
+    except Exception:
+        return None
+
+
+def _is_json_response(response):
+    content_type = str((response.headers or {}).get("Content-Type", "")).lower()
+    payload = _try_parse_json_response(response)
+    return "json" in content_type and payload is not None
+
+
+class TinnoP12ReadonlyClient:
+    """面向 Tinno 连通性实验的最小只读客户端。"""
+
+    def __init__(self, raw_client, ensure_login=True):
+        self.raw_client = raw_client
+        if ensure_login:
+            self.raw_client.ensure_authenticated()
+        elif not self.raw_client.session:
+            self.raw_client.connect()
+
+    def _request_json(self, endpoint, params=None):
+        if not self.raw_client.session:
+            raise RuntimeError("P12 会话未建立，无法执行只读探针")
+
+        response = self.raw_client.session.get(
+            urljoin(self.raw_client.jira_url, endpoint),
+            params=params,
+            timeout=self.raw_client.timeout,
+            verify=self.raw_client.verify,
+            allow_redirects=True,
+        )
+        payload = _try_parse_json_response(response)
+        content_type = str((response.headers or {}).get("Content-Type", "")).lower()
+        if response.status_code != 200:
+            raise RuntimeError(
+                f"接口 {endpoint} 响应异常: status={response.status_code}, body={(response.text or '')[:200]}"
+            )
+        if "json" not in content_type or payload is None:
+            body_preview = ((response.text or "")[:200]).replace("\r", " ").replace("\n", " ")
+            raise RuntimeError(
+                f"接口 {endpoint} 未返回有效 JSON: content_type={content_type or 'unknown'}, body={body_preview or '<empty>'}"
+            )
+        return payload
+
+    def current_user(self):
+        payload = self._request_json("/rest/api/2/myself")
+        current_user = (
+            payload.get("name")
+            or payload.get("displayName")
+            or payload.get("key")
+            or payload.get("emailAddress")
+        )
+        if not current_user:
+            raise RuntimeError("myself 接口返回了 JSON，但缺少可识别的用户标识字段")
+        return current_user
+
+    def probe_project(self, project_key):
+        project = self._request_json(f"/rest/api/2/project/{project_key}")
+        if project.get("key") != project_key:
+            raise RuntimeError(f"项目探针返回异常: 期望 {project_key}，实际 {project.get('key')}")
+
+        components = self._request_json(f"/rest/api/2/project/{project_key}/components")
+        if not isinstance(components, list):
+            raise RuntimeError("components 接口未返回列表结构")
+
+        create_meta = self._request_json(
+            "/rest/api/2/issue/createmeta",
+            params={"projectKeys": project_key, "expand": "projects.issuetypes.fields"},
+        )
+        projects = create_meta.get("projects") or []
+        if not projects:
+            raise RuntimeError("createmeta 接口返回为空，无法确认 VCAME 字段元数据")
+
+        issue_types = projects[0].get("issuetypes") or []
+        return {
+            "project_key": project.get("key"),
+            "project_name": project.get("name"),
+            "component_count": len(components),
+            "issue_type_count": len(issue_types),
+        }
+
+    def close(self):
+        self.raw_client.close()
+
+
+def _parse_cookie_string(cookie_string):
+    cookies = {}
+    for chunk in str(cookie_string or "").split(";"):
+        if "=" not in chunk:
+            continue
+        key, value = chunk.strip().split("=", 1)
+        key = key.strip()
+        value = value.strip()
+        if key and value:
+            cookies[key] = value
+    return cookies
+
+
+def _load_tinno_cookie_values():
+    cookies = _parse_cookie_string(JIRA_COOKIE_STRING)
+    if JIRA_COOKIE_JSESSIONID:
+        cookies["JSESSIONID"] = JIRA_COOKIE_JSESSIONID
+    if JIRA_COOKIE_XSRF_TOKEN:
+        cookies["atlassian.xsrf.token"] = JIRA_COOKIE_XSRF_TOKEN
+    if JIRA_COOKIE_REMEMBERME:
+        cookies["seraph.rememberme.cookie"] = JIRA_COOKIE_REMEMBERME
+    if JIRA_COOKIE_CROWD_TOKEN:
+        cookies["crowd.token_key"] = JIRA_COOKIE_CROWD_TOKEN
+    return cookies
+
+
+def _apply_tinno_cookies(session, server, cookies):
+    domain = (urlparse(server).hostname or "").strip()
+    if not domain:
+        raise RuntimeError(f"无法从服务器地址解析 Cookie 域名: {server}")
+    for key, value in cookies.items():
+        session.cookies.set(key, value, domain=domain)
+
+
+def _connect_to_jira_with_p12(server, user, password):
+    """Tinno 专用的 P12 + 只读验证回退路径。"""
+    if not JIRA_P12_PATH or not JIRA_P12_PASSWORD:
+        raise RuntimeError("未配置 JIRA_P12_PATH / JIRA_P12_PASSWORD，无法执行 P12 回退连接")
+
+    raw_client = JiraP12Client(
+        jira_url=server,
+        p12_file_path=JIRA_P12_PATH,
+        p12_password=JIRA_P12_PASSWORD,
+        jira_username=user,
+        jira_password=password,
+        verify=False,
+    )
+    client = TinnoP12ReadonlyClient(raw_client)
+    current_user = client.current_user()
+    project_probe = client.probe_project(PROJECT_KEY)
+    print("[成功] P12 只读 JSON 连通性验证成功")
+    print(f"当前登录用户: {current_user}")
+    print(
+        f"项目探针: {project_probe['project_key']} / {project_probe['project_name']} "
+        f"(组件数={project_probe['component_count']}, 问题类型数={project_probe['issue_type_count']})"
+    )
+    return client
+
+
+def _connect_to_jira_with_p12_and_cookie(server, user, password):
+    """Tinno 专用的 P12 + 浏览器 Cookie 只读验证路径。"""
+    cookies = _load_tinno_cookie_values()
+    if not cookies:
+        raise RuntimeError("未配置 Tinno Cookie，无法执行 P12 + Cookie 回退连接")
+    if not JIRA_P12_PATH or not JIRA_P12_PASSWORD:
+        raise RuntimeError("未配置 JIRA_P12_PATH / JIRA_P12_PASSWORD，无法执行 P12 + Cookie 回退连接")
+
+    raw_client = JiraP12Client(
+        jira_url=server,
+        p12_file_path=JIRA_P12_PATH,
+        p12_password=JIRA_P12_PASSWORD,
+        jira_username=user,
+        jira_password=password,
+        verify=False,
+    )
+    raw_client.connect()
+    _apply_tinno_cookies(raw_client.session, server, cookies)
+    client = TinnoP12ReadonlyClient(raw_client, ensure_login=False)
+    current_user = client.current_user()
+    project_probe = client.probe_project(PROJECT_KEY)
+    print("[成功] P12 + Cookie 只读 JSON 连通性验证成功")
+    print(f"当前登录用户: {current_user}")
+    print(
+        f"项目探针: {project_probe['project_key']} / {project_probe['project_name']} "
+        f"(组件数={project_probe['component_count']}, 问题类型数={project_probe['issue_type_count']})"
+    )
+    return client
+
+
 def test_server_connection(server):
     """测试服务器连接"""
     try:
@@ -44,37 +240,35 @@ def test_server_connection(server):
         # 测试API端点
         api_url = f"{server}/rest/api/2/serverInfo"
         print(f"测试API端点: {api_url}")
-        response = requests.get(api_url, timeout=10)
+        response = requests.get(api_url, timeout=10, verify=False)
         print(f"API响应状态码: {response.status_code}")
         print(f"响应内容前200字符: {response.text[:200]}")
         
         if response.status_code == 200:
-            try:
+            if _is_json_response(response):
                 server_info = response.json()
-                print(f"✅ 服务器连接正常，JIRA版本: {server_info.get('version', '未知')}")
+                print(f"[成功] 服务器连接正常，JIRA版本: {server_info.get('version', '未知')}")
                 return True
-            except json.JSONDecodeError:
-                print("⚠️ 服务器响应不是有效的JSON格式，可能需要认证")
-                print("这通常意味着JIRA需要登录才能访问API")
-                return True  # 服务器可达，但需要认证
+            print("[提示] 服务器可达，但 serverInfo 未返回 JSON，通常表示 Tinno 需要更强的认证链路")
+            return True  # 服务器可达，但需要进一步认证
         elif response.status_code == 401:
-            print("⚠️ 需要认证，这是正常的")
+            print("[提示] 需要认证，这是正常的")
             return True
         elif response.status_code == 403:
-            print("⚠️ 权限不足，但服务器可达")
+            print("[提示] 权限不足，但服务器可达")
             return True
         else:
-            print(f"⚠️ 服务器响应异常，状态码: {response.status_code}")
+            print(f"[提示] 服务器响应异常，状态码: {response.status_code}")
             return False
             
     except requests.exceptions.Timeout:
-        print("❌ 连接超时，请检查网络连接")
+        print("[失败] 连接超时，请检查网络连接")
         return False
     except requests.exceptions.ConnectionError:
-        print("❌ 无法连接到服务器，请检查服务器地址")
+        print("[失败] 无法连接到服务器，请检查服务器地址")
         return False
     except Exception as e:
-        print(f"❌ 测试连接时发生错误: {e}")
+        print(f"[失败] 测试连接时发生错误: {e}")
         return False
 
 def test_jira_auth(server, user, password):
@@ -90,19 +284,19 @@ def test_jira_auth(server, user, password):
             "password": password
         }
         
-        response = requests.post(auth_url, json=login_data, timeout=10)
+        response = requests.post(auth_url, json=login_data, timeout=10, verify=False)
         print(f"认证响应状态码: {response.status_code}")
         print(f"认证响应内容: {response.text[:300]}")
         
-        if response.status_code == 200:
-            print("✅ 认证成功")
+        if response.status_code == 200 and _is_json_response(response):
+            print("[成功] 认证成功")
             return True
-        else:
-            print(f"❌ 认证失败，状态码: {response.status_code}")
-            return False
+
+        print("[失败] 认证接口未返回有效 JSON，当前不能判定为成功")
+        return False
             
     except Exception as e:
-        print(f"❌ 测试认证时发生错误: {e}")
+        print(f"[失败] 测试认证时发生错误: {e}")
         return False
 
 def connect_to_jira(server, user, password):
@@ -130,12 +324,42 @@ def connect_to_jira(server, user, password):
             print("  服务器地址不正确或服务不可用")
         else:
             print("  请检查网络连接和服务器状态")
-        return None
-        
+        fallback_errors = []
+        cookie_values = _load_tinno_cookie_values()
+        if cookie_values:
+            print("  正在尝试 Tinno P12 + Cookie 只读回退连接...")
+            try:
+                return _connect_to_jira_with_p12_and_cookie(server, user, password)
+            except Exception as cookie_error:
+                fallback_errors.append(f"P12 + Cookie 回退失败: {cookie_error}")
+        print("  正在尝试 Tinno P12 只读回退连接...")
+        try:
+            return _connect_to_jira_with_p12(server, user, password)
+        except Exception as p12_error:
+            fallback_errors.append(f"P12 回退失败: {p12_error}")
+            for message in fallback_errors:
+                print(f"  {message}")
+            return None
+
     except Exception as e:
         print(f"[失败] JIRA 连接失败: {e}")
         print(f"错误类型: {type(e).__name__}")
-        return None
+        fallback_errors = []
+        cookie_values = _load_tinno_cookie_values()
+        if cookie_values:
+            print("正在尝试 Tinno P12 + Cookie 只读回退连接...")
+            try:
+                return _connect_to_jira_with_p12_and_cookie(server, user, password)
+            except Exception as cookie_error:
+                fallback_errors.append(f"P12 + Cookie 回退失败: {cookie_error}")
+        print("正在尝试 Tinno P12 只读回退连接...")
+        try:
+            return _connect_to_jira_with_p12(server, user, password)
+        except Exception as p12_error:
+            fallback_errors.append(f"P12 回退失败: {p12_error}")
+            for message in fallback_errors:
+                print(message)
+            return None
 
 def get_issue_details(client, issue_key):
     """获取并打印单个问题的详细信息"""
@@ -448,31 +672,28 @@ def create_jira_issue(client, project_key, issue_type, summary, assignee, descri
 # ==========================================================
 if __name__ == "__main__":
     print("=" * 60)
-    print("读取当前用户在VFFBA项目下提交的所有问题")
+    print("Tinno Jira 连通性只读实验")
     print("=" * 60)
-    
+
+    server_ok = test_server_connection(JIRA_SERVER)
+    auth_ok = test_jira_auth(JIRA_SERVER, JIRA_USER, JIRA_PASSWORD)
+    print(f"[信息] server_ok={server_ok}, auth_ok={auth_ok}")
+
     # 连接到 JIRA
     jira = connect_to_jira(JIRA_SERVER, JIRA_USER, JIRA_PASSWORD)
 
     if jira:
-        # # 示例1: 读取单个问题
-        # get_issue_details(jira, 'VFFBA-2') # 请替换为真实问题Key
-
-        # # 示例2: 搜索问题
-        # my_jql = "project = 'VFFBA' AND assignee = currentUser()" # 请替换为真实项目Key
-        # search_for_issues(jira, my_jql)
-        
-        # # 示例3: 添加评论
-        # add_comment_to_issue(jira, ISSUE_KEY_TO_COMMENT, COMMENT_TEXT)
-        
-        # # 示例4: 关闭问题单
-        # close_jira_issue(jira, ISSUE_KEY_TO_CLOSE, TARGET_TRANSITION_KEYWORDS)
-        
-        # 示例5: 读取当前用户在VFFBA项目下提交的所有问题
-        # project_key = 'VFFBA'  # V551A (VFFBA)
-        # user_issues = get_current_user_issues(jira, project_key)
-        
-        get_issue_details(jira, ISSUE_KEY_TO_READ)
+        print(f"\n[信息] 当前实验项目: {PROJECT_KEY}")
+        print("[信息] 已确认 VCAME 的只读 JSON 接口可用，可继续补字段与读写逻辑。")
+        if ISSUE_KEY_TO_READ and hasattr(jira, "issue"):
+            print(f"[信息] 额外读取问题: {ISSUE_KEY_TO_READ}")
+            get_issue_details(jira, ISSUE_KEY_TO_READ)
+        try:
+            jira.close()
+        except Exception:
+            pass
+    else:
+        print(f"\n[结论] {PROJECT_KEY} 的只读 JSON REST 接口当前未打通，需继续排查 Tinno 的真实认证链路。")
 
 
         # 如需创建新问题单，可以取消注释下面的代码：

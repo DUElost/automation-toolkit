@@ -93,6 +93,7 @@ class DatabaseManager:
             source_file TEXT,
             raw_data TEXT,
             fix_version TEXT,
+            build_version TEXT,
             regression_pass_count INTEGER DEFAULT 0,
             verified_versions TEXT
         );
@@ -218,6 +219,7 @@ class DatabaseManager:
             ("pending_issues", "priority", "TEXT"),
             ("pending_issues", "ps", "TEXT"),
             ("jira_issues_main", "fix_version", "TEXT"),
+            ("jira_issues_main", "build_version", "TEXT"),
             ("jira_issues_main", "resolution", "TEXT"),
             ("jira_issues_main", "regression_pass_count", "INTEGER DEFAULT 0"),
             ("jira_issues_main", "verified_versions", "TEXT"),
@@ -386,7 +388,7 @@ class DatabaseManager:
             'jira_key', 'status', 'summary', 'normalized_summary', 'test_environment',
             'raw_caused_by', 'assignee', 'bug_severity', 'priority', 'description',
             'resolution', 'package_name', 'exp_class', 'exp_type', 'cur_process', 'version',
-            'count', 'device_count', 'source_file', 'raw_data', 'fix_version',
+            'count', 'device_count', 'source_file', 'raw_data', 'fix_version', 'build_version',
             'regression_pass_count', 'verified_versions'
         ]
         

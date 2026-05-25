@@ -1,0 +1,22 @@
+{
+  "MLD-LX1": {
+    "jira_project": "VFFCA",
+    "monkey_project": "VFFCA"
+  },
+  "MLD-LX2": {
+    "jira_project": "VFFCA",
+    "monkey_project": "VFFCA"
+  },
+  "MLD-LX3": {
+    "jira_project": "VFFCA",
+    "monkey_project": "VFFCA"
+  },
+  "V552AA": {
+    "jira_project": "VFFCA",
+    "monkey_project": "VFFCA"
+  },
+  "V551A": {
+    "jira_project": "VFFBA",
+    "monkey_project": "VFFBA"
+  }
+}
