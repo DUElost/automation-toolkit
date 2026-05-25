@@ -27,10 +27,7 @@ class ItmsUiAutomation:
         storage_path.parent.mkdir(parents=True, exist_ok=True)
 
         with sync_playwright() as playwright:
-            browser = playwright.chromium.launch(
-                headless=self.config.browser.headless,
-                slow_mo=self.config.browser.slow_mo_ms,
-            )
+            browser = playwright.chromium.launch(**self.auth_manager.build_launch_kwargs())
             context = browser.new_context(**context_kwargs)
             context.set_default_timeout(self.config.browser.timeout_ms)
             page = context.new_page()

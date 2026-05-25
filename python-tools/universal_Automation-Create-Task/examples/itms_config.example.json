@@ -16,7 +16,8 @@
     "headless": false,
     "slow_mo_ms": 150,
     "timeout_ms": 20000,
-    "storage_state_path": ".runtime/itms_storage_state.json"
+    "storage_state_path": ".runtime/itms_storage_state.json",
+    "executable_path": "C:\\Users\\Rin\\AppData\\Local\\ms-playwright\\chromium-1200\\chrome-win64\\chrome.exe"
   },
   "auth": {
     "auto_relogin": false,

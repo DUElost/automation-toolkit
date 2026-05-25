@@ -30,10 +30,7 @@ class ItmsAuthManager:
         storage_path.parent.mkdir(parents=True, exist_ok=True)
 
         with sync_playwright() as playwright:
-            browser = playwright.chromium.launch(
-                headless=self.config.browser.headless,
-                slow_mo=self.config.browser.slow_mo_ms,
-            )
+            browser = playwright.chromium.launch(**self.build_launch_kwargs())
             context = browser.new_context()
             context.set_default_timeout(self.config.browser.timeout_ms)
             page = context.new_page()
@@ -122,10 +119,7 @@ class ItmsAuthManager:
         storage_path.parent.mkdir(parents=True, exist_ok=True)
 
         with sync_playwright() as playwright:
-            browser = playwright.chromium.launch(
-                headless=self.config.browser.headless,
-                slow_mo=self.config.browser.slow_mo_ms,
-            )
+            browser = playwright.chromium.launch(**self.build_launch_kwargs())
             context = browser.new_context()
             context.set_default_timeout(self.config.browser.timeout_ms)
             page = context.new_page()
@@ -178,6 +172,17 @@ class ItmsAuthManager:
         kwargs = {}
         if storage_path.exists():
             kwargs["storage_state"] = str(storage_path)
+        return kwargs
+
+    def build_launch_kwargs(self) -> Dict[str, object]:
+        """生成 Playwright 浏览器启动参数。"""
+        kwargs: Dict[str, object] = {
+            "headless": self.config.browser.headless,
+            "slow_mo": self.config.browser.slow_mo_ms,
+        }
+        executable_path = self.config.browser.executable_path.strip()
+        if executable_path:
+            kwargs["executable_path"] = executable_path
         return kwargs
 
     def _get_credentials(self) -> Tuple[str, str]:

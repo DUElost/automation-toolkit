@@ -123,6 +123,170 @@ python main.py inspect-options --config examples\itms_config.example.json --form
 python main.py ui --config examples\itms_config.example.json --form examples\sub_plan_form.example.json
 ```
 
+### 6. 录制人力预估页面提交请求
+
+```powershell
+python main.py discover-manpower --config examples\manpower_config.example.json
+```
+
+说明：
+
+- 该命令会打开 `#/manpowerhub/manpower/task?tab=taskhrmy`
+- 请手动完成一次“添加任务并提交”
+- 完成后回到终端按回车
+- 全量抓包会输出到 `.runtime/manpower_task_capture.json`
+- 候选提交请求会输出到 `.runtime/manpower_task_candidate.json`
+
+### 7. 直接提交人力预估
+
+```powershell
+python main.py create-manpower --config examples\manpower_config.example.json --form examples\manpower_form.example.json
+```
+
+如果直接使用默认人力配置，也可以省略 `--config`：
+
+```powershell
+python main.py create-manpower --form examples\manpower_form.example.json
+```
+
+批量提交示例：
+
+```powershell
+python main.py create-manpower --excel examples\manpower_form_template.csv
+```
+
+说明：
+
+- 该命令直接调用 `POST /api/task/hrestimate/create`
+- 当前登录用户会自动作为 `leaderId`
+- `standardWorkHours` 需要在表单中显式传入
+- 单条输入会输出单个结果对象；批量输入会输出结果列表
+- 任一条提交失败时，命令退出码会返回 `1`
+
+### 8. 从周计划 Excel 生成批量人力预估 CSV
+
+```powershell
+python main.py build-manpower-csv --excel examples\本周项目计划表.xlsx
+```
+
+说明：
+
+- 读取首个工作表中的 `项目 / 本周计划 / 人力投入 / 项目编号 / 测试人员`
+- 自动生成 `projectName / taskName / site / groupType / beginDate / endDate / standardWorkHours / testerNames`
+- 生成的 `taskName` 会自动追加周次后缀，例如 `（WK16）`
+- 输出到 `examples/manpower_form_template_YYYYMMDD_HHMMSS.csv`
+- 生成后可直接继续执行 `create-manpower --excel <输出文件>`
+- `testerNames` 原样承接 `测试人员` 列，格式为英文逗号分隔，例如 `张三,李四`
+
+### 9. 给已存在的人力预估任务关联测试人员
+
+```powershell
+python main.py assign-manpower-testers --excel examples\manpower_form_template_20260411_160000.csv
+```
+
+说明：
+
+- 该命令不会创建任务，只负责关联测试人员
+- 若输入行中已提供 `estimateId`，则优先按 `estimateId` 关联
+- 若未提供 `estimateId`，则会按 `projectName / taskName / beginDate / endDate` 定位当前登录人的任务
+- `testerNames` 支持多个值，使用英文逗号分隔
+- 测试人员会先精确匹配 `username`，再精确匹配 `nickname`
+
+### 10. 一次执行创建与测试人员关联
+
+```powershell
+python main.py run-manpower --excel examples\manpower_form_template_20260411_160000.csv
+```
+
+说明：
+
+- 该命令脚本层等价于“先创建，再关联”
+- 代码层仍保持 `create-manpower` 与 `assign-manpower-testers` 两段逻辑分离
+- 某行创建失败时，该行不会继续关联
+- 某行创建成功但 `testerNames` 为空时，该行只创建不关联
+- 某行关联失败时，不会回滚已创建任务，结果中会保留任务 ID 和失败原因
+
+### 11. 直接从周计划 Excel 关联已创建任务的测试人员
+
+```powershell
+python main.py assign-manpower-from-weekly-plan --excel examples\本周项目计划表.xlsx
+```
+
+说明：
+
+- 该命令直接消费原始周计划 Excel
+- 内部会先生成标准人力预估 CSV，再执行任务定位与测试人员关联
+- 任务名称沿用周计划生成规则，自动追加 `（WKxx）`
+- 任务定位逻辑仍然与 `assign-manpower-testers` 一致
+- 中间生成的 CSV 会保留在 `examples/` 目录下，便于补跑与审计
+
+### 12. 直接从周计划 Excel 回填已创建任务的实际工时
+
+```powershell
+python main.py fill-manpower-actual-from-weekly-plan --excel examples\本周项目计划表.xlsx
+```
+
+说明：
+
+- 该命令直接消费原始周计划 Excel
+- Excel 中的 `测试人员` 使用英文逗号分隔，`实际工时01 / 实际工时02 / ...` 按顺序对应各测试人员
+- 实际工时计算公式为 `人力投入 * 实际工时XX * 8`
+- 任务名称沿用周计划生成规则，自动追加 `（WKxx）`
+- 任务定位逻辑仍然按 `projectName / taskName / beginDate / endDate` 匹配当前登录人的已创建任务
+- 当前版本优先支持单周任务，会调用 `POST /api/task/hrestimate/update/actual` 回填 `weeklyPersonalList`
+
+### 13. 标记已创建的人力预估任务为已完成
+
+```powershell
+python main.py complete-manpower --excel examples\manpower_form_template_20260411_160000.csv
+```
+
+说明：
+
+- 该命令只负责标记已完成，不会创建任务
+- 若输入行中已提供 `estimateId`，则优先按 `estimateId` 完成
+- 若未提供 `estimateId`，则会按 `projectName / taskName / beginDate / endDate` 定位当前登录人的任务
+- 接口固定调用 `POST /api/task/hrestimate/update/status`
+- 请求体为表单编码 `ids=<estimateId>&status=2`
+
+### 14. 直接从周计划 Excel 批量标记已完成
+
+```powershell
+python main.py complete-manpower-from-weekly-plan --excel examples\本周项目计划表.xlsx
+```
+
+说明：
+
+- 该命令直接消费原始周计划 Excel
+- 内部复用现有周计划映射与任务定位逻辑
+- 若单行任务未找到，则该行跳过，不影响其他行
+
+### 15. 从周计划 Excel 一次执行创建、关联与实际工时回填
+
+```powershell
+python main.py run-weekly-manpower --excel examples\本周项目计划表.xlsx
+```
+
+说明：
+
+- 该命令直接消费原始周计划 Excel
+- 内部按顺序执行：创建任务、关联测试人员、回填实际工时
+- 周计划派生的任务名称会自动追加 `（WKxx）`，避免跨周同名冲突
+- 某行创建失败时，不继续关联和工时回填
+- 某行关联失败时，不继续工时回填
+
+### 16. 周一批量完成任务并输出提醒
+
+```powershell
+python main.py monday-manpower-maintenance --excel examples\本周项目计划表.xlsx
+```
+
+说明：
+
+- 该命令批量标记对应任务已完成
+- 同时输出提醒消息：`请编写并确认本周项目计划表.xlsx`
+- 适合由 Windows 计划任务在每周一固定时间触发
+
 ## 配置说明
 
 `examples/itms_config.example.json` 中主要有三类内容：

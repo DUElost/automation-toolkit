@@ -7,7 +7,16 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List
 
-from .models import ApiConfig, AuthConfig, BrowserConfig, ItmsToolConfig, UiConfig, UiFieldBinding
+from .models import (
+    ApiConfig,
+    AuthConfig,
+    BrowserConfig,
+    CaptureConfig,
+    ItmsToolConfig,
+    ManpowerCaptureToolConfig,
+    UiConfig,
+    UiFieldBinding,
+)
 
 
 def _resolve_path(base_dir: Path, value: str) -> str:
@@ -58,6 +67,7 @@ def load_config(config_path: str) -> ItmsToolConfig:
         storage_state_path=_resolve_path(
             config_dir, browser_raw.get("storage_state_path", ".runtime/itms_storage_state.json")
         ),
+        executable_path=_resolve_path(config_dir, browser_raw["executable_path"]) if browser_raw.get("executable_path") else "",
     )
 
     auth = AuthConfig(
@@ -109,4 +119,60 @@ def load_config(config_path: str) -> ItmsToolConfig:
         auth=auth,
         api=api,
         ui=ui,
+    )
+
+
+def load_manpower_config(config_path: str) -> ManpowerCaptureToolConfig:
+    """加载人力预估专项采集配置。"""
+    raw = load_json_file(config_path)
+    config_dir = Path(config_path).resolve().parent
+
+    browser_raw = raw.get("browser", {})
+    auth_raw = raw.get("auth", {})
+    capture_raw = raw.get("capture", {})
+
+    browser = BrowserConfig(
+        headless=browser_raw.get("headless", False),
+        slow_mo_ms=browser_raw.get("slow_mo_ms", 0),
+        timeout_ms=browser_raw.get("timeout_ms", 20000),
+        storage_state_path=_resolve_path(
+            config_dir, browser_raw.get("storage_state_path", ".runtime/itms_storage_state.json")
+        ),
+        executable_path=_resolve_path(config_dir, browser_raw["executable_path"]) if browser_raw.get("executable_path") else "",
+    )
+
+    auth = AuthConfig(
+        auto_relogin=auth_raw.get("auto_relogin", False),
+        login_url=auth_raw.get("login_url", raw.get("workbench_url", "http://itms.tinno.com/#/workbench")),
+        username_env=auth_raw.get("username_env", "ITMS_USERNAME"),
+        password_env=auth_raw.get("password_env", "ITMS_PASSWORD"),
+        username_selector=auth_raw.get("username_selector", ""),
+        password_selector=auth_raw.get("password_selector", ""),
+        submit_selector=auth_raw.get("submit_selector", ""),
+        success_url_contains=auth_raw.get("success_url_contains", "#/workbench"),
+        success_wait_ms=auth_raw.get("success_wait_ms", 15000),
+    )
+
+    capture = CaptureConfig(
+        discovery_output_path=_resolve_path(
+            config_dir, capture_raw.get("discovery_output_path", ".runtime/manpower_task_capture.json")
+        ),
+        candidate_output_path=_resolve_path(
+            config_dir, capture_raw.get("candidate_output_path", ".runtime/manpower_task_candidate.json")
+        ),
+        create_keywords=capture_raw.get(
+            "create_keywords",
+            ["manpower", "task", "estimate", "save", "submit", "create", "add"],
+        ),
+    )
+
+    return ManpowerCaptureToolConfig(
+        config_path=str(Path(config_path).resolve()),
+        base_url=raw.get("base_url", "http://itms.tinno.com"),
+        workbench_url=raw.get("workbench_url", "http://itms.tinno.com/#/workbench"),
+        entry_url=raw["entry_url"],
+        page_name=raw.get("page_name", "人力预估页面"),
+        browser=browser,
+        auth=auth,
+        capture=capture,
     )

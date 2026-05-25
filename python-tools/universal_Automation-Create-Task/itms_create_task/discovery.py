@@ -11,7 +11,7 @@ from typing import Dict, List, Optional
 from playwright.sync_api import sync_playwright
 
 from .auth import ItmsAuthManager
-from .models import ItmsToolConfig, RecordedRequest
+from .models import ItmsToolConfig, ManpowerCaptureToolConfig, RecordedRequest
 
 
 LOGGER = logging.getLogger(__name__)
@@ -35,10 +35,7 @@ class ApiDiscovery:
         context_kwargs = self.auth_manager.build_context_kwargs()
 
         with sync_playwright() as playwright:
-            browser = playwright.chromium.launch(
-                headless=self.config.browser.headless,
-                slow_mo=self.config.browser.slow_mo_ms,
-            )
+            browser = playwright.chromium.launch(**self.auth_manager.build_launch_kwargs())
             context = browser.new_context(**context_kwargs)
             context.set_default_timeout(self.config.browser.timeout_ms)
             page = context.new_page()
@@ -146,3 +143,123 @@ class ApiDiscovery:
             if key_lower in ("content-type", "x-requested-with", "x-xsrf-token", "x-csrf-token"):
                 allowed[key] = value
         return allowed
+
+
+class ManpowerCaptureDiscovery:
+    """录制人力预估页面的人工操作请求。"""
+
+    def __init__(self, config: ManpowerCaptureToolConfig, auth_manager: ItmsAuthManager):
+        self.config = config
+        self.auth_manager = auth_manager
+
+    def record_manual_flow(self) -> Dict[str, object]:
+        """打开专项页面并录制人工操作请求。"""
+        capture_path = Path(self.config.capture.discovery_output_path)
+        candidate_path = Path(self.config.capture.candidate_output_path)
+        capture_path.parent.mkdir(parents=True, exist_ok=True)
+        candidate_path.parent.mkdir(parents=True, exist_ok=True)
+
+        captures: List[RecordedRequest] = []
+        context_kwargs = self.auth_manager.build_context_kwargs()
+
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch(**self.auth_manager.build_launch_kwargs())
+            context = browser.new_context(**context_kwargs)
+            context.set_default_timeout(self.config.browser.timeout_ms)
+            page = context.new_page()
+
+            def on_response(response):
+                request = response.request
+                if request.resource_type not in ("fetch", "xhr", "document"):
+                    return
+                if self.config.base_url not in request.url:
+                    return
+
+                try:
+                    response_body = response.text()
+                except Exception:
+                    response_body = None
+
+                captures.append(
+                    RecordedRequest(
+                        method=request.method,
+                        url=request.url,
+                        request_headers=request.headers,
+                        response_headers=response.headers,
+                        post_data=request.post_data,
+                        response_status=response.status,
+                        response_body=response_body,
+                    )
+                )
+
+            page.on("response", on_response)
+            page.goto(self.config.entry_url)
+
+            print("浏览器已启动，开始录制人力预估页面网络请求。")
+            print("请手动完成一次“添加任务并提交”的完整动作。")
+            print("完成后回到终端按回车，脚本会保存录制结果。")
+            input()
+
+            context.storage_state(path=self.config.browser.storage_state_path)
+            browser.close()
+
+        payload = self._build_payload([capture.__dict__ for capture in captures])
+        with open(capture_path, "w", encoding="utf-8") as file_obj:
+            json.dump(payload, file_obj, ensure_ascii=False, indent=2)
+
+        if payload["candidate_request"]:
+            with open(candidate_path, "w", encoding="utf-8") as file_obj:
+                json.dump(payload["candidate_request"], file_obj, ensure_ascii=False, indent=2)
+        elif candidate_path.exists():
+            candidate_path.unlink()
+
+        return payload
+
+    def _build_payload(self, captures: List[Dict[str, object]]) -> Dict[str, object]:
+        """构建专项采集输出。"""
+        return {
+            "captures": captures,
+            "candidate_request": self._select_candidate(captures),
+        }
+
+    def _select_candidate(self, captures: List[Dict[str, object]]) -> Optional[Dict[str, object]]:
+        """从录制结果中筛选最可能的提交请求。"""
+        keywords = [item.lower() for item in self.config.capture.create_keywords]
+        filtered = []
+
+        for capture in captures:
+            method = str(capture.get("method", "")).upper()
+            url = str(capture.get("url", ""))
+            post_data = capture.get("post_data")
+            if method not in ("POST", "PUT", "PATCH"):
+                continue
+            if keywords and not any(keyword in url.lower() for keyword in keywords):
+                continue
+            if not post_data:
+                continue
+            filtered.append(capture)
+
+        if not filtered:
+            return None
+
+        candidate = filtered[-1]
+        request_headers = candidate.get("request_headers", {})
+        if not isinstance(request_headers, dict):
+            request_headers = {}
+
+        return {
+            "method": candidate.get("method", ""),
+            "url": candidate.get("url", ""),
+            "request_headers": ApiDiscovery._filter_headers(request_headers),
+            "body_sample": self._try_parse_json(candidate.get("post_data")) or candidate.get("post_data"),
+        }
+
+    @staticmethod
+    def _try_parse_json(value):
+        """尽量将请求体解析成 JSON。"""
+        if value is None:
+            return None
+        try:
+            return json.loads(value)
+        except (json.JSONDecodeError, TypeError):
+            return None

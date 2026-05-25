@@ -1,0 +1,37 @@
+{
+  "base_url": "http://itms.tinno.com",
+  "workbench_url": "http://itms.tinno.com/#/workbench",
+  "entry_url": "http://itms.tinno.com/#/manpowerhub/manpower/task?tab=taskhrmy",
+  "page_name": "我的预估任务管理",
+  "browser": {
+    "headless": false,
+    "slow_mo_ms": 150,
+    "timeout_ms": 20000,
+    "storage_state_path": ".runtime/itms_storage_state.json",
+    "executable_path": "C:\\Users\\Rin\\AppData\\Local\\ms-playwright\\chromium-1200\\chrome-win64\\chrome.exe"
+  },
+  "auth": {
+    "auto_relogin": false,
+    "login_url": "http://itms.tinno.com/#/workbench",
+    "username_env": "ITMS_USERNAME",
+    "password_env": "ITMS_PASSWORD",
+    "username_selector": "",
+    "password_selector": "",
+    "submit_selector": "",
+    "success_url_contains": "#/workbench",
+    "success_wait_ms": 15000
+  },
+  "capture": {
+    "discovery_output_path": ".runtime/manpower_task_capture.json",
+    "candidate_output_path": ".runtime/manpower_task_candidate.json",
+    "create_keywords": [
+      "manpower",
+      "task",
+      "estimate",
+      "save",
+      "submit",
+      "create",
+      "add"
+    ]
+  }
+}

@@ -1,2 +1,0 @@
-﻿project_name,main_plan_name,testsuite_component_name,task_type,task_sub_type,sub_plan_name,owner_name,start_date,end_date,project_label,project_version,prototype_stage,prototype_num,remark
-T726A,RC阶段测试,稳定性,专项测试计划,monkey专项,自动化创建子计划示例_请改名,吕代,2026-03-20,2026-03-27,PR0/一供/A1,,DVT2,60,请根据实际表单字段补充/调整

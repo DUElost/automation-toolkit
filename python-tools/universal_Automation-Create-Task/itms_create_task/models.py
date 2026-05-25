@@ -15,6 +15,7 @@ class BrowserConfig:
     slow_mo_ms: int = 0
     timeout_ms: int = 20000
     storage_state_path: str = ".runtime/itms_storage_state.json"
+    executable_path: str = ""
 
 
 @dataclass
@@ -41,6 +42,17 @@ class ApiConfig:
     discovery_output_path: str = ".runtime/itms_api_discovery.json"
     create_keywords: List[str] = field(default_factory=list)
     body_overrides: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class CaptureConfig:
+    """专项录制配置。"""
+
+    discovery_output_path: str = ".runtime/manpower_task_capture.json"
+    candidate_output_path: str = ".runtime/manpower_task_candidate.json"
+    create_keywords: List[str] = field(
+        default_factory=lambda: ["manpower", "task", "estimate", "save", "submit", "create", "add"]
+    )
 
 
 @dataclass
@@ -85,6 +97,20 @@ class ItmsToolConfig:
     auth: AuthConfig
     api: ApiConfig
     ui: UiConfig
+
+
+@dataclass
+class ManpowerCaptureToolConfig:
+    """人力预估专项采集配置。"""
+
+    config_path: str
+    base_url: str
+    workbench_url: str
+    entry_url: str
+    page_name: str
+    browser: BrowserConfig
+    auth: AuthConfig
+    capture: CaptureConfig
 
 
 @dataclass
