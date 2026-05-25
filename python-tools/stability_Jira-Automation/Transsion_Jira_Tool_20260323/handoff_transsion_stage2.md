@@ -90,7 +90,7 @@
 
 候选必须同时满足：
 
-- 历史单 `状态=已解决`
+- 历史单 `状态=已解决/Verified`
 - 历史单 `解决结果=已修复`
 - 本轮未命中
 - `fixVersion` 有值
@@ -108,6 +108,23 @@
 默认阈值：
 
 - `required_regression_pass_versions = 2`
+
+真实执行时的 PASS 备注规则：
+
+- `Monkey专项` 保持原单行备注：
+  - `已回归验证{pass_count}个版本PASS，已测试版本：{version_text}`
+- 其他专项使用固定多行模板：
+
+```text
+验证结果：PASS
+测试次数：0/1000
+验证步骤：{对应测试专项}
+验证版本：{测试版本}
+样机标识：PR1
+应用版本：/
+测试人员及联系方式：吕代+18379465576
+备注：已回归验证{pass_count}个版本PASS，已测试版本：{version_text}
+```
 
 ## 4. 当前关键开关
 
@@ -166,7 +183,7 @@
 - 命令行临时开关 `--disable-regression`
 - Components 无效值兜底到 `ODM处理`
 
-当前没有待实现的大项，但仍需按实际 Jira 项目元数据确认：
+当前已新增“回归验证模式”设计与实现，仍需按实际 Jira 项目元数据确认：
 
 - `ODM处理` 是否在目标项目的合法 Components 列表中
 - 关闭状态流转在实际项目中是否有可用 transition
@@ -185,6 +202,18 @@ python .\create_transsion_jira_batch_from_excel.py --add-excel-file .\result\你
 python .\create_transsion_jira_batch_from_excel.py --add-excel-file .\result\你的Excel.xlsx --jira-username xxx --jira-password xxx --dry-run
 ```
 
+### 6.3 回归验证模式执行 dry-run
+
+```powershell
+python .\create_transsion_jira_batch_from_excel.py --regression-project X6851OS16 --regression-specialty 休眠唤醒专项 --regression-specialty Monkey专项 --current-version X6851-16.3.0.021(OP001PF001AZ)_SU --history-reporter dailv.tinno --jira-username xxx --jira-password xxx --dry-run
+```
+
+### 6.4 模式互斥说明
+
+- 传 `--add-excel-file` 时走 Excel 模式
+- 传 `--regression-project` 时走回归验证模式
+- 两种模式参数不能同时使用
+
 ## 7. 常用验证命令
 
 ### 7.1 入口与配置开关
@@ -202,7 +231,7 @@ python -m pytest F:\automation-toolkit\python-tools\stability_Jira-Automation\Tr
 ### 7.3 相关回归
 
 ```powershell
-python -m pytest F:\automation-toolkit\python-tools\stability_Jira-Automation\Transsion_Jira_Tool_20260323\test\test_transsion_batch_common.py F:\automation-toolkit\python-tools\stability_Jira-Automation\Transsion_Jira_Tool_20260323\test\test_transsion_batch_entry.py F:\automation-toolkit\python-tools\stability_Jira-Automation\Transsion_Jira_Tool_20260323\test\test_transsion_regression_executor.py F:\automation-toolkit\python-tools\stability_Jira-Automation\Transsion_Jira_Tool_20260323\test\test_transsion_regression_pass.py -q
+python -m pytest F:\automation-toolkit\python-tools\stability_Jira-Automation\Transsion_Jira_Tool_20260323\test\test_generate_transsion_upload_list.py F:\automation-toolkit\python-tools\stability_Jira-Automation\Transsion_Jira_Tool_20260323\test\test_transsion_upload_template_common.py F:\automation-toolkit\python-tools\stability_Jira-Automation\Transsion_Jira_Tool_20260323\test\test_transsion_batch_common.py F:\automation-toolkit\python-tools\stability_Jira-Automation\Transsion_Jira_Tool_20260323\test\test_transsion_batch_entry.py F:\automation-toolkit\python-tools\stability_Jira-Automation\Transsion_Jira_Tool_20260323\test\test_transsion_regression_config.py F:\automation-toolkit\python-tools\stability_Jira-Automation\Transsion_Jira_Tool_20260323\test\test_transsion_regression_matcher.py F:\automation-toolkit\python-tools\stability_Jira-Automation\Transsion_Jira_Tool_20260323\test\test_transsion_regression_pass.py F:\automation-toolkit\python-tools\stability_Jira-Automation\Transsion_Jira_Tool_20260323\test\test_transsion_regression_store.py -q
 ```
 
 ## 8. 新窗口接手建议

@@ -85,7 +85,7 @@ def test_real_regression_rules_config_matches_contract(regression_module):
     assert rules.matching.cause_similarity_threshold == 0.9
     assert rules.regression.enabled is True
     assert rules.regression.required_regression_pass_versions == 2
-    assert rules.output.sqlite_path == "result/transsion_regression_cache.db"
+    assert rules.output.sqlite_path == "result/regression_cache"
     assert rules.output.excel_summary_dir == "result"
     assert rules.status_rules.open_like_statuses == ["Open", "开放", "Reopened", "重新打开", "处理中"]
     assert rules.status_rules.resolved_statuses == ["已解决", "Verified"]

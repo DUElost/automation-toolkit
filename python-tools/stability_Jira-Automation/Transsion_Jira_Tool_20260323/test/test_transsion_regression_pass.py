@@ -542,3 +542,169 @@ def test_run_batch_create_dry_run_skips_regression_pass_for_unrelated_specialty(
         item["action"] == "REGRESSION_PASS_PROGRESS"
         for item in store_events["execution_results"]
     ), "不在本轮专项集合里的历史单不应推进 PASS"
+
+
+def test_process_regression_pass_candidates_closes_duplicate_issues_with_main_issue(batch_entry_module):
+    module = batch_entry_module
+    store_events: dict[str, object] = {"execution_results": [], "recorded_pass": []}
+
+    class FakeJira:
+        def __init__(self):
+            self.comments: list[tuple[str, str]] = []
+            self.transitions_called: list[str] = []
+
+        def issue(self, issue_key: str):
+            return SimpleNamespace(
+                key=issue_key,
+                fields=SimpleNamespace(status=SimpleNamespace(name="已解决")),
+            )
+
+        def transitions(self, _issue):
+            return [{"id": "31", "name": "关闭", "to": {"name": "已关闭"}}]
+
+        def transition_issue(self, issue, transition_id: str):
+            assert transition_id == "31"
+            self.transitions_called.append(issue.key)
+
+        def add_comment(self, issue_key: str, comment: str):
+            self.comments.append((issue_key, comment))
+
+    class FakeStore:
+        def save_execution_result(self, result):
+            store_events["execution_results"].append(dict(result))
+
+        def fetch_issue_state(self, jira_key):
+            assert jira_key == "TRANSSION-88"
+            return None
+
+        def record_regression_pass(self, *args, **kwargs):
+            store_events["recorded_pass"].append((args, kwargs))
+
+    jira = FakeJira()
+    raw_payload = {
+        "fields": {
+            "issuelinks": [
+                {
+                    "type": {"name": "Duplicate", "outward": "Duplicates", "inward": "is duplicated by"},
+                    "outwardIssue": {"key": "TRANSSION-89"},
+                }
+            ]
+        }
+    }
+    history_row = {
+        "jira_key": "TRANSSION-88",
+        "summary": "[Total Number 4] [MonkeyAEE] ANR com.transsion.demo",
+        "status": "已解决",
+        "resolution": "已修复",
+        "fix_version": "V9",
+        "raw_payload": json.dumps(raw_payload, ensure_ascii=False),
+    }
+    rules = SimpleNamespace(
+        status_rules=SimpleNamespace(
+            resolved_statuses=["已解决"],
+            resolved_fixed_resolutions=["已修复"],
+            closed_statuses=["已关闭", "已关单", "Closed"],
+        ),
+        regression=SimpleNamespace(required_regression_pass_versions=1),
+    )
+    results: list[dict[str, object]] = []
+    summary_rows: list[dict[str, object]] = []
+
+    module.process_regression_pass_candidates(
+        jira_client=jira,
+        store=FakeStore(),
+        run_id="run-001",
+        current_version="V10",
+        regression_rules=rules,
+        snapshot_rows=[history_row],
+        matched_jira_keys=set(),
+        allowed_specialties={"MonkeyAEE"},
+        args=SimpleNamespace(dry_run=False),
+        results=results,
+        summary_rows=summary_rows,
+    )
+
+    assert ("TRANSSION-89", "跟随主单一同关闭。") in jira.comments
+    assert jira.transitions_called == ["TRANSSION-88", "TRANSSION-89"]
+    assert any(item["action"] == "REGRESSION_DUPLICATE_CLOSE" for item in store_events["execution_results"])
+
+
+def test_process_closed_main_duplicate_followups_closes_verified_duplicates_only(batch_entry_module):
+    module = batch_entry_module
+    store_events: dict[str, object] = {"execution_results": []}
+
+    class FakeJira:
+        def __init__(self):
+            self.statuses = {
+                "TRANSSION-89": "Verified",
+                "TRANSSION-90": "Open",
+            }
+            self.comments: list[tuple[str, str]] = []
+            self.transitions_called: list[str] = []
+
+        def issue(self, issue_key: str):
+            return SimpleNamespace(
+                key=issue_key,
+                fields=SimpleNamespace(status=SimpleNamespace(name=self.statuses.get(issue_key, "已关闭"))),
+            )
+
+        def transitions(self, _issue):
+            return [{"id": "31", "name": "关闭", "to": {"name": "已关闭"}}]
+
+        def transition_issue(self, issue, transition_id: str):
+            assert transition_id == "31"
+            self.transitions_called.append(issue.key)
+            self.statuses[issue.key] = "已关闭"
+
+        def add_comment(self, issue_key: str, comment: str):
+            self.comments.append((issue_key, comment))
+
+    class FakeStore:
+        def save_execution_result(self, result):
+            store_events["execution_results"].append(dict(result))
+
+    raw_payload = {
+        "fields": {
+            "issuelinks": [],
+            "customfield_14207": [
+                {
+                    "key": "TRANSSION-89",
+                    "fields": {"status": {"name": "Verified"}},
+                },
+                {
+                    "key": "TRANSSION-90",
+                    "fields": {"status": {"name": "Open"}},
+                },
+            ]
+        }
+    }
+    closed_main_row = {
+        "jira_key": "TRANSSION-88",
+        "summary": "[Total Number 4] [MonkeyAEE] ANR com.transsion.demo",
+        "status": "已关闭",
+        "resolution": "已修复",
+        "fix_version": "V9",
+        "raw_payload": json.dumps(raw_payload, ensure_ascii=False),
+    }
+    rules = SimpleNamespace(
+        status_rules=SimpleNamespace(closed_statuses=["已关闭", "已关单", "Closed"]),
+    )
+    jira = FakeJira()
+    results: list[dict[str, object]] = []
+    summary_rows: list[dict[str, object]] = []
+
+    module.process_closed_main_duplicate_followups(
+        jira_client=jira,
+        store=FakeStore(),
+        run_id="run-001",
+        regression_rules=rules,
+        snapshot_rows=[closed_main_row],
+        allowed_specialties={"MonkeyAEE"},
+        args=SimpleNamespace(dry_run=False),
+        results=results,
+        summary_rows=summary_rows,
+    )
+
+    assert jira.comments == [("TRANSSION-89", "跟随主单一同关闭。")]
+    assert jira.transitions_called == ["TRANSSION-89"]
+    assert any(item["matched_jira_key"] == "TRANSSION-89" for item in store_events["execution_results"])

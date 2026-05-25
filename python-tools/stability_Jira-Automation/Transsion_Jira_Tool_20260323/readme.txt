@@ -223,11 +223,25 @@ python create_transsion_jira_batch_from_excel.py
   - `matching.required_exact_fields` 固定要求 `affect_project`、`environment`、`exp_class`
   - `matching.cause_similarity_threshold` 默认值为 `0.9`
   - `regression.required_regression_pass_versions` 默认值为 `2`
-  - `output.sqlite_path` 默认写入 `result/transsion_regression_cache.db`
+  - `output.sqlite_path` 默认写入 `result/regression_cache/<Project>.db`
   - `output.excel_summary_dir` 默认写入 `result`
   - `status_rules` 用于定义回归状态归类，后续第二阶段回归比对会按该配置统一判断状态
   - `open_like` 命中后不会重复提单，会沿用历史单并覆盖更新 `Summary/Description/Priority`
   - `resolved_fixed` 且本轮未命中时，会按 `required_regression_pass_versions` 做回归 PASS 计数；达到阈值后会尝试执行关单流转
+  - 回归 PASS 真实执行时会自动追加备注：
+    - `Monkey专项` 沿用原格式：`已回归验证{pass_count}个版本PASS，已测试版本：{version_text}`
+    - 其他专项使用固定多行模板：
+
+```text
+验证结果：PASS
+测试次数：0/1000
+验证步骤：{对应测试专项}
+验证版本：{测试版本}
+样机标识：PR1
+应用版本：/
+测试人员及联系方式：吕代+18379465576
+备注：已回归验证{pass_count}个版本PASS，已测试版本：{version_text}
+```
   - `resolved_fixed` 但 `fixVersion` 为空，或当前版本已达到/超过 `fixVersion` 且再次命中时，会在结果中标记 `MANUAL_REVIEW`
   - 每次运行都会同时输出 JSON 结果、SQLite 明细和 Excel 摘要
   - 当 `regression.enabled=false` 时，脚本会完全跳过历史单导出、强命中、PASS/关单、SQLite 和 Excel 摘要，只保留原有第二阶段建单流程和 JSON 结果
@@ -244,6 +258,14 @@ python create_transsion_jira_batch_from_excel.py
   单次执行时临时关闭第二阶段新增的回归验证功能
   优先级高于 `config/regression_rules.json` 里的 `regression.enabled`
   开启后会跳过历史单导出、强命中、PASS/关单、SQLite 和 Excel 摘要，仅保留原有第二阶段建单流程和 JSON 结果
+- --regression-project
+  进入“回归验证模式”，指定要处理的 Jira 项目 Key
+- --regression-specialty
+  回归验证模式下指定专项，支持重复传多个
+- --current-version
+  回归验证模式下显式指定当前验证版本
+- --history-reporter
+  回归验证模式下按 reporter 粗筛历史问题
 
 示例：
 python create_transsion_jira_batch_from_excel.py --add-excel-file JIRA_Upload_List_Transsion_开关机专项_20260325_120728.xlsx --jira-username your_user --jira-password your_password --validate-metadata
@@ -251,6 +273,13 @@ python create_transsion_jira_batch_from_excel.py --add-excel-file JIRA_Upload_Li
 python create_transsion_jira_batch_from_excel.py --add-excel-file JIRA_Upload_List_Transsion_开关机专项_20260325_120728.xlsx --jira-username your_user --jira-password your_password --dry-run
 
 python create_transsion_jira_batch_from_excel.py --add-excel-file JIRA_Upload_List_Transsion_开关机专项_20260325_120728.xlsx --jira-username your_user --jira-password your_password --add-comments
+
+python create_transsion_jira_batch_from_excel.py --regression-project X6851OS16 --regression-specialty 休眠唤醒专项 --regression-specialty Monkey专项 --current-version X6851-16.3.0.021(OP001PF001AZ)_SU --history-reporter dailv.tinno --jira-username your_user --jira-password your_password --dry-run
+
+模式互斥说明：
+- 传 `--add-excel-file` 时走 Excel 模式
+- 传 `--regression-project` 时走回归验证模式
+- 两种模式参数不能同时使用
 
 
 5.1、辅助脚本：按模块批量修正经办人

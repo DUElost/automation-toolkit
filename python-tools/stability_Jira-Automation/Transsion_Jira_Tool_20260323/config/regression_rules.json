@@ -63,7 +63,7 @@
     "required_regression_pass_versions": 2
   },
   "output": {
-    "sqlite_path": "result/transsion_regression_cache.db",
+    "sqlite_path": "result/regression_cache",
     "excel_summary_dir": "result"
   }
 }

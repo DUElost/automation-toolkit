@@ -37,6 +37,10 @@ def batch_entry_module() -> Generator[object, None, None]:
 def _make_args(tmp_path: Path, **overrides):
     base = {
         "excel_file": "fake.xlsx",
+        "regression_project": None,
+        "regression_specialties": [],
+        "current_version": None,
+        "history_reporter": None,
         "jira_username": "user",
         "jira_password": "pass",
         "jira_server": "http://jira.example.com",
@@ -51,6 +55,446 @@ def _make_args(tmp_path: Path, **overrides):
     }
     base.update(overrides)
     return SimpleNamespace(**base)
+
+
+def test_resolve_run_mode_returns_excel_for_excel_args(batch_entry_module):
+    module = batch_entry_module
+    args = SimpleNamespace(
+        excel_file="upload.xlsx",
+        regression_project=None,
+        regression_specialties=[],
+        current_version=None,
+        history_reporter=None,
+    )
+
+    mode = module.resolve_run_mode(args)
+
+    assert mode == "excel"
+
+
+def test_resolve_run_mode_returns_regression_verify_for_regression_args(batch_entry_module):
+    module = batch_entry_module
+    args = SimpleNamespace(
+        excel_file=None,
+        regression_project="X6851OS16",
+        regression_specialties=["休眠唤醒专项"],
+        current_version="X6851-16.3.0.021(OP001PF001AZ)_SU",
+        history_reporter="dailv.tinno",
+    )
+
+    mode = module.resolve_run_mode(args)
+
+    assert mode == "regression_verify"
+
+
+def test_resolve_run_mode_rejects_mixed_excel_and_regression_args(batch_entry_module):
+    module = batch_entry_module
+    args = SimpleNamespace(
+        excel_file="upload.xlsx",
+        regression_project="X6851OS16",
+        regression_specialties=["休眠唤醒专项"],
+        current_version="X6851-16.3.0.021(OP001PF001AZ)_SU",
+        history_reporter="dailv.tinno",
+    )
+
+    with pytest.raises(ValueError, match="模式参数不能同时"):
+        module.resolve_run_mode(args)
+
+
+def test_resolve_run_mode_rejects_missing_required_regression_args(batch_entry_module):
+    module = batch_entry_module
+    args = SimpleNamespace(
+        excel_file=None,
+        regression_project="X6851OS16",
+        regression_specialties=[],
+        current_version=None,
+        history_reporter=None,
+    )
+
+    with pytest.raises(ValueError, match="regression-specialty|current-version|history-reporter"):
+        module.resolve_run_mode(args)
+
+
+def test_build_project_scoped_sqlite_path_returns_project_db_under_regression_cache(batch_entry_module):
+    module = batch_entry_module
+
+    resolved = module.build_project_scoped_sqlite_path(
+        project_key="X6851OS16",
+        sqlite_path_setting="result/regression_cache",
+    )
+
+    assert resolved == module.CURRENT_DIR / "result" / "regression_cache" / "X6851OS16.db"
+
+
+def test_build_regression_verify_jql_uses_monkey_aee_keyword_for_monkey_aee_specialty(batch_entry_module):
+    module = batch_entry_module
+
+    jql = module.build_regression_verify_jql(
+        project_key="X6851OS16",
+        reporter="dailv.tinno",
+        specialty="MonkeyAEE",
+    )
+
+    assert jql == 'project = X6851OS16 AND reporter in (dailv.tinno) AND (summary ~ "\\\\[MonkeyAEE\\\\]")'
+
+
+def test_build_regression_verify_jql_uses_plain_monkey_specialty_text(batch_entry_module):
+    module = batch_entry_module
+
+    jql = module.build_regression_verify_jql(
+        project_key="X6851OS16",
+        reporter="dailv.tinno",
+        specialty="Monkey专项",
+    )
+
+    assert jql == 'project = X6851OS16 AND reporter in (dailv.tinno) AND (summary ~ "Monkey专项")'
+
+
+def test_build_regression_verify_jql_uses_stability_keyword_for_non_monkey_specialty(batch_entry_module):
+    module = batch_entry_module
+
+    jql = module.build_regression_verify_jql(
+        project_key="X6851OS16",
+        reporter="dailv.tinno",
+        specialty="休眠唤醒专项",
+    )
+
+    assert jql == 'project = X6851OS16 AND reporter in (dailv.tinno) AND (summary ~ "【稳定性专项】")'
+
+
+def test_deduplicate_snapshot_rows_by_jira_key_keeps_latest_first(batch_entry_module):
+    module = batch_entry_module
+
+    rows = module.deduplicate_snapshot_rows_by_jira_key(
+        [
+            {"jira_key": "X6851OS16-607", "summary": "a"},
+            {"jira_key": "X6851OS16-607", "summary": "b"},
+            {"jira_key": "X6851OS16-608", "summary": "c"},
+        ]
+    )
+
+    assert rows == [
+        {"jira_key": "X6851OS16-607", "summary": "a"},
+        {"jira_key": "X6851OS16-608", "summary": "c"},
+    ]
+
+
+def test_run_batch_create_uses_project_scoped_store_path_for_excel_mode(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    batch_entry_module,
+):
+    module = batch_entry_module
+    args = _make_args(tmp_path, dry_run=True, excel_file="fake.xlsx")
+    df = pd.DataFrame([_make_row(Project="X6851OS16")])
+    captured_paths = []
+
+    class FakeJira:
+        def current_user(self) -> str:
+            return "robot"
+
+        def search_issues(self, *_args, **_kwargs):
+            return []
+
+    monkeypatch.setattr(
+        module,
+        "load_defaults",
+        lambda _: {"jira_server": "http://jira.example.com", "project_key": "X6851OS16", "issue_type": "故障"},
+    )
+    monkeypatch.setattr(module, "load_priority_mapping_from_rules_excel", lambda _: {"severity_to_priority": {}, "priority_aliases": {}})
+    monkeypatch.setattr(module, "read_excel_smart", lambda _: df)
+    monkeypatch.setattr(module, "connect_to_jira", lambda *_: FakeJira())
+    monkeypatch.setattr(
+        module,
+        "load_regression_rules",
+        lambda _: SimpleNamespace(
+            jira_export=SimpleNamespace(enabled=True, jql="reporter in (dailv.tinno)", max_results=50, fields=["key"]),
+            matching=SimpleNamespace(
+                required_exact_fields=["affect_project", "environment", "exp_class"],
+                cause_similarity_threshold=0.9,
+            ),
+            regression=SimpleNamespace(enabled=True, required_regression_pass_versions=2),
+            output=SimpleNamespace(
+                sqlite_path="result/regression_cache",
+                excel_summary_dir=str(tmp_path / "result"),
+            ),
+        ),
+    )
+    monkeypatch.setattr(
+        module,
+        "RegressionStore",
+        lambda db_path: captured_paths.append(db_path) or SimpleNamespace(
+            save_sync_run=lambda *_a, **_k: None,
+            save_snapshot=lambda *_a, **_k: None,
+            save_execution_result=lambda *_a, **_k: None,
+        ),
+    )
+    monkeypatch.setattr(module, "get_meta_bundle", lambda *_: {"create_fields": {}, "allowed_values": {}, "field_name_lookup": {}})
+    monkeypatch.setattr(module, "build_issue_fields", lambda **_: {"summary": "stub"})
+    monkeypatch.setattr(module, "process_regression_pass_candidates", lambda **_: None)
+
+    exit_code = module.run_batch_create(args)
+
+    assert exit_code == 0
+    assert captured_paths == [module.CURRENT_DIR / "result" / "regression_cache" / "X6851OS16.db"]
+
+
+def test_run_batch_create_regression_verify_mode_builds_queries_per_specialty_and_writes_execution_results(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    batch_entry_module,
+):
+    module = batch_entry_module
+    result_dir = tmp_path / "result"
+    args = _make_args(
+        tmp_path,
+        excel_file=None,
+        regression_project="X6851OS16",
+        regression_specialties=["休眠唤醒专项", "Monkey专项"],
+        current_version="X6851-16.3.0.021(OP001PF001AZ)_SU",
+        history_reporter="dailv.tinno",
+        dry_run=True,
+    )
+    captured_jql: list[str] = []
+    saved_results: list[dict[str, object]] = []
+
+    class FakeJira:
+        def current_user(self):
+            return "robot"
+
+        def search_issues(self, jql: str, maxResults: int = 50, fields: str | None = None):
+            captured_jql.append(jql)
+            return [SimpleNamespace(key="X6851OS16-607")]
+
+        def issue(self, issue_key: str):
+            return SimpleNamespace(
+                key=issue_key,
+                raw={
+                    "fields": {
+                        "summary": "【天珑团队】【BUG】【X6851】【OP】【Alpha】【稳定性专项】【休眠唤醒专项】问题",
+                        "status": {"name": "Verified"},
+                        "resolution": {"name": "已修复"},
+                        "fixVersions": [{"name": "X6851-16.3.0.020(OP001PF001AZ)_SU"}],
+                    }
+                },
+            )
+
+    class FakeStore:
+        def save_sync_run(self, *_args, **_kwargs):
+            return None
+
+        def save_snapshot(self, *_args, **_kwargs):
+            return None
+
+        def save_execution_result(self, payload):
+            saved_results.append(payload)
+
+    monkeypatch.setattr(module, "RESULT_DIR", result_dir)
+    monkeypatch.setattr(module, "connect_to_jira", lambda *_: FakeJira())
+    monkeypatch.setattr(module, "load_defaults", lambda _: {"jira_server": "http://jira.example.com"})
+    monkeypatch.setattr(module, "load_priority_mapping_from_rules_excel", lambda _: {"severity_to_priority": {}, "priority_aliases": {}})
+    monkeypatch.setattr(module, "load_regression_rules", lambda _: _make_rules(tmp_path, result_dir))
+    monkeypatch.setattr(module, "RegressionStore", lambda *_args, **_kwargs: FakeStore())
+
+    exit_code = module.run_batch_create(args)
+
+    assert exit_code == 0
+    assert len(captured_jql) == 2
+    assert any('summary ~ "Monkey专项"' in item for item in captured_jql)
+    assert any("稳定性专项" in item for item in captured_jql)
+    assert saved_results
+
+
+def test_run_batch_create_regression_verify_mode_dry_run_does_not_record_pass_state(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    batch_entry_module,
+):
+    module = batch_entry_module
+    result_dir = tmp_path / "result"
+    args = _make_args(
+        tmp_path,
+        excel_file=None,
+        regression_project="X6851OS16",
+        regression_specialties=["休眠唤醒专项"],
+        current_version="X6851-16.3.0.021(OP001PF001AZ)_SU",
+        history_reporter="dailv.tinno",
+        dry_run=True,
+    )
+    record_calls: list[str] = []
+
+    class FakeJira:
+        def current_user(self):
+            return "robot"
+
+        def search_issues(self, *_args, **_kwargs):
+            return [SimpleNamespace(key="X6851OS16-607")]
+
+        def issue(self, issue_key: str):
+            return SimpleNamespace(
+                key=issue_key,
+                raw={
+                    "fields": {
+                        "summary": "【天珑团队】【BUG】【X6851】【OP】【Alpha】【稳定性专项】【休眠唤醒专项】问题",
+                        "status": {"name": "Verified"},
+                        "resolution": {"name": "已修复"},
+                        "fixVersions": [{"name": "X6851-16.3.0.020(OP001PF001AZ)_SU"}],
+                    }
+                },
+            )
+
+    class FakeStore:
+        def save_sync_run(self, *_args, **_kwargs):
+            return None
+
+        def save_snapshot(self, *_args, **_kwargs):
+            return None
+
+        def save_execution_result(self, *_args, **_kwargs):
+            return None
+
+        def record_regression_pass(self, *_args, **_kwargs):
+            record_calls.append("called")
+
+    monkeypatch.setattr(module, "RESULT_DIR", result_dir)
+    monkeypatch.setattr(module, "connect_to_jira", lambda *_: FakeJira())
+    monkeypatch.setattr(module, "load_defaults", lambda _: {"jira_server": "http://jira.example.com"})
+    monkeypatch.setattr(module, "load_priority_mapping_from_rules_excel", lambda _: {"severity_to_priority": {}, "priority_aliases": {}})
+    monkeypatch.setattr(module, "load_regression_rules", lambda _: _make_rules(tmp_path, result_dir))
+    monkeypatch.setattr(module, "RegressionStore", lambda *_args, **_kwargs: FakeStore())
+
+    exit_code = module.run_batch_create(args)
+
+    assert exit_code == 0
+    assert record_calls == []
+
+
+def test_run_batch_create_regression_verify_mode_records_skip_results_and_reason(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    batch_entry_module,
+):
+    module = batch_entry_module
+    result_dir = tmp_path / "result"
+    args = _make_args(
+        tmp_path,
+        excel_file=None,
+        regression_project="X6851OS16",
+        regression_specialties=["休眠唤醒专项"],
+        current_version="X6851-16.3.0.020(OP001PF001AZ)_SU",
+        history_reporter="dailv.tinno",
+        dry_run=True,
+    )
+    saved_results: list[dict[str, object]] = []
+
+    class FakeJira:
+        def current_user(self):
+            return "robot"
+
+        def search_issues(self, *_args, **_kwargs):
+            return [SimpleNamespace(key="X6851OS16-607")]
+
+        def issue(self, issue_key: str):
+            return SimpleNamespace(
+                key=issue_key,
+                raw={
+                    "fields": {
+                        "summary": "【天珑团队】【BUG】【X6851】【OP】【Alpha】【稳定性专项】【休眠唤醒专项】问题",
+                        "status": {"name": "Verified"},
+                        "resolution": {"name": "已修复"},
+                        "fixVersions": [{"name": "X6851-16.3.0.021(OP001PF001AZ)_SU"}],
+                    }
+                },
+            )
+
+    class FakeStore:
+        def save_sync_run(self, *_args, **_kwargs):
+            return None
+
+        def save_snapshot(self, *_args, **_kwargs):
+            return None
+
+        def save_execution_result(self, payload):
+            saved_results.append(payload)
+
+    monkeypatch.setattr(module, "RESULT_DIR", result_dir)
+    monkeypatch.setattr(module, "connect_to_jira", lambda *_: FakeJira())
+    monkeypatch.setattr(module, "load_defaults", lambda _: {"jira_server": "http://jira.example.com"})
+    monkeypatch.setattr(module, "load_priority_mapping_from_rules_excel", lambda _: {"severity_to_priority": {}, "priority_aliases": {}})
+    monkeypatch.setattr(module, "load_regression_rules", lambda _: _make_rules(tmp_path, result_dir))
+    monkeypatch.setattr(module, "RegressionStore", lambda *_args, **_kwargs: FakeStore())
+
+    with caplog.at_level(logging.INFO):
+        exit_code = module.run_batch_create(args)
+
+    assert exit_code == 0
+    assert saved_results
+    assert saved_results[0]["action"] == "REGRESSION_PASS_SKIP"
+    assert saved_results[0]["reason"] == "CURRENT_VERSION_BEFORE_FIX_VERSION"
+    assert "REGRESSION_PASS_SKIP" in caplog.text
+    assert "CURRENT_VERSION_BEFORE_FIX_VERSION" in caplog.text
+
+
+def test_build_regression_pass_comment_keeps_legacy_format_for_monkey_specialty(batch_entry_module):
+    module = batch_entry_module
+
+    comment = module.build_regression_pass_comment(
+        pass_count=1,
+        versions=["X6851-16.3.0.022(OP001PF001AZ)_SU"],
+        specialty="Monkey专项",
+        current_version="X6851-16.3.0.022(OP001PF001AZ)_SU",
+    )
+
+    assert comment == "已回归验证1个版本PASS，已测试版本：X6851-16.3.0.022(OP001PF001AZ)_SU"
+
+
+def test_build_regression_pass_comment_uses_multiline_template_for_non_monkey_specialty(batch_entry_module):
+    module = batch_entry_module
+
+    comment = module.build_regression_pass_comment(
+        pass_count=2,
+        versions=[
+            "X6851-16.3.0.022(OP001PF001AZ)_SU",
+            "X6851-16.3.0.023(OP001PF001AZ)_SU",
+        ],
+        specialty="休眠唤醒专项",
+        current_version="X6851-16.3.0.023(OP001PF001AZ)_SU",
+    )
+
+    assert comment == (
+        "验证结果：PASS\n"
+        "测试次数：0/1000\n"
+        "验证步骤：休眠唤醒专项\n"
+        "验证版本：X6851-16.3.0.023(OP001PF001AZ)_SU\n"
+        "样机标识：PR1\n"
+        "应用版本：/\n"
+        "测试人员及联系方式：吕代+18379465576\n"
+        "备注：已回归验证2个版本PASS，已测试版本："
+        "X6851-16.3.0.022(OP001PF001AZ)_SU, X6851-16.3.0.023(OP001PF001AZ)_SU"
+    )
+
+
+def test_build_regression_pass_comment_treats_adb_reboot_monkey_as_non_monkey(batch_entry_module):
+    module = batch_entry_module
+
+    comment = module.build_regression_pass_comment(
+        pass_count=1,
+        versions=["X6851-16.3.0.022(OP001PF001AZ)_SU"],
+        specialty="ADB重启+Monkey专项",
+        current_version="X6851-16.3.0.022(OP001PF001AZ)_SU",
+    )
+
+    assert comment == (
+        "验证结果：PASS\n"
+        "测试次数：0/1000\n"
+        "验证步骤：ADB重启+Monkey专项\n"
+        "验证版本：X6851-16.3.0.022(OP001PF001AZ)_SU\n"
+        "样机标识：PR1\n"
+        "应用版本：/\n"
+        "测试人员及联系方式：吕代+18379465576\n"
+        "备注：已回归验证1个版本PASS，已测试版本：X6851-16.3.0.022(OP001PF001AZ)_SU"
+    )
 
 
 def _make_row(**overrides):
@@ -91,6 +535,14 @@ def _make_rules(tmp_path: Path, result_dir: Path):
             required_exact_fields=["affect_project", "environment", "exp_class"],
             cause_similarity_threshold=0.9,
         ),
+        status_rules=SimpleNamespace(
+            open_like_statuses=["Open", "开放", "Reopened", "重新打开", "处理中"],
+            resolved_statuses=["已解决", "Verified"],
+            resolved_fixed_resolutions=["已修复"],
+            wont_fix_resolutions=["问题不修改", "非问题", "Won't Fix", "不解决"],
+            closed_statuses=["Closed", "已关闭", "已关单"],
+        ),
+        regression=SimpleNamespace(enabled=True, required_regression_pass_versions=2),
         output=SimpleNamespace(
             sqlite_path=str(tmp_path / "regression.db"),
             excel_summary_dir=str(result_dir),
@@ -109,6 +561,41 @@ def test_collect_regression_summary_keywords_uses_monkey_keyword_for_monkey_rows
     )
 
     assert module.collect_regression_summary_keywords(df) == ["[MonkeyAEE]"]
+
+
+def test_extract_specialty_from_summary_recognizes_monkey_aee_tag(batch_entry_module):
+    module = batch_entry_module
+
+    specialty = module.extract_specialty_from_summary(
+        "[Total Number 4] [MonkeyAEE] ANR com.trassion.infinix.xclub"
+    )
+
+    assert specialty == "MonkeyAEE"
+
+
+def test_get_regression_pass_candidates_keeps_monkey_aee_rows_when_specialty_allowed(batch_entry_module):
+    module = batch_entry_module
+    regression_rules = _make_rules(Path("."), Path("."))
+
+    candidates = module._get_regression_pass_candidates(
+        store=SimpleNamespace(),
+        run_id="20260422_140109",
+        snapshot_rows=[
+            {
+                "jira_key": "X6852AEE-71",
+                "status": "已解决",
+                "resolution": "已修复",
+                "fix_version": "X6852-16.3.0.102(OP001PF001AZ)",
+                "summary": "[Total Number 4] [MonkeyAEE] ANR com.trassion.infinix.xclub",
+            }
+        ],
+        regression_rules=regression_rules,
+        matched_jira_keys=set(),
+        allowed_specialties={"MonkeyAEE"},
+    )
+
+    assert len(candidates) == 1
+    assert candidates[0]["jira_key"] == "X6852AEE-71"
 
 
 def test_collect_regression_summary_keywords_uses_stability_keyword_for_non_monkey_rows(batch_entry_module):
@@ -1487,10 +1974,12 @@ def test_run_batch_create_create_new_records_new_issue_key(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     batch_entry_module,
+    caplog: pytest.LogCaptureFixture,
 ):
     module = batch_entry_module
     result_dir = tmp_path / "result"
     store_events: dict[str, object] = {"execution_results": []}
+    caplog.set_level(logging.INFO)
 
     class FakeJira:
         def current_user(self) -> str:
@@ -1551,6 +2040,7 @@ def test_run_batch_create_create_new_records_new_issue_key(
     exit_code = module.run_batch_create(_make_args(tmp_path, add_comments=False))
 
     assert exit_code == 0
+    assert "第 1 行执行结果: matched_jira_key=TRANSSION-NEW-1 action=CREATE_NEW reason=未命中历史单 status=SUCCESS result=CREATE_NEW -> TRANSSION-NEW-1" in caplog.text
     assert store_events["execution_results"][0]["matched_jira_key"] == "TRANSSION-NEW-1"
     assert store_events["execution_results"][0]["success"] == 1
     result_files = sorted(result_dir.glob("transsion_jira_batch_create_result_*.json"))

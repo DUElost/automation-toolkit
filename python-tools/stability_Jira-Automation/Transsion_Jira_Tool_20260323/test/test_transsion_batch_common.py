@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+import logging
 import sys
 from pathlib import Path
 from typing import Generator
@@ -96,8 +97,13 @@ def test_build_issue_fields_falls_back_to_odm_component_when_components_invalid(
     assert issue_fields["components"] == [{"name": "ODM处理"}]
 
 
-def test_build_issue_fields_keeps_versions_validation_unchanged(batch_common_module):
+def test_build_issue_fields_logs_versions_metadata_when_validation_fails(
+    batch_common_module,
+    caplog: pytest.LogCaptureFixture,
+):
     module = batch_common_module
+
+    caplog.set_level(logging.ERROR)
 
     with pytest.raises(ValueError, match="Versions 存在无效值"):
         module.build_issue_fields(
@@ -119,6 +125,12 @@ def test_build_issue_fields_keeps_versions_validation_unchanged(batch_common_mod
             project_cache={},
             create_assignee_override=None,
         )
+
+    assert "Versions 校验失败" in caplog.text
+    assert "project=TRANSSION" in caplog.text
+    assert "issue_type=故障" in caplog.text
+    assert "submitted=['UNKNOWN']" in caplog.text
+    assert "allowed_sample=['V10']" in caplog.text
 
 
 def test_build_issue_fields_reports_original_component_and_odm_fallback_failure(batch_common_module):

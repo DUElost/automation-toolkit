@@ -9,12 +9,15 @@ Transsion Jira 第二阶段公共逻辑
 
 from __future__ import annotations
 
+import logging
 import os
 import re
 import json
 from typing import Any, Dict, List, Optional, Tuple
 
 from jira import JIRA
+
+logger = logging.getLogger(__name__)
 
 EXCEL_FIELD_CANDIDATES = {
     "project": ["Project", "project"],
@@ -581,7 +584,19 @@ def build_issue_fields(
 
     components = resolve_components_for_create(components, allowed_values)
     validate_multi_values("Components", "components", components, allowed_values)
-    validate_multi_values("Versions", "versions", versions, allowed_values)
+    try:
+        validate_multi_values("Versions", "versions", versions, allowed_values)
+    except ValueError:
+        version_allowed = allowed_values.get("versions", {})
+        logger.error(
+            "Versions 校验失败: project=%s issue_type=%s submitted=%s allowed_count=%d allowed_sample=%s",
+            project_key,
+            issue_type_name,
+            versions,
+            len(version_allowed),
+            list(version_allowed.keys())[:10],
+        )
+        raise
 
     issue_fields: Dict[str, Any] = {
         "project": {"key": str(project_key)},
