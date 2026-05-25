@@ -1,0 +1,331 @@
+#!/bin/bash
+# taskmgr — 轻量 launchd 定时任务管理器
+# https://github.com/.../automation-toolkit/macos-tools/system_Task-Scheduler
+# 用法: taskmgr {list|add|edit|remove|start|stop|log|status|delay|cancel} [name]
+
+set -e
+
+# ---- 路径配置（可通过环境变量覆盖） ----
+TASKMGR_HOME="${TASKMGR_HOME:-$HOME/scripts}"           # 任务脚本/日志存储目录
+LAUNCH_DIR="$HOME/Library/LaunchAgents"                  # launchd plist 目录
+DELAY_DIR="${TASKMGR_RUNTIME:-$HOME/.taskmgr_delays}"    # 延时 PID 存储
+PREFIX="com.userscript"                                  # launchd label 前缀
+TOOL_DIR="$(cd "$(dirname "$0")" && pwd)"               # 本工具所在目录
+TERMINAL_NOTIFIER="${TERMINAL_NOTIFIER:-$(which terminal-notifier 2>/dev/null || echo /opt/homebrew/bin/terminal-notifier)}"
+
+die() { echo "❌ $*" >&2; exit 1; }
+ok()  { echo "✅ $*"; }
+
+# ---- 内部工具 ----
+
+_plist_path() { echo "$LAUNCH_DIR/${PREFIX}.${1}.plist"; }
+_script_path() { echo "$TASKMGR_HOME/${1}.py"; }
+_list_all() { ls "$LAUNCH_DIR/${PREFIX}".*.plist 2>/dev/null | while read f; do basename "$f" .plist | sed "s/^${PREFIX}\.//"; done; }
+
+# ---- 命令 ----
+
+cmd_list() {
+    local tasks
+    tasks=$(_list_all)
+    if [[ -z "$tasks" ]]; then
+        echo "暂无托管任务"
+        return
+    fi
+    printf "%-20s %-10s %-12s %s\n" "NAME" "STATUS" "DELAY" "SCHEDULE"
+    printf "%-20s %-10s %-12s %s\n" "----" "------" "----------" "--------"
+    while IFS= read -r name; do
+        local plist
+        plist=$(_plist_path "$name")
+        local pid status schedule minute delay_info
+        pid=$(launchctl list | awk -v label="${PREFIX}.${name}" '$3==label{print $1; exit}')
+        if [[ -n "$pid" && "$pid" != "-" ]]; then
+            status="运行中"
+        elif launchctl list | grep -q "${PREFIX}.${name}"; then
+            status="已启用"
+        else
+            status="已停用"
+        fi
+
+        delay_info="-"
+        local pidfile="$DELAY_DIR/${name}.pid"
+        if [[ -f "$pidfile" ]]; then
+            local dpid ddeadline
+            dpid=$(awk '{print $1}' "$pidfile")
+            ddeadline=$(awk '{print $3}' "$pidfile")
+            if kill -0 "$dpid" 2>/dev/null; then
+                delay_info="${ddeadline}"
+            else
+                rm -f "$pidfile"
+            fi
+        fi
+
+        schedule=$(/usr/libexec/PlistBuddy -c "Print :StartCalendarInterval:Hour" "$plist" 2>/dev/null || echo "?")
+        minute=$(/usr/libexec/PlistBuddy -c "Print :StartCalendarInterval:Minute" "$plist" 2>/dev/null || echo "?")
+        [[ "$schedule" == "?" ]] && schedule="手动" || schedule="每天 ${schedule}:$(printf '%02d' "${minute:-0}")"
+        printf "%-20s %-10s %-12s %s\n" "$name" "$status" "$delay_info" "$schedule"
+    done <<< "$tasks"
+}
+
+cmd_status() {
+    local name=$1
+    [[ -z "$name" ]] && { cmd_list; return; }
+    local plist script
+    plist=$(_plist_path "$name")
+    script=$(_script_path "$name")
+    [[ -f "$plist" ]] || die "任务 '$name' 不存在"
+    echo "=== $name ==="
+    echo "plist : $plist"
+    echo "脚本  : $script"
+    echo "日志  : $TASKMGR_HOME/${name}.log"
+    launchctl list | awk -v label="${PREFIX}.${name}" '$3==label{printf "状态  : PID=%s 退出码=%s\n", $1, $2}'
+    local pidfile="$DELAY_DIR/${name}.pid"
+    if [[ -f "$pidfile" ]]; then
+        local pid deadline
+        pid=$(awk '{print $1}' "$pidfile")
+        deadline=$(awk '{print $3}' "$pidfile")
+        if kill -0 "$pid" 2>/dev/null; then
+            echo "延时  : ${deadline} (PID=$pid)"
+        else
+            rm -f "$pidfile"
+        fi
+    fi
+}
+
+cmd_log() {
+    local name=$1
+    [[ -z "$name" ]] && die "请指定任务名"
+    local logf="$TASKMGR_HOME/${name}.log"
+    if [[ -f "$logf" ]]; then
+        tail -30 "$logf"
+    else
+        echo "暂无日志"
+    fi
+}
+
+cmd_start() {
+    local name=$1
+    [[ -z "$name" ]] && die "请指定任务名"
+    launchctl start "${PREFIX}.${name}" 2>/dev/null || die "启动失败，任务是否已加载？"
+    sleep 2
+    tail -5 "$TASKMGR_HOME/${name}.log" 2>/dev/null
+    ok "$name 已触发"
+}
+
+cmd_delay() {
+    local name=$1
+    local mins=$2
+    [[ -z "$name" ]] && die "用法: taskmgr delay <name> <分钟数>"
+    [[ -z "$mins" || ! "$mins" =~ ^[0-9]+$ || "$mins" -le 0 ]] && die "请提供有效的分钟数"
+    local plist
+    plist=$(_plist_path "$name")
+    [[ -f "$plist" ]] || die "任务 '$name' 不存在"
+
+    mkdir -p "$DELAY_DIR"
+    local pidfile="$DELAY_DIR/${name}.pid"
+    local deadline_fmt deadline_ts
+    deadline_fmt=$(date -v +"${mins}M" '+%H:%M')
+    deadline_ts=$(date -v +"${mins}M" '+%s')
+
+    local prev_pidfile="$DELAY_DIR/${name}.pid"
+    if [[ -f "$prev_pidfile" ]]; then
+        kill "$(awk '{print $1}' "$prev_pidfile")" 2>/dev/null
+        rm -f "$prev_pidfile"
+    fi
+
+    local secs=$((mins * 60))
+    nohup bash -c "sleep $secs && launchctl start ${PREFIX}.${name}" >/dev/null 2>&1 &
+    local pid=$!
+    echo "$pid $deadline_ts $deadline_fmt" > "$pidfile"
+    ok "$name 将在 ${mins} 分钟后执行（约 $deadline_fmt）"
+}
+
+cmd_cancel() {
+    local name=$1
+    [[ -z "$name" ]] && die "用法: taskmgr cancel <name>"
+    local pidfile="$DELAY_DIR/${name}.pid"
+    if [[ -f "$pidfile" ]]; then
+        local pid
+        pid=$(awk '{print $1}' "$pidfile")
+        kill "$pid" 2>/dev/null && ok "$name 延时已取消" || true
+        rm -f "$pidfile"
+    else
+        echo "没有待执行的延时"
+    fi
+}
+
+cmd_stop() {
+    local name=$1
+    [[ -z "$name" ]] && die "请指定任务名"
+    local plist
+    plist=$(_plist_path "$name")
+    launchctl unload "$plist" 2>/dev/null || die "停用失败"
+    ok "$name 已停用"
+}
+
+cmd_enable() {
+    local name=$1
+    [[ -z "$name" ]] && die "请指定任务名"
+    local plist
+    plist=$(_plist_path "$name")
+    launchctl load "$plist" 2>/dev/null || die "启用失败"
+    ok "$name 已启用"
+}
+
+cmd_add() {
+    local name=$1
+    [[ -z "$name" ]] && die "用法: taskmgr add <name>"
+    local plist
+    plist=$(_plist_path "$name")
+    [[ -f "$plist" ]] && die "任务 '$name' 已存在"
+
+    mkdir -p "$TASKMGR_HOME"
+
+    echo "创建新定时任务: $name"
+    echo "-------------------------"
+    read -rp "Hour   (0-23) [9]: " hour; hour=${hour:-9}
+    read -rp "Minute (0-59) [0]: " minute; minute=${minute:-0}
+
+    echo "示例: python3 ~/script.py | node ~/task.js | curl https://..."
+    read -rp "启动命令: " cmd
+    [[ -z "$cmd" ]] && die "命令不能为空"
+    cmd="${cmd//\~/$HOME}"
+    read -ra argv <<< "$cmd"
+
+    read -rp "执行后发送通知? [Y/n]: " want_notify; want_notify=${want_notify:-y}
+    local wrapper_script="$TASKMGR_HOME/${name}.sh"
+    if [[ "$want_notify" =~ ^[Yy]$ ]]; then
+        cat > "$wrapper_script" <<WRAPEOF
+#!/bin/bash
+cd "\$HOME"
+$cmd
+rc=\$?
+if [ \$rc -eq 0 ]; then
+    $TERMINAL_NOTIFIER -title "$name 完成" -subtitle "\$(date '+%H:%M')" -message "执行成功" -sound Glass -execute "$TOOL_DIR/_notify_action.sh $name"
+else
+    $TERMINAL_NOTIFIER -title "$name 失败" -subtitle "\$(date '+%H:%M')" -message "退出码: \$rc" -sound Basso -execute "$TOOL_DIR/_notify_action.sh $name"
+fi
+WRAPEOF
+        chmod +x "$wrapper_script"
+        argv=(/bin/bash "$wrapper_script")
+    fi
+
+    local args_xml=""
+    for arg in "${argv[@]}"; do
+        args_xml+="        <string>${arg}</string>"$'\n'
+    done
+
+    cat > "$plist" <<PLISTEOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+ "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>${PREFIX}.${name}</string>
+    <key>ProgramArguments</key>
+    <array>
+${args_xml}    </array>
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key><integer>${hour}</integer>
+        <key>Minute</key><integer>${minute}</integer>
+    </dict>
+    <key>StandardOutPath</key>
+    <string>${TASKMGR_HOME}/${name}.log</string>
+    <key>StandardErrorPath</key>
+    <string>${TASKMGR_HOME}/${name}.err</string>
+</dict>
+</plist>
+PLISTEOF
+
+    launchctl load "$plist"
+    ok "任务 '$name' 已创建，每天 ${hour}:$(printf '%02d' "$minute") 执行"
+    echo "  修改命令: taskmgr edit $name"
+    echo "  查看日志: taskmgr log  $name"
+    echo "  手动触发: taskmgr start $name"
+}
+
+cmd_remove() {
+    local name=$1
+    [[ -z "$name" ]] && die "用法: taskmgr remove <name>"
+    local plist script
+    plist=$(_plist_path "$name")
+    script=$(_script_path "$name")
+    [[ -f "$plist" ]] || die "任务 '$name' 不存在"
+
+    launchctl unload "$plist" 2>/dev/null || true
+    rm -f "$plist" "$script" "$TASKMGR_HOME/${name}.sh" "$TASKMGR_HOME/${name}.log" "$TASKMGR_HOME/${name}.err"
+    ok "$name 已删除"
+}
+
+cmd_edit() {
+    local name=$1
+    [[ -z "$name" ]] && die "用法: taskmgr edit <name>"
+    local py_script sh_wrapper plist
+    py_script=$(_script_path "$name")
+    sh_wrapper="$TASKMGR_HOME/${name}.sh"
+    plist=$(_plist_path "$name")
+    [[ -f "$plist" ]] || die "任务 '$name' 不存在"
+
+    if [[ -f "$py_script" ]]; then
+        ${EDITOR:-vim} "$py_script"
+    elif [[ -f "$sh_wrapper" ]]; then
+        ${EDITOR:-vim} "$sh_wrapper"
+    else
+        local cur_cmd
+        cur_cmd=$(/usr/libexec/PlistBuddy -c "Print :ProgramArguments" "$plist" 2>/dev/null | awk 'NR>1 && !/^[{}]/ {printf "%s%s", (sep?FS:""), $0; sep=1} END{print ""}')
+        echo "当前命令: $cur_cmd"
+        read -rp "新命令 (留空不修改): " new_cmd
+        if [[ -n "$new_cmd" ]]; then
+            new_cmd="${new_cmd//\~/$HOME}"
+            read -ra argv <<< "$new_cmd"
+            /usr/libexec/PlistBuddy -c "Delete :ProgramArguments" "$plist" 2>/dev/null
+            /usr/libexec/PlistBuddy -c "Add :ProgramArguments array" "$plist"
+            for arg in "${argv[@]}"; do
+                /usr/libexec/PlistBuddy -c "Add :ProgramArguments: string '${arg}'" "$plist"
+            done
+            launchctl unload "$plist" 2>/dev/null
+            launchctl load "$plist"
+            ok "命令已更新"
+        fi
+    fi
+}
+
+cmd_help() {
+    echo "taskmgr — launchd 定时任务管理器"
+    echo ""
+    echo "  taskmgr list              列出所有任务"
+    echo "  taskmgr status [name]     查看任务详情"
+    echo "  taskmgr log    <name>     查看运行日志"
+    echo "  taskmgr start  <name>     立即触发一次"
+    echo "  taskmgr delay  <name> <m> N 分钟后延时执行"
+    echo "  taskmgr cancel <name>     取消待执行的延时"
+    echo "  taskmgr stop   <name>     停用调度"
+    echo "  taskmgr enable <name>     启用调度"
+    echo "  taskmgr add    <name>     创建新任务"
+    echo "  taskmgr edit   <name>     编辑脚本 ($EDITOR)"
+    echo "  taskmgr remove <name>     删除任务"
+    echo ""
+    echo "环境变量:"
+    echo "  TASKMGR_HOME      任务存储目录 (默认 ~/scripts)"
+    echo "  TASKMGR_RUNTIME   运行时状态目录 (默认 ~/.taskmgr_delays)"
+    echo "  TERMINAL_NOTIFIER terminal-notifier 路径 (自动检测)"
+}
+
+# ---- 入口 ----
+
+case "${1:-help}" in
+    list)   cmd_list ;;
+    status) cmd_status "$2" ;;
+    log)    cmd_log "$2" ;;
+    start)  cmd_start "$2" ;;
+    delay)  cmd_delay "$2" "$3" ;;
+    cancel) cmd_cancel "$2" ;;
+    stop)   cmd_stop "$2" ;;
+    enable) cmd_enable "$2" ;;
+    add)    cmd_add "$2" ;;
+    edit)   cmd_edit "$2" ;;
+    remove) cmd_remove "$2" ;;
+    rm)     cmd_remove "$2" ;;
+    help|*) cmd_help ;;
+esac
