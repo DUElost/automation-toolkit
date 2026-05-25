@@ -159,4 +159,92 @@ class MergeExcels(ScanBase):
                 f.write(str(statistics_list))
             TEST_LOGGER.info("******************** 生成累计结果完成 ********************\n")
 
+    def start_merge_files(self, xls_file_path_list):
+        """合并多个已生成的 xls 结果文件（_org.xls 或 final .xls）
+        :param xls_file_path_list: 待合并的 xls 文件路径列表
+        :return: 合并结果目录路径
+        """
+        if not xls_file_path_list:
+            TEST_LOGGER.error("待合并文件列表为空，退出")
+            return
+
+        total_aee_rlt_list = []
+        aee_path_list = []
+        for file_path in xls_file_path_list:
+            if not os.path.isfile(file_path):
+                TEST_LOGGER.warn(f"文件不存在，跳过：{file_path}")
+                continue
+            aee_rlt_list = read_aee_rlt_excel(file_path)
+            TEST_LOGGER.info(f"文件：{file_path} 中读取记录：{len(aee_rlt_list)}条")
+            for aee_rlt in aee_rlt_list:
+                aee_path = aee_rlt.get_aee_attrs()[0]
+                if aee_path not in aee_path_list:
+                    total_aee_rlt_list.append(aee_rlt)
+                    aee_path_list.append(aee_path)
+
+        TEST_LOGGER.info(f"累计读取原始记录共：{len(total_aee_rlt_list)}条")
+
+        if not total_aee_rlt_list:
+            TEST_LOGGER.warn("合并文件后无有效记录，退出")
+            return
+
+        if self._MergeExcels__merge_side == "shanghai":
+            self._pkglist_file = "pkglist.txt"
+            self._scan_type = "shanghai"
+        elif self._MergeExcels__merge_side == "factory":
+            self._pkglist_file = "pkglist_factory.txt"
+            self._scan_type = "factory"
+
+        pkglist_file_path = PathManager.config_folder + os.sep + self._pkglist_file
+        self._pkglist = self._get_pkglist(self._scan_type, pkglist_file_path)
+
+        total_aee_rlt_list_org, total_aee_rlt_list_final, to_be_deleted_file_list = self._aee_to_data_list(total_aee_rlt_list)
+
+        if total_aee_rlt_list_org:
+            build_version = total_aee_rlt_list_org[0][1]
+            self._MergeExcels__target_build = build_version
+            TEST_LOGGER.info(f"合并结果记录中测试版本为：{build_version}")
+
+        statistics_project_name = self._MergeExcels__target_build.split("-")[0] if self._MergeExcels__target_build else None
+        timestamp = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+        merge_result_dir = PathManager.merge_rlt_folder + os.sep + timestamp
+        try:
+            os.makedirs(merge_result_dir)
+        except:
+            pass
+
+        org_excel_name = "Result_MergeFiles_org.xls"
+        final_excel_name = "Result_MergeFiles.xls"
+
+        if total_aee_rlt_list_org:
+            org_excel_path = merge_result_dir + os.sep + org_excel_name
+            TEST_LOGGER.info(f"合并去重前Excel文件：{org_excel_path}")
+            try:
+                Excel(org_excel_path).insertResultAee(total_aee_rlt_list_org)
+            except:
+                TEST_LOGGER.warn(traceback.format_exc())
+
+        if total_aee_rlt_list_final:
+            statistics_list = [
+                statistics_project_name, self._MergeExcels__target_build
+            ] + self.get_statistics(total_aee_rlt_list_final)
+            final_excel_path = merge_result_dir + os.sep + final_excel_name
+            TEST_LOGGER.info(f"合并去重后Excel文件：{final_excel_path}")
+            try:
+                Excel(final_excel_path).insertResultAee(total_aee_rlt_list_final, deduplicated=True)
+            except:
+                TEST_LOGGER.warn(traceback.format_exc())
+        else:
+            statistics_list = [
+                statistics_project_name, self._MergeExcels__target_build
+            ] + [0] * 17 + [""]
+            TEST_LOGGER.warn("去重后数据为0")
+
+        statistics_file_path = merge_result_dir + os.sep + "statistics.txt"
+        with open(statistics_file_path, "w", encoding="utf-8") as f:
+            f.write(str(statistics_list))
+
+        TEST_LOGGER.info("******************** 合并文件结果完成 ********************\n")
+        return merge_result_dir
+
 # okay decompiling extracted_pyz_modules/modules/mode\MergeExcels.pyc

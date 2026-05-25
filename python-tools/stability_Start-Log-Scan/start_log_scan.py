@@ -7,6 +7,7 @@ from modules.common.GlobalAttrs import *
 from modules.common.Logger import TEST_LOGGER
 from modules.common.Path import PathManager
 from modules.common.Version import VERSION, TOOL_NAME
+from modules.mode.DedupOrgExcel import DedupOrgExcel
 from modules.mode.MergeExcels import MergeExcels
 from modules.mode.ScanAeeIndependent import ScanAeeIndependent
 from modules.mode.ScanAeeMedia import ScanAeePlatformMedia
@@ -20,6 +21,7 @@ from modules.mode.ScanStuckLogo import ScanStuckLogo
 from modules.mode.ScanTneUpload import ScanTneUpload
 from modules.mode.ScanTneUsic import ScanTneUsic
 if __name__ == "__main__":
+    dedup_requested = "-dedup_org" in sys.argv
     cur_datetime = datetime.datetime.now()
     cur_datetime_formatted = cur_datetime.strftime("%Y-%m-%d %H:%M:%S")
     TEST_LOGGER.info("**************************************************")
@@ -74,8 +76,10 @@ if __name__ == "__main__":
     parser.add_argument("-merge", dest="merge_excel_dir", metavar="合并Excel文件存放目录", type=str, default=None, nargs="+", help="合并Excel文件，待合并文件夹目录")
     parser.add_argument("-merge_key", dest="merge_key", metavar="过滤待合并文件名关键字", type=str, default=None, nargs="?", help="过滤待合并文件名关键字")
     parser.add_argument("-side", dest="merge_side", metavar="合并Excel文件归属地", type=str, default="shanghai", nargs="?", help="合并Excel文件归属地：shanghai / factory")
+    parser.add_argument("-dedup_org", dest="dedup_org", metavar="离线去重_org.xls路径", type=str, default=None, nargs="?", const="", help="离线去重指定的_org.xls文件")
     parser.add_argument("-merge_priority", "--merge_priority", dest="merge_priority", action="store_const", const=True, default=False, metavar="是否判断优先级",
       help="是否判断优先级")
+    parser.add_argument("-merge_files", dest="merge_files", metavar="合并多个已生成的xls文件", type=str, default=None, nargs="+", help="合并多个已生成的xls结果文件（_org.xls或final.xls），去重汇总输出")
     try:
         args = parser.parse_args()
         show_version = args.show_version
@@ -83,6 +87,20 @@ if __name__ == "__main__":
             sys.exit(0)
         if args.debug_mode:
             TEST_LOGGER.setDebugMode()
+        if args.dedup_org is not None:
+            if not args.dedup_org:
+                TEST_LOGGER.error("-dedup_org 缺少_org.xls文件路径，退出离线去重")
+                sys.exit(1)
+            try:
+                output_path = DedupOrgExcel(args.dedup_org, args.merge_side).run()
+            except SystemExit:
+                raise
+            except:
+                TEST_LOGGER.error("离线 org 去重执行失败：\n{}".format(traceback.format_exc()))
+                sys.exit(1)
+
+            print(output_path)
+            sys.exit(0)
         scan_mode = args.scan_mode
         if not os.path.isdir(PathManager.tmp_folder):
             try:
@@ -90,12 +108,25 @@ if __name__ == "__main__":
             except:
                 pass
 
+        merge_files = args.merge_files
         merge_factory = args.merge_factory
         merge_excel_dir_list = args.merge_excel_dir
         merge_side = args.merge_side
         merge_key = args.merge_key
         merge_priority = args.merge_priority
         merge_excels = None
+        if merge_files:
+            TEST_LOGGER.info("合并多个已生成的Excel文件，文件列表：{}，归属地：{}".format(merge_files, merge_side))
+            merge_excels = MergeExcels(merge_files, merge_side, "", SCAN_MODE_AEE, priority=merge_priority)
+            try:
+                merge_excels.start_merge_files(merge_files)
+            except:
+                exception_file = PathManager.log_folder + os.sep + datetime.datetime.now().strftime("merge_exception_%Y_%m_%d_%H_%M_%S.txt")
+                with open(exception_file, "w", encoding="utf-8", errors="ignore") as f:
+                    f.write("Version:{}\n\n".format(VERSION))
+                    f.write(traceback.format_exc())
+                traceback.print_exc()
+            sys.exit()
         if merge_factory:
             TEST_LOGGER.info("合并扫描结果Excel文件，merge_factory模式：{}，合并关键字：{}".format(merge_factory, merge_key))
             merge_excels = MergeExcels(merge_factory, "factory", merge_key, scan_mode, True, priority=merge_priority)
@@ -163,10 +194,14 @@ if __name__ == "__main__":
             TEST_LOGGER.info(f"-reporter [问题提交人员 reporter]：{reporter}")
             TEST_LOGGER.info(f"-tcid [UTP平台测试例ID tcid]：{utp_tcid}")
             TEST_LOGGER.info(f"-taskid [UTP平台任务ID taskid]：{utp_taskid}")
-    except SystemExit:
+    except SystemExit as e:
+        if dedup_requested:
+            raise
         sys.exit(0)
     except:
         TEST_LOGGER.warn(f"参数解析异常：\n{traceback.format_exc()}")
+        if dedup_requested:
+            sys.exit(1)
         if len(sys.argv) == 2 and sys.argv[1] != "-v":
             scan_root_dir = sys.argv[1]
             if not os.path.isdir(scan_root_dir):

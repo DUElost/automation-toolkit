@@ -63,6 +63,25 @@ python start_log_scan.py -m 0 -d 2025-12-22 -p SH
 python start_log_scan.py -m 1 -d 2025-12-22 -p SH -s
 ```
 
+## 离线 org 去重
+
+当工具已经生成 `*_org.xls` 后，可以直接对该文件做离线去重，不需要重新扫描日志。
+
+```bash
+# 默认使用 shanghai 规则
+python start_log_scan.py -dedup_org "F:\path\Result_xxx_org.xls"
+
+# 可选 factory 规则
+python start_log_scan.py -dedup_org "F:\path\Result_xxx_org.xls" -side factory
+```
+
+说明：
+
+- `-dedup_org` 传入单个 `*_org.xls` 文件路径
+- `-side` 可选，默认值为 `shanghai`
+- `-side factory` 时使用工厂侧配置
+- 输出文件与输入文件同目录，命名格式为 `*_org_dedup_org_YYYYMMDD_HHMMSS.xls`
+
 ## 输出文件
 
 报告生成在 `-d` 参数指定的目录下：

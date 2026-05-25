@@ -1,0 +1,1 @@
+['MLD', 'MLD-LX3-16-260518V3', 34, 7, 17, 10, 34, 0, 4, 0, 0, 2, 0, 1, 0, 17, 0, 10, 0, 'total_count：34\na_total：7\nb_total：17\nc_total：10\na_b_c_sum：34\nother_count：0\nswt_count：4\nhwt_count：0\nke_count：0\nhang_count：2\nfatal_ne：0\nfatal_je：1\nee_modem_count：0\nje_count：17\nne_count：0\nanr_count：10\nee_combo_count：0']

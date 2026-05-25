@@ -5140,3 +5140,11 @@ com.laolaiwangtech
 com.transsion.aiwriting
 SUnreclaim
 VmallocUsed
+/vendor/bin/hw/android.hardware.nfc-service-st
+/vendor/bin/hw/android.hardware.nfc2-service.nxp_w
+com.transsion.mediaeditor
+com.ape.soundrecorder
+com.ape.fmradio
+com.myos.camera
+com.google.android.providers.media.module
+com.android.contacts
