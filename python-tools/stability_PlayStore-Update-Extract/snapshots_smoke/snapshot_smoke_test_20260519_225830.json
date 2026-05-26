@@ -1,0 +1,1569 @@
+{
+  "timestamp": "2026-05-19T22:58:30.399932",
+  "label": "smoke_test",
+  "device": {
+    "brand": "Infinix",
+    "model": "Infinix X6852",
+    "android_version": "16",
+    "sdk": 36
+  },
+  "package_count": 389,
+  "packages": {
+    "com.google.android.apps.docs": {
+      "apk_path": "/tr_region/operator/app/Drive/Drive.apk",
+      "version_code": "214309283"
+    },
+    "com.mediatek.wifi.system.mainline.resources.overlay": {
+      "apk_path": "/product/overlay/WifiSystemResMainlineOverlay/WifiSystemResMainlineOverlay.apk",
+      "version_code": "1"
+    },
+    "com.google.android.overlay.modules.packageinstaller": {
+      "apk_path": "/tr_product/overlay/TranGooglePackageInstallerOverlay.apk",
+      "version_code": "1"
+    },
+    "com.funbase.xradio": {
+      "apk_path": "/system_ext/app/FM_FunBase/FM_FunBase.apk",
+      "version_code": "30001182"
+    },
+    "com.android.DeviceAsWebcam": {
+      "apk_path": "/system/priv-app/DeviceAsWebcam/DeviceAsWebcam.apk",
+      "version_code": "36"
+    },
+    "com.android.bluetooth": {
+      "apk_path": "/apex/com.android.bt/app/Bluetooth@BP2A.250605.031.A3/Bluetooth.apk",
+      "version_code": "36"
+    },
+    "com.transsion.chromecustomization": {
+      "apk_path": "/tr_region/app/ChromeAssistant/ChromeAssistant.apk",
+      "version_code": "36"
+    },
+    "com.google.android.marvin.talkback": {
+      "apk_path": "/tr_region/app/talkback/talkback.apk",
+      "version_code": "60192190"
+    },
+    "com.android.devicediagnostics": {
+      "apk_path": "/system/priv-app/DeviceDiagnostics/DeviceDiagnostics.apk",
+      "version_code": "36"
+    },
+    "com.android.companiondevicemanager": {
+      "apk_path": "/system/app/CompanionDeviceManager/CompanionDeviceManager.apk",
+      "version_code": "36"
+    },
+    "com.aurora.store": {
+      "apk_path": "/data/app/~~ogkhaUckuXqrtrPRwmwgeg==/com.aurora.store-ns_Q1fkkhExghymRXHsXQQ==/base.apk",
+      "version_code": "75"
+    },
+    "com.transsion.succ": {
+      "apk_path": "/system_ext/app/TranSucc/TranSucc.apk",
+      "version_code": "112"
+    },
+    "com.mediatek.gnss.nonframeworklbs": {
+      "apk_path": "/product/app/NonFrameworkLbs/NonFrameworkLbs.apk",
+      "version_code": "1"
+    },
+    "com.transsion": {
+      "apk_path": "/system_ext/framework/transsion-res.apk",
+      "version_code": "36"
+    },
+    "com.google.android.apps.safetyhub": {
+      "apk_path": "/tr_region/priv-app/PersonalSafety/PersonalSafety.apk",
+      "version_code": "100766961"
+    },
+    "com.android.virtualmachine.res": {
+      "apk_path": "/apex/com.android.virt/app/android.system.virtualmachine.res@BP2A.250605.031.A3/android.system.virtualmachine.res.apk",
+      "version_code": "36"
+    },
+    "com.transsion.personalizedService.xos": {
+      "apk_path": "/tr_product/app/ZeroScreen/ZeroScreen.apk",
+      "version_code": "160000112"
+    },
+    "com.transsion.rro.framework_res.tr_region.x6852": {
+      "apk_path": "/tr_region/overlay/android/X6852_overlay_android.apk",
+      "version_code": "0"
+    },
+    "com.transsion.manualguide": {
+      "apk_path": "/tr_region/app/Manual/Manual.apk",
+      "version_code": "221"
+    },
+    "com.transsion.thunderback.overlay": {
+      "apk_path": "/tr_product/overlay/TranThunderback_overlayInfinix.apk",
+      "version_code": "1"
+    },
+    "com.transsion.audiosmartconnect": {
+      "apk_path": "/system_ext/app/AudioLink/AudioLink.apk",
+      "version_code": "150253"
+    },
+    "com.transsion.keyguardtheme": {
+      "apk_path": "/system_ext/app/KeyguardTheme/KeyguardTheme.apk",
+      "version_code": "160300026"
+    },
+    "com.android.cts.priv.ctsshim": {
+      "apk_path": "/apex/com.android.apex.cts.shim/priv-app/CtsShimPriv@MAIN/CtsShimPriv.apk",
+      "version_code": "35"
+    },
+    "com.android.providers.downloads.ui": {
+      "apk_path": "/system/priv-app/DownloadProviderUi/DownloadProviderUi.apk",
+      "version_code": "36"
+    },
+    "com.android.wallpapercropper": {
+      "apk_path": "/system_ext/priv-app/WallpaperCropper/WallpaperCropper.apk",
+      "version_code": "36"
+    },
+    "com.google.android.overlay.modules.ext.services": {
+      "apk_path": "/product/overlay/GoogleExtServicesConfigOverlay.apk",
+      "version_code": "1"
+    },
+    "com.transsion.connectx.mirror.source": {
+      "apk_path": "/tr_product/app/ConnectBase/ConnectBase.apk",
+      "version_code": "10402112"
+    },
+    "com.theme.icondefaultshape": {
+      "apk_path": "/tr_product/app/IconDefaultShape/IconDefaultShape.apk",
+      "version_code": "1"
+    },
+    "com.android.soundpicker": {
+      "apk_path": "/system_ext/priv-app/TranSoundPicker/TranSoundPicker.apk",
+      "version_code": "160300011"
+    },
+    "tech.palm.find": {
+      "apk_path": "/system_ext/priv-app/TranPalmFind/TranPalmFind.apk",
+      "version_code": "160002167"
+    },
+    "com.transsion.phonemaster": {
+      "apk_path": "/system_ext/priv-app/PhoneMaster/PhoneMaster.apk",
+      "version_code": "623103"
+    },
+    "com.transsion.phoenix": {
+      "apk_path": "/tr_region/operator/app/Phoenix/Phoenix.apk",
+      "version_code": "6340"
+    },
+    "com.transsion.gamespace.app": {
+      "apk_path": "/product/app/GameSpace/GameSpace.apk",
+      "version_code": "30711014"
+    },
+    "com.transsion.overlaysuw": {
+      "apk_path": "/system_ext/app/OOBE/OOBE.apk",
+      "version_code": "50604020"
+    },
+    "com.transsion.multiwindow.overlay": {
+      "apk_path": "/tr_product/overlay/TranMultiWindow_overlayInfinix.apk",
+      "version_code": "1"
+    },
+    "com.google.android.overlay.modules.captiveportallogin.forframework": {
+      "apk_path": "/product/overlay/CaptivePortalLoginFrameworkOverlay.apk",
+      "version_code": "1"
+    },
+    "com.google.android.overlay.modules.permissioncontroller.forframework": {
+      "apk_path": "/product/overlay/GooglePermissionControllerFrameworkOverlay.apk",
+      "version_code": "1"
+    },
+    "com.google.mainline.telemetry": {
+      "apk_path": "/product/app/com.google.mainline.telemetry/com.google.mainline.telemetry.apk",
+      "version_code": "361141404"
+    },
+    "com.talpa.hiservice": {
+      "apk_path": "/product/app/HiLanguageService/HiLanguageService.apk",
+      "version_code": "20260127"
+    },
+    "com.google.android.rkpdapp": {
+      "apk_path": "/apex/com.android.rkpd/priv-app/rkpdapp.google@361153320/rkpdapp.google.apk",
+      "version_code": "36"
+    },
+    "com.google.audio.hearing.visualization.accessibility.scribe": {
+      "apk_path": "/tr_region/app/LiveTranscribe/LiveTranscribe.apk",
+      "version_code": "178672"
+    },
+    "com.android.htmlviewer": {
+      "apk_path": "/system/app/HTMLViewer/HTMLViewer.apk",
+      "version_code": "36"
+    },
+    "com.android.providers.media": {
+      "apk_path": "/system/priv-app/MediaProviderLegacy/MediaProviderLegacy.apk",
+      "version_code": "1024"
+    },
+    "com.transsion.keyguardclock": {
+      "apk_path": "/system_ext/app/KeyguardClock/KeyguardClock.apk",
+      "version_code": "160000006"
+    },
+    "com.android.chrome": {
+      "apk_path": "/tr_region/app/Chrome64/Chrome64.apk",
+      "version_code": "749919233"
+    },
+    "com.google.android.providers.media.module": {
+      "apk_path": "/apex/com.android.mediaprovider/priv-app/MediaProviderGoogle@361153920/MediaProviderGoogle.apk",
+      "version_code": "36"
+    },
+    "com.android.credentialmanager": {
+      "apk_path": "/system/priv-app/CredentialManager/CredentialManager.apk",
+      "version_code": "36"
+    },
+    "com.transsion.aicore.main": {
+      "apk_path": "/product/app/AICoreModelManager/AICoreModelManager.apk",
+      "version_code": "160301015"
+    },
+    "com.transsion.pcconnect": {
+      "apk_path": "/tr_product/app/PCConnect/PCConnect.apk",
+      "version_code": "10301222"
+    },
+    "com.google.android.apps.photos": {
+      "apk_path": "/tr_region/app/Photos/Photos.apk",
+      "version_code": "51365019"
+    },
+    "com.android.backupconfirm": {
+      "apk_path": "/system/priv-app/BackupRestoreConfirmation/BackupRestoreConfirmation.apk",
+      "version_code": "36"
+    },
+    "com.transsion.guideservice": {
+      "apk_path": "/system_ext/app/GuideService/GuideService.apk",
+      "version_code": "36"
+    },
+    "com.android.storagemanager": {
+      "apk_path": "/system_ext/priv-app/StorageManager/StorageManager.apk",
+      "version_code": "36"
+    },
+    "com.mediatek.omacp": {
+      "apk_path": "/system_ext/priv-app/Omacp/Omacp.apk",
+      "version_code": "36"
+    },
+    "com.android.phone": {
+      "apk_path": "/system/priv-app/MtkTeleService/MtkTeleService.apk",
+      "version_code": "36"
+    },
+    "tech.palm.id": {
+      "apk_path": "/system_ext/app/PalmID/PalmID.apk",
+      "version_code": "160300211"
+    },
+    "com.transsion.inearmonitor": {
+      "apk_path": "/tr_product/app/InearMonitor/InearMonitor.apk",
+      "version_code": "10100070"
+    },
+    "com.android.hotwordenrollment.okgoogle": {
+      "apk_path": "/tr_product/priv-app/HotwordEnrollmentYGoogle/HotwordEnrollmentYGoogle.apk",
+      "version_code": "100"
+    },
+    "com.android.printspooler": {
+      "apk_path": "/system/app/PrintSpooler/PrintSpooler.apk",
+      "version_code": "36"
+    },
+    "com.transsion.mediaeditor": {
+      "apk_path": "/system_ext/app/MediaEditor/MediaEditor.apk",
+      "version_code": "160300049"
+    },
+    "com.google.android.adservices.api": {
+      "apk_path": "/apex/com.android.adservices/priv-app/AdServicesApkGoogle@361153320/AdServicesApkGoogle.apk",
+      "version_code": "36"
+    },
+    "com.transsion.atomiccore": {
+      "apk_path": "/system_ext/app/TransAtomicCore/TransAtomicCore.apk",
+      "version_code": "163000019"
+    },
+    "com.android.bookmarkprovider": {
+      "apk_path": "/system/app/BookmarkProvider/BookmarkProvider.apk",
+      "version_code": "36"
+    },
+    "com.google.android.connectivity.resources": {
+      "apk_path": "/apex/com.android.tethering/priv-app/ServiceConnectivityResourcesGoogle@361153320/ServiceConnectivityResourcesGoogle.apk",
+      "version_code": "1"
+    },
+    "com.google.android.gsf": {
+      "apk_path": "/tr_region/priv-app/GoogleServicesFramework/GoogleServicesFramework.apk",
+      "version_code": "36"
+    },
+    "com.android.cameraextensions": {
+      "apk_path": "/system/app/CameraExtensionsProxy/CameraExtensionsProxy.apk",
+      "version_code": "36"
+    },
+    "com.transsion.tranradionet": {
+      "apk_path": "/system_ext/app/TranRadioNetService/TranRadioNetService.apk",
+      "version_code": "36"
+    },
+    "com.google.android.overlay.gmsconfig.geotz": {
+      "apk_path": "/product/overlay/GmsConfigOverlayGeotz.apk",
+      "version_code": "1"
+    },
+    "com.google.android.onetimeinitializer": {
+      "apk_path": "/tr_region/priv-app/GoogleOneTimeInitializer/GoogleOneTimeInitializer.apk",
+      "version_code": "36"
+    },
+    "com.transsion.applock": {
+      "apk_path": "/system_ext/priv-app/AppLock/AppLock.apk",
+      "version_code": "162000168"
+    },
+    "com.google.ar.core": {
+      "apk_path": "/tr_region/priv-app/ARCore/ARCore.apk",
+      "version_code": "260340193"
+    },
+    "com.silead.factorytest": {
+      "apk_path": "/system_ext/app/silead_opt_fp/silead_opt_fp.apk",
+      "version_code": "1"
+    },
+    "com.transsion.theme.icon": {
+      "apk_path": "/tr_product/priv-app/OSIcon/OSIcon.apk",
+      "version_code": "1000"
+    },
+    "com.transsion.XOSLauncher.overlay": {
+      "apk_path": "/tr_product/overlay/TranssionLauncherOverlay_infinix_upgrade.apk",
+      "version_code": "1"
+    },
+    "com.google.android.apps.youtube.music": {
+      "apk_path": "/tr_region/app/YTMusic/YTMusic.apk",
+      "version_code": "90352240"
+    },
+    "com.android.vending": {
+      "apk_path": "/tr_region/priv-app/Phonesky/Phonesky.apk",
+      "version_code": "85013320"
+    },
+    "com.transsion.settings.nfc": {
+      "apk_path": "/system_ext/priv-app/TranSettingsNfcApk/TranSettingsNfcApk.apk",
+      "version_code": "60300113"
+    },
+    "com.android.simappdialog": {
+      "apk_path": "/system/app/SimAppDialog/SimAppDialog.apk",
+      "version_code": "36"
+    },
+    "com.transsion.tabe": {
+      "apk_path": "/system_ext/priv-app/TranAbe/TranAbe.apk",
+      "version_code": "160042031"
+    },
+    "com.android.stk": {
+      "apk_path": "/system_ext/priv-app/TranStk/TranStk.apk",
+      "version_code": "353101005"
+    },
+    "com.android.cts.ctsshim": {
+      "apk_path": "/apex/com.android.apex.cts.shim/app/CtsShim@MAIN/CtsShim.apk",
+      "version_code": "35"
+    },
+    "com.transsion.smartrecognition": {
+      "apk_path": "/tr_product/app/SmartRecognition/SmartRecognition.apk",
+      "version_code": "30000019"
+    },
+    "com.transsion.livewallpaper.theme": {
+      "apk_path": "/tr_product/app/ThemeWallpaper/ThemeWallpaper.apk",
+      "version_code": "10016009"
+    },
+    "com.idea.questionnaire": {
+      "apk_path": "/system_ext/app/Questionnaire/Questionnaire.apk",
+      "version_code": "160000104"
+    },
+    "com.transsion.systemui.plugins": {
+      "apk_path": "/system_ext/app/TranSystemUIPlugin/TranSystemUIPlugin.apk",
+      "version_code": "160300014"
+    },
+    "com.transsion.tranengine": {
+      "apk_path": "/system_ext/app/TranEngine/TranEngine.apk",
+      "version_code": "150000075"
+    },
+    "com.transsion.statisticalsales": {
+      "apk_path": "/system_ext/app/SysStasl/SysStasl.apk",
+      "version_code": "4021"
+    },
+    "com.transsion.spl": {
+      "apk_path": "/system_ext/app/TranPluginApp/TranPluginApp.apk",
+      "version_code": "10000002"
+    },
+    "com.aigallery.videoeditor": {
+      "apk_path": "/tr_product/app/transsionvideoedit/TranssionVideoEdit.apk",
+      "version_code": "160300003"
+    },
+    "com.google.android.partnersetup": {
+      "apk_path": "/tr_region/priv-app/GooglePartnerSetup/GooglePartnerSetup.apk",
+      "version_code": "7885"
+    },
+    "com.transsion.launcher3": {
+      "apk_path": "/system_ext/priv-app/TranssionLauncher/TranssionLauncher.apk",
+      "version_code": "160300338"
+    },
+    "com.instagram.android": {
+      "apk_path": "/tr_region/operator/app/Instagram/Instagram.apk",
+      "version_code": "1"
+    },
+    "com.android.internal.display.cutout.emulation.corner": {
+      "apk_path": "/product/overlay/DisplayCutoutEmulationCorner/DisplayCutoutEmulationCornerOverlay.apk",
+      "version_code": "1"
+    },
+    "com.mediatek.engineermode": {
+      "apk_path": "/system_ext/app/EngineerMode/EngineerMode.apk",
+      "version_code": "2"
+    },
+    "com.android.dynsystem": {
+      "apk_path": "/system/priv-app/DynamicSystemInstallationService/DynamicSystemInstallationService.apk",
+      "version_code": "36"
+    },
+    "com.android.internal.display.cutout.emulation.hole": {
+      "apk_path": "/product/overlay/DisplayCutoutEmulationHole/DisplayCutoutEmulationHoleOverlay.apk",
+      "version_code": "1"
+    },
+    "com.transsion.tranfacmode": {
+      "apk_path": "/system_ext/app/TranfacMode/TranfacMode.apk",
+      "version_code": "160300023"
+    },
+    "com.google.android.feedback": {
+      "apk_path": "/tr_region/priv-app/GoogleFeedback/GoogleFeedback.apk",
+      "version_code": "36"
+    },
+    "com.transsion.settings.bluetooth": {
+      "apk_path": "/system_ext/priv-app/BluetoothSettingsApk/BluetoothSettingsApk.apk",
+      "version_code": "30000142"
+    },
+    "com.android.providers.calendar": {
+      "apk_path": "/system/priv-app/MtkCalendarProvider/MtkCalendarProvider.apk",
+      "version_code": "36"
+    },
+    "com.android.mms.service": {
+      "apk_path": "/system/priv-app/MtkMmsService/MtkMmsService.apk",
+      "version_code": "36"
+    },
+    "com.android.compos.payload": {
+      "apk_path": "/apex/com.android.compos/app/CompOSPayloadApp@BP2A.250605.031.A3/CompOSPayloadApp.apk",
+      "version_code": "36"
+    },
+    "com.westalgo.factorycamera": {
+      "apk_path": "/tr_product/app/CalibrationTool2/CalibrationTool2.apk",
+      "version_code": "10000021"
+    },
+    "com.mediatek": {
+      "apk_path": "/system_ext/app/mediatek-res/mediatek-res.apk",
+      "version_code": "36"
+    },
+    "com.transsion.aicore.nexusflow": {
+      "apk_path": "/product/app/AICoreNexusFlow/AICoreNexusFlow.apk",
+      "version_code": "160302074"
+    },
+    "com.google.android.as.oss": {
+      "apk_path": "/tr_region/priv-app/PrivateComputeServices/PrivateComputeServices.apk",
+      "version_code": "119015"
+    },
+    "com.google.android.sdksandbox": {
+      "apk_path": "/apex/com.android.adservices/app/SdkSandboxGoogle@361153320/SdkSandboxGoogle.apk",
+      "version_code": "1"
+    },
+    "android.auto_generated_rro_product__": {
+      "apk_path": "/product/overlay/framework-res__sys_mssi_64_64only_cn_armv82__auto_generated_rro_product.apk",
+      "version_code": "1"
+    },
+    "net.bat.store": {
+      "apk_path": "/tr_region/operator/app/AHAGames/AHAGames.apk",
+      "version_code": "3957"
+    },
+    "com.transsion.overlaysuw.overlay": {
+      "apk_path": "/tr_product/overlay/OOBE_OverlayRes_infinixNormal.apk",
+      "version_code": "1"
+    },
+    "com.google.android.healthconnect.controller": {
+      "apk_path": "/apex/com.android.healthfitness/priv-app/HealthConnectControllerGoogle@361153320/HealthConnectControllerGoogle.apk",
+      "version_code": "36"
+    },
+    "com.transsion.aivoiceassistant": {
+      "apk_path": "/tr_product/priv-app/AIVoiceAssistant/AIVoiceAssistant.apk",
+      "version_code": "50301264"
+    },
+    "com.transsion.iotcard": {
+      "apk_path": "/system_ext/app/IotCard/IotCard.apk",
+      "version_code": "501163108"
+    },
+    "com.mediatek.batterywarning": {
+      "apk_path": "/system_ext/app/BatteryWarning2/BatteryWarning2.apk",
+      "version_code": "30001010"
+    },
+    "com.mediatek.wifi.mainline.resources.overlay": {
+      "apk_path": "/vendor/overlay/WifiResMainlineOverlay/WifiResMainlineOverlay.apk",
+      "version_code": "1"
+    },
+    "com.transsion.rro.com.transsion.thub.res.tr_product.x6852": {
+      "apk_path": "/tr_product/overlay/com_transsion_thub_res/X6852_overlay_com_transsion_thub_res.apk",
+      "version_code": "0"
+    },
+    "com.google.android.tts": {
+      "apk_path": "/tr_region/app/SpeechServicesByGoogle/SpeechServicesByGoogle.apk",
+      "version_code": "210547004"
+    },
+    "com.android.ons": {
+      "apk_path": "/system/priv-app/ONS/ONS.apk",
+      "version_code": "36"
+    },
+    "com.mediatek.SettingsProviderResOverlay": {
+      "apk_path": "/vendor/overlay/SettingsProviderResOverlay/SettingsProviderResOverlay.apk",
+      "version_code": "36"
+    },
+    "com.android.providers.userdictionary": {
+      "apk_path": "/system/priv-app/UserDictionaryProvider/UserDictionaryProvider.apk",
+      "version_code": "36"
+    },
+    "com.zhiliaoapp.musically.go": {
+      "apk_path": "/tr_region/operator/app/TikTokLite/TikTokLite.apk",
+      "version_code": "400000"
+    },
+    "com.google.android.videos": {
+      "apk_path": "/tr_region/operator/app/Videos/Videos.apk",
+      "version_code": "439554191"
+    },
+    "com.smartlife.nebula": {
+      "apk_path": "/tr_region/operator/app/Welife/Welife.apk",
+      "version_code": "10000662"
+    },
+    "com.android.internal.display.cutout.emulation.tall": {
+      "apk_path": "/product/overlay/DisplayCutoutEmulationTall/DisplayCutoutEmulationTallOverlay.apk",
+      "version_code": "1"
+    },
+    "com.transsion.aicore.main.overlay": {
+      "apk_path": "/tr_product/overlay/AICoreMainXOSOverlay.apk",
+      "version_code": "160301015"
+    },
+    "com.transsion.soundrecorder": {
+      "apk_path": "/product/app/TranssionSoundRecorder/TranssionSoundRecorder.apk",
+      "version_code": "160300075"
+    },
+    "com.android.microdroid.empty_payload": {
+      "apk_path": "/apex/com.android.virt/app/EmptyPayloadApp@BP2A.250605.031.A3/EmptyPayloadApp.apk",
+      "version_code": "36"
+    },
+    "com.android.wallpaper": {
+      "apk_path": "/system_ext/priv-app/ThemePicker/ThemePicker.apk",
+      "version_code": "160200006"
+    },
+    "com.android.systemui.infinix.overlay": {
+      "apk_path": "/tr_product/overlay/SystemUIOSOverlay.apk",
+      "version_code": "160300089"
+    },
+    "com.imaging.aiengine": {
+      "apk_path": "/system_ext/app/ImagingAiEngine/ImagingAiEngine.apk",
+      "version_code": "160000009"
+    },
+    "com.tranlauncher.res": {
+      "apk_path": "/tr_region/app/LauncherConfigOverlay/LauncherConfigOverlay.apk",
+      "version_code": "35010101"
+    },
+    "com.transsion.faceid": {
+      "apk_path": "/system_ext/app/FaceUnlock/FaceUnlock.apk",
+      "version_code": "50303031"
+    },
+    "com.transsion.multiwindow": {
+      "apk_path": "/system_ext/app/TranMultiWindow/TranMultiWindow.apk",
+      "version_code": "70003162"
+    },
+    "com.rlk.weathers": {
+      "apk_path": "/tr_region/app/WeatherPro/WeatherPro.apk",
+      "version_code": "160300027"
+    },
+    "com.android.fanstrace": {
+      "apk_path": "/system_ext/app/Fanstrace/Fanstrace.apk",
+      "version_code": "2"
+    },
+    "com.transsion.livewallpaper.livephoto": {
+      "apk_path": "/tr_product/app/LivePhotoWallpaper/LivePhotoWallpaper.apk",
+      "version_code": "10016032"
+    },
+    "com.transsion.microintelligence": {
+      "apk_path": "/system_ext/app/MicroIntelligence/MicroIntelligence.apk",
+      "version_code": "160000162"
+    },
+    "com.google.android.networkstack": {
+      "apk_path": "/system/priv-app/NetworkStackGoogle/NetworkStackGoogle.apk",
+      "version_code": "361153320"
+    },
+    "com.android.proxyhandler": {
+      "apk_path": "/system/priv-app/ProxyHandler/ProxyHandler.apk",
+      "version_code": "36"
+    },
+    "com.transsion.camera.overlay.product": {
+      "apk_path": "/tr_product/overlay/TranCamera_Overlay_X6852_OP_ui5.apk",
+      "version_code": "1"
+    },
+    "com.transsion.camerademo": {
+      "apk_path": "/tr_product/app/CameraTestTool/CameraTestTool.apk",
+      "version_code": "10000007"
+    },
+    "com.mediatek.schpwronoff": {
+      "apk_path": "/system_ext/app/TranSchedulePowerOnOff/TranSchedulePowerOnOff.apk",
+      "version_code": "160300020"
+    },
+    "com.google.android.photopicker": {
+      "apk_path": "/apex/com.android.mediaprovider/priv-app/PhotopickerGoogle@361153920/PhotopickerGoogle.apk",
+      "version_code": "36"
+    },
+    "com.google.android.packageinstaller": {
+      "apk_path": "/tr_region/priv-app/GooglePackageInstaller/GooglePackageInstaller.apk",
+      "version_code": "36"
+    },
+    "com.android.internal.display.cutout.emulation.double": {
+      "apk_path": "/product/overlay/DisplayCutoutEmulationDouble/DisplayCutoutEmulationDoubleOverlay.apk",
+      "version_code": "1"
+    },
+    "com.transsion.tips": {
+      "apk_path": "/tr_product/app/TranssionTips/TranssionTips.apk",
+      "version_code": "20103024"
+    },
+    "com.android.externalstorage": {
+      "apk_path": "/system/priv-app/ExternalStorageProvider/ExternalStorageProvider.apk",
+      "version_code": "36"
+    },
+    "com.android.cellbroadcastreceiver": {
+      "apk_path": "/system/priv-app/CellBroadcastLegacyApp/CellBroadcastLegacyApp.apk",
+      "version_code": "300000000"
+    },
+    "com.google.android.overlay.modules.modulemetadata.forframework": {
+      "apk_path": "/product/overlay/ModuleMetadataGoogleOverlay.apk",
+      "version_code": "1"
+    },
+    "com.transsion.performance.rms": {
+      "apk_path": "/system_ext/priv-app/performancerms/performancerms.apk",
+      "version_code": "251106011"
+    },
+    "com.mediatek.FrameworkResOverlayExt": {
+      "apk_path": "/vendor/overlay/FrameworkResOverlayExt/FrameworkResOverlayExt.apk",
+      "version_code": "36"
+    },
+    "com.android.role.notes.enabled": {
+      "apk_path": "/product/overlay/NotesRoleEnabled/NotesRoleEnabledOverlay.apk",
+      "version_code": "1"
+    },
+    "com.transsion.sru": {
+      "apk_path": "/system_ext/app/TranSru/TranSru.apk",
+      "version_code": "30000036"
+    },
+    "com.android.wallpaper.livepicker": {
+      "apk_path": "/system/priv-app/LiveWallpapersPicker/LiveWallpapersPicker.apk",
+      "version_code": "36"
+    },
+    "com.transsion.livewallpaper.page": {
+      "apk_path": "/system_ext/priv-app/TranLivePicker/TranLivePicker.apk",
+      "version_code": "10016323"
+    },
+    "com.transsion.iotcard.overlay": {
+      "apk_path": "/tr_product/overlay/IotCard_infinix_overlay.apk",
+      "version_code": "1"
+    },
+    "com.mediatek.telephony": {
+      "apk_path": "/system_ext/priv-app/MtkTelephonyAssist/MtkTelephonyAssist.apk",
+      "version_code": "36"
+    },
+    "com.transsion.smartpanel.overlay": {
+      "apk_path": "/tr_product/overlay/SmartPanel_infinix.apk",
+      "version_code": "160003089"
+    },
+    "com.transsion.aichargeprovider": {
+      "apk_path": "/product/app/AIChargeProvider/AIChargeProvider.apk",
+      "version_code": "36"
+    },
+    "com.transsion.batterylab.overlay": {
+      "apk_path": "/tr_product/overlay/TranBatteryLab_Overlay_infinix.apk",
+      "version_code": "0"
+    },
+    "com.transsion.smartpanel": {
+      "apk_path": "/system_ext/app/SmartPanel/SmartPanel.apk",
+      "version_code": "160003089"
+    },
+    "com.goodix.fingerprint.setting": {
+      "apk_path": "/system_ext/app/GFLincoln-aidl-apk-v400/GFLincoln-aidl-apk-v400.apk",
+      "version_code": "400"
+    },
+    "com.google.android.safetycenter.resources": {
+      "apk_path": "/apex/com.android.permission/priv-app/GoogleSafetyCenterResources@361154140/GoogleSafetyCenterResources.apk",
+      "version_code": "339999900"
+    },
+    "com.google.android.wifi.resources": {
+      "apk_path": "/apex/com.android.wifi/priv-app/ServiceWifiResourcesGoogle@361153320/ServiceWifiResourcesGoogle.apk",
+      "version_code": "1"
+    },
+    "com.android.mtp": {
+      "apk_path": "/system/priv-app/MtpService/MtpService.apk",
+      "version_code": "36"
+    },
+    "com.jiiov.fingerprint_factorytest": {
+      "apk_path": "/system_ext/app/JVFactoryTest/JVFactoryTest.apk",
+      "version_code": "36"
+    },
+    "com.transsion.net.wifi": {
+      "apk_path": "/system_ext/app/TranDualWifi/TranDualWifi.apk",
+      "version_code": "36"
+    },
+    "com.scorpio.securitycom": {
+      "apk_path": "/system_ext/priv-app/SecurityCom/SecurityCom.apk",
+      "version_code": "424"
+    },
+    "com.transsion.rro.com.transsion.overlaysuw.tr_product.x6852": {
+      "apk_path": "/tr_product/overlay/com_transsion_overlaysuw/X6852_overlay_com_transsion_overlaysuw.apk",
+      "version_code": "0"
+    },
+    "com.transsion.tranvoicecommand": {
+      "apk_path": "/product/priv-app/TranVoiceCommand/TranVoiceCommand.apk",
+      "version_code": "10101022"
+    },
+    "com.google.android.overlay.gmsconfig.personalsafety": {
+      "apk_path": "/product/overlay/GmsConfigOverlayPersonalSafety.apk",
+      "version_code": "1"
+    },
+    "tech.palm.id.overlay": {
+      "apk_path": "/tr_product/overlay/TransID_infinix_overlay.apk",
+      "version_code": "160300211"
+    },
+    "com.transsion.deskclock": {
+      "apk_path": "/system_ext/app/TranssionDeskClock/TranssionDeskClock.apk",
+      "version_code": "160300055"
+    },
+    "com.google.android.modulemetadata": {
+      "apk_path": "/product/app/com.google.android.modulemetadata/com.google.android.modulemetadata.apk",
+      "version_code": "361144214"
+    },
+    "com.transsion.launcher3.overlay": {
+      "apk_path": "/tr_product/overlay/TranssionLauncherOverlay_infinix.apk",
+      "version_code": "1"
+    },
+    "com.google.android.projection.gearhead": {
+      "apk_path": "/tr_region/priv-app/AndroidAutoStub/AndroidAutoStub.apk",
+      "version_code": "12558700"
+    },
+    "com.android.keychain": {
+      "apk_path": "/system/app/KeyChain/KeyChain.apk",
+      "version_code": "36"
+    },
+    "com.google.android.googlequicksearchbox": {
+      "apk_path": "/tr_region/priv-app/VelvetCtS/VelvetCtS.apk",
+      "version_code": "301693722"
+    },
+    "com.google.android.printservice.recommendation": {
+      "apk_path": "/tr_region/app/GooglePrintRecommendationService/GooglePrintRecommendationService.apk",
+      "version_code": "4"
+    },
+    "com.facebook.katana": {
+      "apk_path": "/tr_region/operator/app/FacebookStub/FacebookStub.apk",
+      "version_code": "1"
+    },
+    "com.android.providers.downloads": {
+      "apk_path": "/system/priv-app/DownloadProvider/DownloadProvider.apk",
+      "version_code": "36"
+    },
+    "com.transsion.fmoverlay": {
+      "apk_path": "/tr_product/overlay/FM_Overlay.apk",
+      "version_code": "30001182"
+    },
+    "com.transsion.cutepet": {
+      "apk_path": "/tr_product/priv-app/CutePet/CutePet.apk",
+      "version_code": "20101025"
+    },
+    "com.android.systemui": {
+      "apk_path": "/system_ext/priv-app/TranSystemUI/TranSystemUI.apk",
+      "version_code": "160300089"
+    },
+    "com.android.systemui.charge.overlay": {
+      "apk_path": "/tr_product/overlay/SystemUIChargeOverlay.apk",
+      "version_code": "160300089"
+    },
+    "com.transsion.mobilecloner": {
+      "apk_path": "/system_ext/app/MobileCloner/MobileCloner.apk",
+      "version_code": "160300037"
+    },
+    "com.mediatek.location.lppe.main": {
+      "apk_path": "/system_ext/priv-app/LPPeService/LPPeService.apk",
+      "version_code": "1"
+    },
+    "com.transsion.magazineservice.xos": {
+      "apk_path": "/tr_product/priv-app/MagazineService/MagazineService.apk",
+      "version_code": "160101032"
+    },
+    "com.transsion.faceid.infinix.overlay": {
+      "apk_path": "/tr_product/overlay/TranFaceUnlockOverlay.apk",
+      "version_code": "50303031"
+    },
+    "com.gallery20": {
+      "apk_path": "/system_ext/app/AiGallery/AiGallery.apk",
+      "version_code": "160300089"
+    },
+    "com.transsion.ossettingsext": {
+      "apk_path": "/system_ext/app/OSSettingsExt/OSSettingsExt.apk",
+      "version_code": "160000132"
+    },
+    "com.transsion.rro.com.transsion.overlaysuw.tr_region.x6852": {
+      "apk_path": "/tr_region/overlay/com_transsion_overlaysuw/X6852_overlay_com_transsion_overlaysuw.apk",
+      "version_code": "0"
+    },
+    "com.transsion.trproduct.overlaysuw.resoverlay": {
+      "apk_path": "/tr_region/app/OOBEConfigOverlay/OOBEConfigOverlay.apk",
+      "version_code": "35010101"
+    },
+    "com.android.bips": {
+      "apk_path": "/system/priv-app/BuiltInPrintService/BuiltInPrintService.apk",
+      "version_code": "36"
+    },
+    "com.google.android.ext.services": {
+      "apk_path": "/apex/com.android.extservices/priv-app/GoogleExtServices@361153320/GoogleExtServices.apk",
+      "version_code": "361153320"
+    },
+    "com.theme.icondefaultshape_h39": {
+      "apk_path": "/tr_product/app/IconDefaultShape_H39/IconDefaultShape_H39.apk",
+      "version_code": "1"
+    },
+    "com.transsion.gamespace.app.overlay": {
+      "apk_path": "/tr_product/overlay/GameSpace_infinix.apk",
+      "version_code": "30711014"
+    },
+    "com.android.hotwordenrollment.xgoogle": {
+      "apk_path": "/tr_product/priv-app/HotwordEnrollmentXGoogle/HotwordEnrollmentXGoogle.apk",
+      "version_code": "100"
+    },
+    "com.google.android.webview": {
+      "apk_path": "/tr_region/app/WebViewGoogle64/WebViewGoogle64.apk",
+      "version_code": "749919233"
+    },
+    "com.mediatek.cellbroadcastuiresoverlay": {
+      "apk_path": "/vendor/overlay/CellbroadcastUIResOverlay/CellbroadcastUIResOverlay.apk",
+      "version_code": "1"
+    },
+    "com.transsion.teop": {
+      "apk_path": "/product/app/TEOP/TEOP.apk",
+      "version_code": "163000130"
+    },
+    "com.autotest.factory_reset_stress": {
+      "apk_path": "/system_ext/app/FactoryReset/FactoryReset.apk",
+      "version_code": "11"
+    },
+    "com.sh.smart.caller": {
+      "apk_path": "/system_ext/priv-app/SmartCaller/SmartCaller.apk",
+      "version_code": "70300077"
+    },
+    "com.talpa.hibrowser": {
+      "apk_path": "/tr_region/operator/app/Hola/Hola.apk",
+      "version_code": "2261501"
+    },
+    "com.transsion.atomicbrain": {
+      "apk_path": "/system_ext/priv-app/TransAtomicBrain/TransAtomicBrain.apk",
+      "version_code": "163000030"
+    },
+    "com.google.android.overlay.gmsconfig.common": {
+      "apk_path": "/product/overlay/GmsConfigOverlayCommon.apk",
+      "version_code": "1"
+    },
+    "com.theme.icondefaultshape_a18": {
+      "apk_path": "/tr_product/app/IconDefaultShape_A18/IconDefaultShape_A18.apk",
+      "version_code": "1"
+    },
+    "com.transsion.magicfont": {
+      "apk_path": "/system_ext/priv-app/MagicFont/MagicFont.apk",
+      "version_code": "20005030"
+    },
+    "com.android.nfc": {
+      "apk_path": "/system_ext/priv-app/NfcNci/NfcNci.apk",
+      "version_code": "36"
+    },
+    "com.transsion.livewallpaper.starring": {
+      "apk_path": "/tr_product/priv-app/StarRingWallpaper/StarRingWallpaper.apk",
+      "version_code": "10016045"
+    },
+    "id.mjs.etalaseapp": {
+      "apk_path": "/tr_region/operator/app/EtalaseApps/EtalaseApps.apk",
+      "version_code": "4005"
+    },
+    "com.android.settings.intelligence": {
+      "apk_path": "/system_ext/app/TranSettingsIntelligence/TranSettingsIntelligence.apk",
+      "version_code": "160300009"
+    },
+    "com.transsion.wallet": {
+      "apk_path": "/system_ext/priv-app/TWallet/TWallet.apk",
+      "version_code": "60200312"
+    },
+    "com.android.calllogbackup": {
+      "apk_path": "/system/priv-app/CallLogBackup/CallLogBackup.apk",
+      "version_code": "36"
+    },
+    "com.mediatek.frameworkresoverlay": {
+      "apk_path": "/vendor/overlay/FrameworkResOverlay/FrameworkResOverlay.apk",
+      "version_code": "36"
+    },
+    "com.mediatek.mdmlsample": {
+      "apk_path": "/system_ext/app/MDMLSample/MDMLSample.apk",
+      "version_code": "36"
+    },
+    "com.transsion.microintelligence.overlay": {
+      "apk_path": "/tr_product/overlay/MicroIntelligence_infinix_full.apk",
+      "version_code": "160000162"
+    },
+    "com.transsionui": {
+      "apk_path": "/system_ext/framework/transsionui-res.apk",
+      "version_code": "36"
+    },
+    "com.mediatek.wifi.resources.overlay": {
+      "apk_path": "/vendor/overlay/WifiResOverlay/WifiResOverlay.apk",
+      "version_code": "1"
+    },
+    "com.transsion.zahooc": {
+      "apk_path": "/system_ext/priv-app/ZaHooc/ZaHooc.apk",
+      "version_code": "10603056"
+    },
+    "com.transsion.compass": {
+      "apk_path": "/tr_region/app/TranCompass/TranCompass.apk",
+      "version_code": "100040028"
+    },
+    "com.android.providers.contactkeys": {
+      "apk_path": "/system/priv-app/E2eeContactKeysProvider/E2eeContactKeysProvider.apk",
+      "version_code": "36"
+    },
+    "com.transsion.letswitch": {
+      "apk_path": "/system_ext/app/LetSwitchService/LetSwitchService.apk",
+      "version_code": "160100024"
+    },
+    "com.geniex.vsimhelper": {
+      "apk_path": "/system_ext/priv-app/SilverHelper_gotii/SilverHelper_gotii.apk",
+      "version_code": "5092"
+    },
+    "com.transsion.systemupdate": {
+      "apk_path": "/system_ext/app/SystemUpdate2.0/SystemUpdate2.0.apk",
+      "version_code": "160001049"
+    },
+    "com.transsion.camera": {
+      "apk_path": "/system_ext/app/TranssionCamera/TranssionCamera.apk",
+      "version_code": "140201336"
+    },
+    "com.android.providers.telephony": {
+      "apk_path": "/system/priv-app/MtkTelephonyProvider/MtkTelephonyProvider.apk",
+      "version_code": "36"
+    },
+    "com.transsion.intercom": {
+      "apk_path": "/tr_product/app/TranChat/TranChat.apk",
+      "version_code": "20004003"
+    },
+    "com.mediatek.networkstack.tethering.overlay": {
+      "apk_path": "/vendor/app/TetheringResOverlay/TetheringResOverlay.apk",
+      "version_code": "36"
+    },
+    "com.transsion.cloudserver": {
+      "apk_path": "/system_ext/priv-app/CloudServer/CloudServer.apk",
+      "version_code": "200003049"
+    },
+    "com.google.android.wifi.dialog": {
+      "apk_path": "/apex/com.android.wifi/app/WifiDialogGoogle@361153320/WifiDialogGoogle.apk",
+      "version_code": "36"
+    },
+    "com.transsion.systemserver": {
+      "apk_path": "/system_ext/priv-app/TranssApp/TranssApp.apk",
+      "version_code": "250928113"
+    },
+    "com.google.android.health.connect.backuprestore": {
+      "apk_path": "/apex/com.android.healthfitness/app/HealthConnectBackupRestoreGoogle@361153320/HealthConnectBackupRestoreGoogle.apk",
+      "version_code": "36"
+    },
+    "com.transsion.carlcare": {
+      "apk_path": "/tr_region/priv-app/Carlcare/Carlcare.apk",
+      "version_code": "3862"
+    },
+    "com.android.settings.tran.overlay": {
+      "apk_path": "/tr_product/overlay/TranSettings_Overlay_infinix.apk",
+      "version_code": "800300146"
+    },
+    "com.mediatek.networkstack.gooverlay": {
+      "apk_path": "/vendor/app/NetworkStackGoogleGoResOverlay/NetworkStackGoogleGoResOverlay.apk",
+      "version_code": "36"
+    },
+    "com.mediatek.atmwifimeta": {
+      "apk_path": "/system_ext/app/ATMWifiMeta/ATMWifiMeta.apk",
+      "version_code": "210100"
+    },
+    "com.android.inputdevices": {
+      "apk_path": "/system/priv-app/InputDevices/InputDevices.apk",
+      "version_code": "36"
+    },
+    "com.google.android.documentsui": {
+      "apk_path": "/system/priv-app/DocumentsUIGoogle/DocumentsUIGoogle.apk",
+      "version_code": "361153320"
+    },
+    "com.google.android.ext.shared": {
+      "apk_path": "/tr_region/app/GoogleExtShared/GoogleExtShared.apk",
+      "version_code": "1"
+    },
+    "com.transsion.livewallpaper.fake3d": {
+      "apk_path": "/tr_product/app/Fake3dWallpaper/Fake3dWallpaper.apk",
+      "version_code": "10016113"
+    },
+    "com.android.emergency": {
+      "apk_path": "/system_ext/priv-app/EmergencyInfoGms/EmergencyInfoGms.apk",
+      "version_code": "36"
+    },
+    "com.android.internal.systemui.navbar.threebutton": {
+      "apk_path": "/product/overlay/NavigationBarMode3Button/NavigationBarMode3ButtonOverlay.apk",
+      "version_code": "1"
+    },
+    "com.transsion.batterylab": {
+      "apk_path": "/system_ext/app/BatteryLab/BatteryLab.apk",
+      "version_code": "60300046"
+    },
+    "com.google.android.apps.nbu.files": {
+      "apk_path": "/tr_region/priv-app/FilesGoogle/FilesGoogle.apk",
+      "version_code": "1671723"
+    },
+    "com.facebook.system": {
+      "apk_path": "/tr_region/priv-app/MetaAppInstaller/MetaAppInstaller.apk",
+      "version_code": "884407272"
+    },
+    "com.android.traceur": {
+      "apk_path": "/system/app/Traceur/Traceur.apk",
+      "version_code": "2"
+    },
+    "com.android.certinstaller": {
+      "apk_path": "/system/app/CertInstaller/CertInstaller.apk",
+      "version_code": "36"
+    },
+    "com.transsion.kolun.aiservice": {
+      "apk_path": "/system_ext/priv-app/AppService/AppService.apk",
+      "version_code": "160300009"
+    },
+    "com.transsion.aftersalecalibrationtool": {
+      "apk_path": "/tr_product/app/AfterSaleCalibrationTool/AfterSaleCalibrationTool.apk",
+      "version_code": "10000023"
+    },
+    "com.android.server.telecom": {
+      "apk_path": "/system/priv-app/MtkTelecom/MtkTelecom.apk",
+      "version_code": "36"
+    },
+    "com.transsnet.store": {
+      "apk_path": "/tr_region/priv-app/AppCenter/Palmstore_9.3.6.115_V9306115_release_2026-0410-09-12-09_signed.apk",
+      "version_code": "9306115"
+    },
+    "com.google.android.apps.wellbeing": {
+      "apk_path": "/tr_region/priv-app/Wellbeing/Wellbeing.apk",
+      "version_code": "787857"
+    },
+    "com.mediatek.ygps": {
+      "apk_path": "/system_ext/app/YGPS/YGPS.apk",
+      "version_code": "2"
+    },
+    "com.transsion.theme": {
+      "apk_path": "/system_ext/app/TranssionTheme/TranssionTheme.apk",
+      "version_code": "160300043"
+    },
+    "com.transsion.resolver": {
+      "apk_path": "/system_ext/priv-app/TranResolver/TranResolver.apk",
+      "version_code": "160003025"
+    },
+    "com.google.android.permissioncontroller": {
+      "apk_path": "/apex/com.android.permission/priv-app/GooglePermissionController@361154140/GooglePermissionController.apk",
+      "version_code": "361154140"
+    },
+    "com.transsion.settings.wifi": {
+      "apk_path": "/system_ext/priv-app/TranSettingsWifiApk/TranSettingsWifiApk.apk",
+      "version_code": "30000253"
+    },
+    "com.google.android.appsearch.apk": {
+      "apk_path": "/apex/com.android.appsearch/priv-app/com.google.android.appsearch.apk@361153980/com.google.android.appsearch.apk.apk",
+      "version_code": "36"
+    },
+    "com.google.android.server.deviceconfig.resources": {
+      "apk_path": "/apex/com.android.configinfrastructure/app/DeviceConfigServiceResourcesGoogle@361153320/DeviceConfigServiceResourcesGoogle.apk",
+      "version_code": "1"
+    },
+    "com.android.carrierdefaultapp": {
+      "apk_path": "/system/app/CarrierDefaultApp/CarrierDefaultApp.apk",
+      "version_code": "36"
+    },
+    "com.transsnet.store.overlay": {
+      "apk_path": "/system_ext/overlay/AppCenter_overlay/AppCenter_overlay.apk",
+      "version_code": "1"
+    },
+    "com.trassion.infinix.xclub": {
+      "apk_path": "/tr_region/operator/app/XClub/XClub.apk",
+      "version_code": "808"
+    },
+    "com.android.theme.font.notoserifsource": {
+      "apk_path": "/product/overlay/FontNotoSerifSource/FontNotoSerifSourceOverlay.apk",
+      "version_code": "1"
+    },
+    "com.transsion.livewallpaper.custompictorial": {
+      "apk_path": "/tr_product/app/CusPictorialWallpaper/CusPictorialWallpaper.apk",
+      "version_code": "10016136"
+    },
+    "com.google.android.hotspot2.osulogin": {
+      "apk_path": "/apex/com.android.wifi/app/OsuLoginGoogle@361153320/OsuLoginGoogle.apk",
+      "version_code": "36"
+    },
+    "com.android.virtualization.terminal": {
+      "apk_path": "/apex/com.android.virt/priv-app/VmTerminalApp@BP2A.250605.031.A3/VmTerminalApp.apk",
+      "version_code": "36"
+    },
+    "com.transsion.mol": {
+      "apk_path": "/tr_product/app/MasterOfLanguage/MasterOfLanguage.apk",
+      "version_code": "30100073"
+    },
+    "com.android.internal.systemui.navbar.transparent": {
+      "apk_path": "/product/overlay/TransparentNavigationBar/TransparentNavigationBarOverlay.apk",
+      "version_code": "1"
+    },
+    "com.google.android.gms": {
+      "apk_path": "/tr_region/priv-app/GmsCore/GmsCore.apk",
+      "version_code": "260438035"
+    },
+    "com.transsion.airtransfer": {
+      "apk_path": "/tr_product/app/AirTransfer/AirTransfer.apk",
+      "version_code": "10201242"
+    },
+    "com.facebook.services": {
+      "apk_path": "/tr_region/priv-app/MetaServices/MetaServices.apk",
+      "version_code": "892936048"
+    },
+    "com.transsion.spacesaversdk": {
+      "apk_path": "/system_ext/app/SpaceSaver/SpaceSaver.apk",
+      "version_code": "160000034"
+    },
+    "com.debug.loggerui": {
+      "apk_path": "/system_ext/app/DebugLoggerUI/DebugLoggerUI.apk",
+      "version_code": "60000"
+    },
+    "com.android.location.fused": {
+      "apk_path": "/system/priv-app/FusedLocation/FusedLocation.apk",
+      "version_code": "36"
+    },
+    "com.mediatek.ims": {
+      "apk_path": "/system_ext/priv-app/ImsService/ImsService.apk",
+      "version_code": "36"
+    },
+    "cn.wps.moffice_eng": {
+      "apk_path": "/tr_region/operator/app/WPSOffice/WPSOffice.apk",
+      "version_code": "1537"
+    },
+    "com.android.dreams.basic": {
+      "apk_path": "/system/app/BasicDreams/BasicDreams.apk",
+      "version_code": "36"
+    },
+    "android": {
+      "apk_path": "/system/framework/framework-res.apk",
+      "version_code": "36"
+    },
+    "com.transsion.aod.overlay": {
+      "apk_path": "/tr_product/overlay/overlay-infinix-release-unsigned.apk",
+      "version_code": "160200001"
+    },
+    "com.transsion.trancare": {
+      "apk_path": "/system_ext/priv-app/Trancare/Trancare.apk",
+      "version_code": "260421001"
+    },
+    "com.google.android.overlay.modules.healthfitness.forframework": {
+      "apk_path": "/product/overlay/GoogleHealthFitnessFrameworkOverlay.apk",
+      "version_code": "1"
+    },
+    "com.google.android.inputmethod.latin": {
+      "apk_path": "/tr_region/app/LatinImeGoogle/LatinImeGoogle.apk",
+      "version_code": "175587354"
+    },
+    "com.android.egg": {
+      "apk_path": "/system/app/EasterEgg/EasterEgg.apk",
+      "version_code": "12"
+    },
+    "com.mediatek.networkstack.nongooverlay": {
+      "apk_path": "/vendor/app/NetworkStackGoogleResOverlay/NetworkStackGoogleResOverlay.apk",
+      "version_code": "36"
+    },
+    "com.transsion.thunderback": {
+      "apk_path": "/system_ext/app/TranThunderback/TranThunderback.apk",
+      "version_code": "70000017"
+    },
+    "com.transsion.sk": {
+      "apk_path": "/system_ext/app/SecureKeyboard/SecureKeyboard.apk",
+      "version_code": "20002073"
+    },
+    "com.google.android.overlay.devicelockcontroller": {
+      "apk_path": "/product/overlay/GoogleDeviceLockControllerOverlay.apk",
+      "version_code": "1"
+    },
+    "com.transsion.plat.appupdate": {
+      "apk_path": "/system_ext/priv-app/AppUpdate/AppUpdate.apk",
+      "version_code": "500013"
+    },
+    "com.google.android.cellbroadcastreceiver": {
+      "apk_path": "/apex/com.android.cellbroadcast/priv-app/GoogleCellBroadcastApp@361153320/GoogleCellBroadcastApp.apk",
+      "version_code": "300000000"
+    },
+    "com.transsion.globalsearch": {
+      "apk_path": "/system_ext/priv-app/GlobalSearch/GlobalSearch.apk",
+      "version_code": "20203004"
+    },
+    "com.google.mainline.adservices": {
+      "apk_path": "/product/app/com.google.mainline.adservices/com.google.mainline.adservices.apk",
+      "version_code": "361141100"
+    },
+    "com.android.shell": {
+      "apk_path": "/system/priv-app/Shell/Shell.apk",
+      "version_code": "36"
+    },
+    "com.google.android.apps.restore": {
+      "apk_path": "/tr_region/priv-app/GoogleRestore/GoogleRestore.apk",
+      "version_code": "927098"
+    },
+    "com.facemoji.lite.transsion": {
+      "apk_path": "/tr_region/app/EmojiKeyboard/EmojiKeyboard.apk",
+      "version_code": "593"
+    },
+    "com.google.android.syncadapters.calendar": {
+      "apk_path": "/tr_region/app/GoogleCalendarSyncAdapter/GoogleCalendarSyncAdapter.apk",
+      "version_code": "2017706991"
+    },
+    "com.shopee.ph": {
+      "apk_path": "/tr_region/operator/app/Shopee/Shopee.apk",
+      "version_code": "35836"
+    },
+    "com.google.android.captiveportallogin": {
+      "apk_path": "/system/app/CaptivePortalLoginGoogle/CaptivePortalLoginGoogle.apk",
+      "version_code": "361153880"
+    },
+    "com.zhiliaoapp.musically": {
+      "apk_path": "/tr_region/operator/app/TikTokzhiliao/TikTokzhiliao.apk",
+      "version_code": "2024003000"
+    },
+    "com.transsion.calendar": {
+      "apk_path": "/data/app/~~SErP57-iQ4b4bX50swS65w==/com.transsion.calendar--_mgUV8frPQj47ESZrJd7g==/base.apk",
+      "version_code": "160300067"
+    },
+    "com.mediatek.deviceaswebcam.overlay": {
+      "apk_path": "/vendor/overlay/DeviceAsWebcamOverlay/DeviceAsWebcamOverlay.apk",
+      "version_code": "36"
+    },
+    "com.google.android.ondevicepersonalization.services": {
+      "apk_path": "/apex/com.android.ondevicepersonalization/priv-app/OnDevicePersonalizationGoogle@361153320/OnDevicePersonalizationGoogle.apk",
+      "version_code": "361099999"
+    },
+    "com.android.providers.contacts": {
+      "apk_path": "/system/priv-app/MtkContactsProvider/MtkContactsProvider.apk",
+      "version_code": "36"
+    },
+    "com.transsion.phonemanager": {
+      "apk_path": "/system_ext/app/HiManager/HiManager.apk",
+      "version_code": "3039"
+    },
+    "com.google.android.gm": {
+      "apk_path": "/tr_region/app/Gmail2/Gmail2.apk",
+      "version_code": "65512427"
+    },
+    "com.google.android.gms.supervision": {
+      "apk_path": "/tr_region/priv-app/FamilyLinkParentalControls/FamilyLinkParentalControls.apk",
+      "version_code": "80206"
+    },
+    "com.android.wallpaperbackup": {
+      "apk_path": "/system/app/WallpaperBackup/WallpaperBackup.apk",
+      "version_code": "36"
+    },
+    "com.mediatek.simprocessor": {
+      "apk_path": "/system_ext/priv-app/SimProcessor/SimProcessor.apk",
+      "version_code": "36"
+    },
+    "com.android.vpndialogs": {
+      "apk_path": "/system/priv-app/VpnDialogs/VpnDialogs.apk",
+      "version_code": "36"
+    },
+    "com.transsion.usf": {
+      "apk_path": "/system_ext/priv-app/UsfApp/UsfApp.apk",
+      "version_code": "251124001"
+    },
+    "com.transsion.healthlife": {
+      "apk_path": "/tr_product/app/Health/Health.apk",
+      "version_code": "50000127"
+    },
+    "com.mediatek.networkstack.tethering.googleoverlay": {
+      "apk_path": "/vendor/app/TetheringGoogleResOverlay/TetheringGoogleResOverlay.apk",
+      "version_code": "36"
+    },
+    "com.transsion.aiwallpaper": {
+      "apk_path": "/tr_product/app/AIwallpaper/AIwallpaper.apk",
+      "version_code": "30100026"
+    },
+    "com.transsion.notebook": {
+      "apk_path": "/system_ext/app/TranssionNotes/TranssionNotes.apk",
+      "version_code": "20930078"
+    },
+    "com.transsion.spld": {
+      "apk_path": "/system_ext/app/TranDaemonApp/TranDaemonApp.apk",
+      "version_code": "10000002"
+    },
+    "com.android.apps.tag": {
+      "apk_path": "/system_ext/priv-app/Tag/Tag.apk",
+      "version_code": "101"
+    },
+    "com.sh.smart.caller.overlay": {
+      "apk_path": "/tr_product/overlay/SmartCallerProOverlay_infinix.apk",
+      "version_code": "1"
+    },
+    "com.mediatek.wifi.system.resources.overlay": {
+      "apk_path": "/product/overlay/WifiSystemResOverlay/WifiSystemResOverlay.apk",
+      "version_code": "1"
+    },
+    "com.android.systemui.os.overlay": {
+      "apk_path": "/system_ext/overlay/SystemUIOverlay.apk",
+      "version_code": "1"
+    },
+    "com.hoffnung": {
+      "apk_path": "/system_ext/app/Hoffnung/Hoffnung.apk",
+      "version_code": "60004270"
+    },
+    "com.android.connectivity.resources.overlay": {
+      "apk_path": "/vendor/overlay/ConnectivityResOverlay/ConnectivityResOverlay.apk",
+      "version_code": "36"
+    },
+    "android.autoinstalls.config.transsion.device": {
+      "apk_path": "/tr_region/app/PlayAutoInstall/PlayAutoInstall.apk",
+      "version_code": "1"
+    },
+    "com.google.android.setupwizard": {
+      "apk_path": "/tr_region/priv-app/SetupWizard/SetupWizard.apk",
+      "version_code": "40439"
+    },
+    "com.android.internal.systemui.navbar.gestural": {
+      "apk_path": "/product/overlay/NavigationBarModeGestural/NavigationBarModeGesturalOverlay.apk",
+      "version_code": "1"
+    },
+    "com.android.systemui.accessibility.accessibilitymenu": {
+      "apk_path": "/system_ext/app/TranAccessibilityMenu/TranAccessibilityMenu.apk",
+      "version_code": "160200006"
+    },
+    "com.transsion.screenrecorder": {
+      "apk_path": "/system_ext/app/TranScreenRecord/TranScreenRecord.apk",
+      "version_code": "1603000020"
+    },
+    "com.google.android.cellbroadcastservice": {
+      "apk_path": "/apex/com.android.cellbroadcast/priv-app/GoogleCellBroadcastServiceModule@361153320/GoogleCellBroadcastServiceModule.apk",
+      "version_code": "300000000"
+    },
+    "cn.wps.moffice.lite.abroad.transsion": {
+      "apk_path": "/tr_region/operator/app/FileViewer/FileViewer.apk",
+      "version_code": "142"
+    },
+    "com.android.customization.themes": {
+      "apk_path": "/product/app/ThemesStub/ThemesStub.apk",
+      "version_code": "1"
+    },
+    "com.infinix.xpark": {
+      "apk_path": "/tr_region/operator/app/XPARK/XPARK.apk",
+      "version_code": "22235"
+    },
+    "com.android.localtransport": {
+      "apk_path": "/system/priv-app/LocalTransport/LocalTransport.apk",
+      "version_code": "36"
+    },
+    "com.afmobi.boomplayer": {
+      "apk_path": "/tr_region/operator/app/Boomplay/Boomplay.apk",
+      "version_code": "7574"
+    },
+    "com.facebook.appmanager": {
+      "apk_path": "/tr_region/app/MetaAppManager/MetaAppManager.apk",
+      "version_code": "884408326"
+    },
+    "com.android.providers.blockednumber": {
+      "apk_path": "/system/priv-app/BlockedNumberProvider/BlockedNumberProvider.apk",
+      "version_code": "36"
+    },
+    "com.google.android.overlay.gmsconfig.gsa": {
+      "apk_path": "/product/overlay/GmsConfigOverlayGSA.apk",
+      "version_code": "1"
+    },
+    "com.transsion.scanningrecharger": {
+      "apk_path": "/system_ext/app/SmartScan/SmartScan.apk",
+      "version_code": "40000199"
+    },
+    "com.android.musicfx": {
+      "apk_path": "/system/priv-app/MusicFX/MusicFX.apk",
+      "version_code": "10400"
+    },
+    "com.android.internal.display.cutout.emulation.waterfall": {
+      "apk_path": "/product/overlay/DisplayCutoutEmulationWaterfall/DisplayCutoutEmulationWaterfallOverlay.apk",
+      "version_code": "1"
+    },
+    "com.transsion.aod": {
+      "apk_path": "/system_ext/priv-app/TranAodApk/TranAodApk.apk",
+      "version_code": "160300040"
+    },
+    "com.mediatek.networkstack.overlay": {
+      "apk_path": "/vendor/app/NetworkStackResOverlay/NetworkStackResOverlay.apk",
+      "version_code": "36"
+    },
+    "com.android.providers.partnerbookmarks": {
+      "apk_path": "/system/app/PartnerBookmarksProvider/PartnerBookmarksProvider.apk",
+      "version_code": "36"
+    },
+    "com.google.android.devicelockcontroller": {
+      "apk_path": "/apex/com.android.devicelock/priv-app/DeviceLockControllerGoogle@343201000/DeviceLockControllerGoogle.apk",
+      "version_code": "35"
+    },
+    "com.google.android.uwb.resources": {
+      "apk_path": "/apex/com.android.uwb/priv-app/ServiceUwbResourcesGoogle@361153840/ServiceUwbResourcesGoogle.apk",
+      "version_code": "1"
+    },
+    "com.transsion.iotservice": {
+      "apk_path": "/system_ext/app/WelinkService/WelinkService.apk",
+      "version_code": "160003127"
+    },
+    "com.mediatek.MtkTelephonyServiceResOverlay": {
+      "apk_path": "/vendor/overlay/MtkTelephonyServiceResOverlay/MtkTelephonyServiceResOverlay.apk",
+      "version_code": "36"
+    },
+    "com.google.android.as": {
+      "apk_path": "/tr_region/priv-app/AndroidSystemIntelligence/AndroidSystemIntelligence.apk",
+      "version_code": "14834247"
+    },
+    "com.transtech.gotii": {
+      "apk_path": "/tr_region/operator/app/Roaming/Roaming.apk",
+      "version_code": "550"
+    },
+    "com.transsion.livewallpaper.onetakevideo": {
+      "apk_path": "/tr_product/priv-app/DynamicWallpaper/DynamicWallpaper.apk",
+      "version_code": "20016053"
+    },
+    "com.transsion.rro.framework_res.tr_product.x6852": {
+      "apk_path": "/tr_product/overlay/android/X6852_overlay_android.apk",
+      "version_code": "0"
+    },
+    "com.transsion.livewallpaper.sunpointer": {
+      "apk_path": "/tr_product/app/SunPointWallPaper/SunPointWallPaper.apk",
+      "version_code": "10016030"
+    },
+    "com.google.android.federatedcompute": {
+      "apk_path": "/apex/com.android.ondevicepersonalization/app/FederatedComputeGoogle@361153320/FederatedComputeGoogle.apk",
+      "version_code": "361099999"
+    },
+    "com.android.settings": {
+      "apk_path": "/system_ext/priv-app/TranSettings/TranSettings.apk",
+      "version_code": "800300146"
+    },
+    "com.transsion.filemanagerx": {
+      "apk_path": "/system_ext/app/OSFileManager/OSFileManager.apk",
+      "version_code": "30320128"
+    },
+    "com.android.carrierconfig": {
+      "apk_path": "/system_ext/priv-app/TranCarrierConfigApp/TranCarrierConfigApp.apk",
+      "version_code": "1"
+    },
+    "com.transsion.aiwriting": {
+      "apk_path": "/system_ext/app/AiWriting/AiWriting.apk",
+      "version_code": "160000108"
+    },
+    "com.android.pacprocessor": {
+      "apk_path": "/system/app/PacProcessor/PacProcessor.apk",
+      "version_code": "36"
+    },
+    "com.ss.android.ugc.trill": {
+      "apk_path": "/tr_region/operator/app/TikTok/TikTok.apk",
+      "version_code": "400300"
+    },
+    "com.android.avatarpicker": {
+      "apk_path": "/system_ext/priv-app/AvatarPicker/AvatarPicker.apk",
+      "version_code": "36"
+    },
+    "com.transsion.fmradio": {
+      "apk_path": "/system_ext/app/TranssionFMRadio/TranssionFMRadio.apk",
+      "version_code": "160001085"
+    },
+    "com.xui.xhide": {
+      "apk_path": "/system_ext/app/XHide/XHide.apk",
+      "version_code": "40603203"
+    },
+    "com.android.imsserviceentitlement": {
+      "apk_path": "/product/priv-app/ImsServiceEntitlement/ImsServiceEntitlement.apk",
+      "version_code": "36"
+    },
+    "com.android.bluetoothmidiservice": {
+      "apk_path": "/system/app/BluetoothMidiService/BluetoothMidiService.apk",
+      "version_code": "36"
+    },
+    "com.transsion.dualapp": {
+      "apk_path": "/product/app/DualApp/DualApp.apk",
+      "version_code": "10005086"
+    },
+    "com.mediatek.gbaservice": {
+      "apk_path": "/system_ext/priv-app/MtkGbaService/MtkGbaService.apk",
+      "version_code": "36"
+    },
+    "com.google.android.configupdater": {
+      "apk_path": "/tr_region/priv-app/ConfigUpdater/ConfigUpdater.apk",
+      "version_code": "36"
+    },
+    "com.transsion.thub.res": {
+      "apk_path": "/system/framework/thub-res.apk",
+      "version_code": "36"
+    },
+    "com.android.sharedstoragebackup": {
+      "apk_path": "/system/priv-app/SharedStorageBackup/SharedStorageBackup.apk",
+      "version_code": "36"
+    },
+    "com.android.intentresolver": {
+      "apk_path": "/system/priv-app/IntentResolver/IntentResolver.apk",
+      "version_code": "0"
+    },
+    "com.transsion.calculator": {
+      "apk_path": "/system_ext/app/TranssionCalculator/TranssionCalculator.apk",
+      "version_code": "163002126"
+    },
+    "com.google.android.overlay.modules.documentsui": {
+      "apk_path": "/product/overlay/GoogleDocumentsUIOverlay.apk",
+      "version_code": "1"
+    },
+    "com.android.managedprovisioning": {
+      "apk_path": "/system/priv-app/ManagedProvisioning/ManagedProvisioning.apk",
+      "version_code": "36"
+    },
+    "com.google.android.apps.maps": {
+      "apk_path": "/tr_region/app/Maps/Maps.apk",
+      "version_code": "1068404646"
+    },
+    "com.transsion.screencapture": {
+      "apk_path": "/system_ext/app/TranScreenshot/TranScreenshot.apk",
+      "version_code": "1603000029"
+    },
+    "com.transsion.rro.net.bat.store.tr_product.x6852": {
+      "apk_path": "/tr_product/overlay/net_bat_store/X6852_overlay_net_bat_store.apk",
+      "version_code": "0"
+    },
+    "com.transsion.kolun.assistant": {
+      "apk_path": "/system_ext/app/SmartAssistant/SmartAssistant.apk",
+      "version_code": "60000032"
+    },
+    "com.google.android.overlay.modules.permissioncontroller": {
+      "apk_path": "/tr_product/overlay/TranGooglePermissionControllerOverlay.apk",
+      "version_code": "1"
+    },
+    "com.mediatek.location.mtkgeofence": {
+      "apk_path": "/system_ext/priv-app/GeofenceService/GeofenceService.apk",
+      "version_code": "36"
+    },
+    "com.mediatek.mdmconfig": {
+      "apk_path": "/system_ext/app/MDMConfig/MDMConfig.apk",
+      "version_code": "36"
+    },
+    "com.transsion.smartmessage": {
+      "apk_path": "/product/app/SmartMessage/SmartMessage.apk",
+      "version_code": "163000037"
+    },
+    "com.google.android.networkstack.tethering": {
+      "apk_path": "/apex/com.android.tethering/priv-app/TetheringGoogle@361153320/TetheringGoogle.apk",
+      "version_code": "36"
+    },
+    "com.android.se": {
+      "apk_path": "/system/app/SecureElement/SecureElement.apk",
+      "version_code": "36"
+    },
+    "com.google.android.apps.tachyon": {
+      "apk_path": "/tr_region/app/Meet/Meet.apk",
+      "version_code": "6856553"
+    },
+    "com.google.android.gms.location.history": {
+      "apk_path": "/tr_region/app/GoogleLocationHistory/GoogleLocationHistory.apk",
+      "version_code": "3"
+    },
+    "com.google.android.youtube": {
+      "apk_path": "/tr_region/app/YouTube/YouTube.apk",
+      "version_code": "1560798656"
+    },
+    "com.transsion.smartmessage.app.overlay": {
+      "apk_path": "/tr_product/overlay/SmartMessage_Overlay__infinix.apk",
+      "version_code": "1"
+    },
+    "com.transsion.magicshow": {
+      "apk_path": "/tr_region/app/VishaPlayer/VishaPlayer.apk",
+      "version_code": "72929"
+    },
+    "com.android.systemui.signal.overlay": {
+      "apk_path": "/tr_product/overlay/SystemUIFiveSignalOverlay.apk",
+      "version_code": "160300089"
+    },
+    "com.android.providers.settings": {
+      "apk_path": "/system_ext/priv-app/MtkSettingsProvider/MtkSettingsProvider.apk",
+      "version_code": "36"
+    },
+    "com.mediatek.MtkSettingsResOverlay": {
+      "apk_path": "/vendor/overlay/MtkSettingsResOverlay/MtkSettingsResOverlay.apk",
+      "version_code": "36"
+    }
+  }
+}

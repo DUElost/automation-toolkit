@@ -92,3 +92,5 @@ nul
 .runtime/
 .worktrees/
 tmp_*.json
+windows-scheduler/tasks/
+windows-scheduler/logs/
