@@ -94,3 +94,4 @@ nul
 tmp_*.json
 windows-scheduler/tasks/
 windows-scheduler/logs/
+windows-scheduler/runtime/

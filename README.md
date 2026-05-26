@@ -20,6 +20,7 @@ automation-toolkit/
 │   └── universal_Factory-Reset/          # 通用恢复出厂设置
 ├── macos-tools/                           # macOS 专属工具
 │   └── system_Task-Scheduler/            # launchd 定时任务管理器
+├── windows-scheduler/                     # Windows 定时任务管理器
 ├── android-tools/                         # Android 工具集（规划中）
 ├── java-platforms/                        # Java 平台（规划中）
 ├── node-scripts/                          # Node.js 脚本（规划中）
@@ -51,6 +52,12 @@ automation-toolkit/
 |---------|------|
 | [system_Task-Scheduler](macos-tools/system_Task-Scheduler/) | launchd 定时任务管理器 |
 
+### Windows 工具
+
+| 工具名称 | 说明 |
+|---------|------|
+| [windows-scheduler](windows-scheduler/) | 任务计划程序定时任务管理器 |
+
 ## 快速开始
 
 ### macOS 定时任务
@@ -66,7 +73,18 @@ brew install terminal-notifier
 taskmgr add mytask
 ```
 
-### Windows
+### Windows 定时任务
+
+```powershell
+cd D:\Tinno_auto\automation-toolkit
+
+# 交互式创建（与 macOS 相同用法）
+taskmgr add mytask
+taskmgr list
+taskmgr start mytask
+```
+
+### Windows Python 工具
 
 ```powershell
 cd python-tools\performance_SMT_ResultFiller
