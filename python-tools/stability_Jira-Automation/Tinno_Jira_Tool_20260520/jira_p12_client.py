@@ -107,23 +107,7 @@ class JiraP12Client:
         if self._try_cookie_auth():
             return
 
-        logger.info("使用账号 %s 登录Jira ...", self.jira_username)
-        login_data = {"username": self.jira_username, "password": self.jira_password}
-        headers = {"Content-Type": "application/json", "X-Atlassian-Token": "no-check"}
-        resp = self.session.post(
-            urljoin(self.jira_url, "/rest/auth/1/session"),
-            json=login_data,
-            headers=headers,
-            timeout=self.timeout,
-            verify=self.verify,
-        )
-        if resp.status_code == 200:
-            self.is_logged_in = True
-            self.auth_mode = "rest"
-            logger.info("Jira REST 登录成功")
-            return
-
-        logger.warning("Jira session 登录失败，尝试回退到 Basic Auth: status=%s", resp.status_code)
+        logger.info("使用账号 %s Basic Auth 登录Jira ...", self.jira_username)
         self.session.auth = HTTPBasicAuth(self.jira_username, self.jira_password)
         verify_resp = self.session.get(
             urljoin(self.jira_url, "/rest/api/2/myself"),
@@ -133,13 +117,13 @@ class JiraP12Client:
         if self._response_has_json(verify_resp):
             self.is_logged_in = True
             self.auth_mode = "basic"
-            logger.info("Jira Basic Auth 回退成功")
+            logger.info("Jira Basic Auth 登录成功")
             return
 
         if self._try_cookie_auth():
             return
 
-        raise RuntimeError(f"Jira登录失败, status={resp.status_code}, body={resp.text}")
+        raise RuntimeError(f"Jira登录失败, status={verify_resp.status_code}, body={verify_resp.text}")
 
     # ------------------------------------------------------------------
     def create_issue(self, fields: Dict[str, Any]) -> Dict[str, Any]:

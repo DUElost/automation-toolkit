@@ -157,8 +157,6 @@ class JiraP12ClientLegacySSLTest(unittest.TestCase):
         )
         client.session = mock.Mock()
         client.session.cookies = mock.Mock()
-        client.session.post.return_value.status_code = 401
-        client.session.post.return_value.text = '{"errorMessages":["Login failed"]}'
 
         invalid_cookie_probe = mock.Mock()
         invalid_cookie_probe.status_code = 401
@@ -177,7 +175,7 @@ class JiraP12ClientLegacySSLTest(unittest.TestCase):
         client.login()
 
         self.assertEqual("basic", client.auth_mode)
-        client.session.post.assert_called_once()
+        client.session.post.assert_not_called()
 
     def test_login_does_not_treat_html_200_basic_auth_probe_as_success(self) -> None:
         client = JiraP12Client(
