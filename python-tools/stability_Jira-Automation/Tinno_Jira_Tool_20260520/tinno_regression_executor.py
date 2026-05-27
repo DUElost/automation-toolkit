@@ -8,6 +8,7 @@ from typing import Any, Mapping
 
 OPEN_LIKE_STATUSES = {"Open", "开放", "Reopened", "重新打开", "处理中", "In Progress"}
 WONT_FIX_RESOLUTIONS = {"问题不修改", "非问题", "Won't Fix", "Won't Do", "不解决"}
+DUPLICATE_RESOLUTIONS = {"重复问题", "Duplicate"}
 RESOLVED_STATUSES = {"Resolved", "已解决", "Verified"}
 RESOLVED_FIXED_RESOLUTION = "完成"
 CLOSED_STATUSES = {"Closed", "已关闭", "已关单"}
@@ -75,6 +76,10 @@ def _is_open_like(status: str) -> bool:
 
 def _is_wont_fix(resolution: str) -> bool:
     return resolution in WONT_FIX_RESOLUTIONS
+
+
+def _is_duplicate_resolution(resolution: str) -> bool:
+    return resolution in DUPLICATE_RESOLUTIONS
 
 
 def _is_closed(status: str) -> bool:
@@ -172,6 +177,22 @@ def decide_action(
             update_jira=False,
             manual_review=False,
             comment_required=True,
+        )
+
+    if _is_duplicate_resolution(resolution):
+        current_version_text = _normalize_text(current_version)
+        if build_version and current_version_text and _compare_versions(current_version_text, build_version) > 0:
+            return ActionDecision(
+                action="DUPLICATE_COMMENT",
+                update_jira=False,
+                manual_review=False,
+                comment_required=True,
+            )
+        return ActionDecision(
+            action="DUPLICATE_KEEP",
+            update_jira=False,
+            manual_review=False,
+            comment_required=False,
         )
 
     if _is_closed(status):

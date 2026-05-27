@@ -162,6 +162,42 @@ class TinnoRegressionExecutorTest(unittest.TestCase):
 
         self.assertEqual("RESOLVED_FIXED_WAIT_NEW_VERSION", decision.action)
 
+    def test_duplicate_resolution_comments_when_current_version_is_newer_than_history_build(self) -> None:
+        decision = executor.decide_action(
+            current_row={"project": "VFFCA"},
+            history={
+                "status": "Resolved",
+                "resolution": "重复问题",
+                "build_version": "MLD-LX2-16-260518V3",
+                "affect_project": "VFFCA",
+            },
+            current_version="MLD-LX2-16-260523V6",
+            strict_version_project_keys=["VFFCA"],
+        )
+
+        self.assertEqual("DUPLICATE_COMMENT", decision.action)
+        self.assertFalse(decision.update_jira)
+        self.assertTrue(decision.comment_required)
+        self.assertFalse(decision.recreate_issue)
+
+    def test_duplicate_resolution_does_not_recreate_when_current_version_not_newer_than_history_build(self) -> None:
+        decision = executor.decide_action(
+            current_row={"project": "VFFCA"},
+            history={
+                "status": "Resolved",
+                "resolution": "重复问题",
+                "build_version": "MLD-LX2-16-260518V3",
+                "affect_project": "VFFCA",
+            },
+            current_version="MLD-LX2-16-260518V3",
+            strict_version_project_keys=["VFFCA"],
+        )
+
+        self.assertEqual("DUPLICATE_KEEP", decision.action)
+        self.assertFalse(decision.update_jira)
+        self.assertFalse(decision.comment_required)
+        self.assertFalse(decision.recreate_issue)
+
     def test_regression_pass_skip_when_build_version_missing_for_vffca(self) -> None:
         decision = executor.evaluate_regression_pass(
             pass_count=0,

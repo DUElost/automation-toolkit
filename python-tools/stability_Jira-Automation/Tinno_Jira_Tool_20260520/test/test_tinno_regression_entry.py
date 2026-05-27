@@ -80,6 +80,35 @@ class TinnoRegressionEntryTest(unittest.TestCase):
         self.assertEqual("V551A-15-250905V60", regression_row["build_version"])
         self.assertEqual("V551A-15-250905V60", regression_row["current_version"])
         self.assertEqual("Java (JE)", regression_row["exp_class"])
+        self.assertEqual("MonkeyAEE", regression_row["specialty"])
+
+    def test_find_regression_match_filters_cross_specialty_history_rows(self) -> None:
+        matching_rules = SimpleNamespace(
+            required_exact_fields=["affect_project", "environment", "exp_class"],
+            cause_similarity_threshold=0.9,
+        )
+        current_row = {
+            "summary": "[自动化][V552AA][Total Number 1][MLD-LX2-16-260518V3][开关机][Java (JE)]system_server发生Java (JE)",
+            "specialty": "开关机",
+            "affect_project": "VFFCA",
+            "environment": "*Package:* system_server",
+            "exp_class": "Java (JE)",
+            "caused_by": "java.lang.RuntimeException: crash",
+        }
+        snapshot_rows = [
+            {
+                "jira_key": "VFFCA-100",
+                "summary": "[自动化][V552AA][Total Number 1][MLD-LX2-16-260518V3][休眠唤醒][Java (JE)]system_server发生Java (JE)",
+                "affect_project": "VFFCA",
+                "environment": "*Package:* system_server",
+                "exp_class": "Java (JE)",
+                "caused_by": "java.lang.RuntimeException: crash",
+            }
+        ]
+
+        matched = self.module.find_regression_match(current_row, snapshot_rows, matching_rules)
+
+        self.assertIsNone(matched)
 
     def test_build_regression_pass_comment_uses_structured_template_for_tinno(self) -> None:
         comment = self.module.build_regression_pass_comment(

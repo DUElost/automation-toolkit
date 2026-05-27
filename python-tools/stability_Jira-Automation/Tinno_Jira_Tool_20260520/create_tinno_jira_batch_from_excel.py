@@ -690,10 +690,20 @@ def extract_specialty_from_summary(summary: Any) -> str:
     return _extract_summary_test_case(summary)
 
 
+def extract_specialty_from_row(row: Any) -> str:
+    specialty = str(getattr(row, "get", lambda *_args, **_kwargs: "")("specialty") or "").strip()
+    if specialty:
+        return specialty
+    specialty = extract_specialty_from_summary(find_first_value(row, "summary", ""))
+    if specialty:
+        return specialty
+    return str(find_first_value(row, "test_case", "") or "").strip()
+
+
 def collect_batch_specialties(df: pd.DataFrame, defaults: Dict[str, Any]) -> set[str]:
     specialties: set[str] = set()
     for _, row in df.iterrows():
-        specialty = extract_specialty_from_summary(find_first_value(row, "summary", ""))
+        specialty = extract_specialty_from_row(row)
         if not specialty:
             specialty = resolve_regression_specialty(find_first_value(row, "test_case", ""), defaults)
         if specialty:
@@ -775,6 +785,9 @@ def build_regression_row(row: Any, defaults: Dict[str, Any]) -> Dict[str, Any]:
     if not exp_class:
         exp_class = _extract_exp_class_from_environment(environment) or _extract_summary_exp_class(summary)
     current_version = select_current_version(version_items)
+    specialty = extract_specialty_from_summary(summary)
+    if not specialty:
+        specialty = resolve_regression_specialty(find_first_value(row, "test_case", ""), defaults)
 
     return {
         "summary": summary,
@@ -789,6 +802,7 @@ def build_regression_row(row: Any, defaults: Dict[str, Any]) -> Dict[str, Any]:
         "versions": version_items,
         "build_version": current_version,
         "current_version": current_version,
+        "specialty": specialty,
     }
 
 
@@ -834,9 +848,14 @@ def _extract_sort_timestamps(row: Dict[str, Any]) -> Tuple[datetime | None, date
 def find_regression_match(current_row: Dict[str, Any], snapshot_rows: List[Dict[str, Any]], matching_rules: Any) -> Dict[str, Any] | None:
     threshold = getattr(matching_rules, "cause_similarity_threshold", 0.9)
     exact_fields = getattr(matching_rules, "required_exact_fields", None)
+    current_specialty = extract_specialty_from_row(current_row)
     candidates = [
         history_row
         for history_row in snapshot_rows
+        if (
+            not current_specialty
+            or extract_specialty_from_row(history_row) == current_specialty
+        )
         if is_strong_match(current_row, history_row, threshold, exact_fields=exact_fields)
     ]
     if not candidates:
@@ -989,7 +1008,7 @@ def build_history_issue_main_comment(
             app_version = normalized_candidate.split(" ", 1)[1].strip() or "/"
             break
 
-    if action == "OPEN_LIKE_UPDATE":
+    if action in {"OPEN_LIKE_UPDATE", "DUPLICATE_COMMENT"}:
         remark = f"自动化回归命中历史单 {history_key}，当前版本 {current_version} 再次复现，请继续跟进。"
     elif action == "WONT_FIX_KEEP":
         remark = f"自动化回归再次命中历史单 {history_key}，当前版本 {current_version} 继续复现，请重新关注评估。"
@@ -1977,7 +1996,7 @@ def execute_decision(
                     "ps_comment_status": ps_comment_status,
                 }
 
-            if action in {"WONT_FIX_KEEP", "RESOLVED_FIXED_WAIT_NEW_VERSION"}:
+            if action in {"WONT_FIX_KEEP", "RESOLVED_FIXED_WAIT_NEW_VERSION", "DUPLICATE_COMMENT", "DUPLICATE_KEEP"}:
                 comment_status = ""
                 ps_comment_status = ""
                 if getattr(decision, "comment_required", False):

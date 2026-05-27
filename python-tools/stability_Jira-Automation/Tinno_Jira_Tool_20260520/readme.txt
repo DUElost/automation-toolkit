@@ -107,6 +107,16 @@ python ".\create_tinno_jira_batch_from_excel.py" `
   --create-only
 ```
 
+第二阶段：真实建单并把 `PS` 列追加为评论
+
+```powershell
+python ".\create_tinno_jira_batch_from_excel.py" `
+  --add-excel-file ".\result\JIRA_Upload_List_Tinno_xxx.xlsx" `
+  --jira-cookie-jsessionid "<JSESSIONID>" `
+  --jira-cookie-xsrf-token "<XSRF_TOKEN>" `
+  --add-comments
+```
+
 第二阶段：全功能真实 dry-run
 
 ```powershell
@@ -116,6 +126,18 @@ python ".\create_tinno_jira_batch_from_excel.py" `
   --jira-cookie-xsrf-token "<XSRF_TOKEN>" `
   --dry-run
 ```
+
+备注说明：
+
+- `--add-comments`
+  - 仅在真实执行时生效
+  - 新建问题单成功后，会把 Excel 中 `PS` 列追加为评论
+- 历史单备注
+  - 当命中历史单且决策需要评论时，脚本会追加结构化 FAIL 备注
+  - 当回归 PASS 判定成立时，脚本会追加结构化 PASS 备注
+- `--dry-run`
+  - 只做字段组装、历史匹配、决策预演和审计输出
+  - 不会真实创建 Jira，不会真实追加任何评论或备注
 
 第二阶段：指定项目做回归验证
 
@@ -163,8 +185,13 @@ python ".\create_tinno_jira_batch_from_excel.py" --test-mode --regression-projec
   - 新问题创建
   - build_version 随建单成功记录落库
   - 历史单导出并回填到本地项目缓存库
+  - 混合专项上传时，历史单匹配按专项隔离，避免不同专项之间串命中
+  - `resolution=重复问题` 时按 `当前提单版本 > 历史建单版本` 判断
+    - 较新版本仍复现：只追加备注，不重建
+    - 非较新版本：跳过，不重建
   - OPEN / WONT_FIX / RESOLVED_FIXED_WAIT_NEW_VERSION / REGRESSION_PASS 等主决策预演
   - PASS / FAIL 结构化备注生成
+  - 新建问题单后按 `--add-comments` 追加 `PS` 评论
   - 严格版本项目按配置比较版本
 - 暂不启用
   - duplicate 跟随关闭
