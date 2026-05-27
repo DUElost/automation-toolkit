@@ -1,75 +1,134 @@
 # Automation Toolkit
 
-自动化测试工具集 - 统一管理各类测试工具和小脚本
+自动化测试工具集 — 统一管理各类测试工具和小脚本
 
 ## 项目结构
 
 ```
 automation-toolkit/
-├── python-tools/          # Python 工具集
-│   ├── performance_SMT_ResultFiller/    # SMT 性能测试结果填充
-│   ├── performance_Top300_ResultFiller/  # Top300 应用启动时间数据填充
-│   ├── system_MemoryFusion/             # 内存融合工具
-│   └── universal_Factory-Reset/         # 通用恢复出厂设置工具
-├── android-tools/         # Android 工具集（规划中）
-├── java-platforms/        # Java 平台（规划中）
-├── node-scripts/          # Node.js 脚本（规划中）
-├── shared/                # 共享资源
-└── docs/                  # 统一文档（规划中）
+├── python-tools/                          # Python 工具集
+│   ├── performance_SMT_ResultFiller/      # SMT 性能测试结果填充
+│   ├── performance_Top300_ResultFiller/   # Top300 应用启动时间数据填充
+│   ├── stability_Jira-Automation/        # Jira 自动化
+│   ├── stability_Start-Log-Scan/         # 稳定性日志扫描分析
+│   ├── stability_PlayStore-Update-Extract/ # Play 商店更新提取
+│   ├── stability_FTPserver-Check/        # FTP 服务器日志检查
+│   ├── stability_Reboot-Sleep-Reset/     # 重启/睡眠/重置稳定性测试
+│   ├── system_MemoryFusion/              # 内存融合工具
+│   ├── universal_Automation-Create-Task/  # ITMS 批量创建测试任务
+│   ├── universal_Auto-Create-TestReport/ # 自动生成测试报告
+│   └── universal_Factory-Reset/          # 通用恢复出厂设置
+├── macos-tools/                           # macOS 专属工具
+│   └── system_Task-Scheduler/            # launchd 定时任务管理器
+├── linux-tools/                           # Linux 专属工具
+│   └── system_Task-Scheduler/            # systemd 定时任务管理器
+├── windows-scheduler/                     # Windows 定时任务管理器
+├── android-tools/                         # Android 工具集（规划中）
+├── java-platforms/                        # Java 平台（规划中）
+├── node-scripts/                          # Node.js 脚本（规划中）
+└── shared/                                # 共享资源
+    └── python-utils/                      # 共享 Python 工具库
 ```
 
 ## 工具索引
 
 ### Python 工具
 
-| 工具名称 | 说明 | 路径 |
-|---------|------|------|
-| Performance SMT Result Filler | SMT 性能测试结果自动填充 Excel（动效丢帧/滑动丢帧） | [python-tools/performance_SMT_ResultFiller/](python-tools/performance_SMT_ResultFiller/) |
-| Performance Top300 Result Filler | Top300 应用启动时间数据自动填充 Excel | [python-tools/performance_Top300_ResultFiller/](python-tools/performance_Top300_ResultFiller/) |
-| MemoryFusion | 内存融合工具 | [python-tools/system_MemoryFusion/](python-tools/system_MemoryFusion/) |
-| Factory Reset | 通用恢复出厂设置工具 | [python-tools/universal_Factory-Reset/](python-tools/universal_Factory-Reset/) |
+| 工具名称 | 说明 |
+|---------|------|
+| [performance_SMT_ResultFiller](python-tools/performance_SMT_ResultFiller/) | SMT 性能测试结果自动填充 Excel |
+| [performance_Top300_ResultFiller](python-tools/performance_Top300_ResultFiller/) | Top300 应用启动时间数据填充 |
+| [stability_Jira-Automation](python-tools/stability_Jira-Automation/) | Jira 自动化工具 |
+| [stability_Start-Log-Scan](python-tools/stability_Start-Log-Scan/) | 稳定性日志扫描分析 |
+| [stability_PlayStore-Update-Extract](python-tools/stability_PlayStore-Update-Extract/) | Google Play 应用更新提取 |
+| [stability_FTPserver-Check](python-tools/stability_FTPserver-Check/) | FTP 日志检查 |
+| [stability_Reboot-Sleep-Reset](python-tools/stability_Reboot-Sleep-Reset/) | 重启/睡眠/重置测试 |
+| [system_MemoryFusion](python-tools/system_MemoryFusion/) | 内存融合工具 |
+| [universal_Automation-Create-Task](python-tools/universal_Automation-Create-Task/) | ITMS 批量创建测试任务 |
+| [universal_Auto-Create-TestReport](python-tools/universal_Auto-Create-TestReport/) | 自动生成测试报告 |
+| [universal_Factory-Reset](python-tools/universal_Factory-Reset/) | 通用恢复出厂设置 |
+
+### macOS 工具
+
+| 工具名称 | 说明 |
+|---------|------|
+| [system_Task-Scheduler](macos-tools/system_Task-Scheduler/) | launchd 定时任务管理器 |
+
+### Linux 工具
+
+| 工具名称 | 说明 |
+|---------|------|
+| [system_Task-Scheduler](linux-tools/system_Task-Scheduler/) | systemd 用户定时任务管理器 |
+
+### Windows 工具
+
+| 工具名称 | 说明 |
+|---------|------|
+| [windows-scheduler](windows-scheduler/) | 任务计划程序定时任务管理器 |
 
 ## 快速开始
 
-### Windows
+### macOS 定时任务
 
-```powershell
-# 进入工具目录
-cd python-tools\performance_SMT_ResultFiller
-# 或
-cd python-tools\performance_Top300_ResultFiller
+```bash
+# 添加到 PATH
+export PATH="$PATH:/path/to/automation-toolkit/macos-tools/system_Task-Scheduler"
 
 # 安装依赖
-pip install -r requirements.txt
+brew install terminal-notifier
 
-# 运行工具
+# 创建任务
+taskmgr add mytask
+```
+
+### Linux 定时任务
+
+```bash
+export PATH="$PATH:/path/to/automation-toolkit/linux-tools/system_Task-Scheduler"
+
+# 可选：桌面通知
+sudo apt install libnotify-bin   # Debian/Ubuntu
+
+taskmgr add mytask
+taskmgr list
+taskmgr start mytask
+```
+
+### Windows 定时任务
+
+```powershell
+cd D:\Tinno_auto\automation-toolkit
+
+# 交互式创建（与 macOS 相同用法）
+taskmgr add mytask
+taskmgr list
+taskmgr start mytask
+```
+
+### Windows Python 工具
+
+```powershell
+cd python-tools\performance_SMT_ResultFiller
+pip install -r requirements.txt
 python main.py
-# 或双击 Start.bat
 ```
 
 ### Linux/Mac
 
 ```bash
-# 进入工具目录
 cd python-tools/performance_SMT_ResultFiller
-# 或
-cd python-tools/performance_Top300_ResultFiller
-
-# 安装依赖
 pip install -r requirements.txt
-
-# 运行工具
 python main.py
 ```
 
 ## 环境要求
 
 - **Python**: 3.8+
-- **依赖管理**: pip
+- **macOS 工具**: terminal-notifier (`brew install terminal-notifier`)
 
 ## 版本
 
-v0.1.0 | 更新时间：2026-02-06
+v0.2.0 | 更新时间：2026-05-25
 
 ## 许可证
 

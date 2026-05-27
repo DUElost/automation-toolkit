@@ -1,0 +1,517 @@
+#!/usr/bin/env bash
+# taskmgr — 轻量 systemd 用户定时任务管理器（对齐 macOS system_Task-Scheduler）
+# 用法: taskmgr {list|add|edit|remove|start|stop|log|status|delay|cancel|enable|cleanup} [name] [args]
+
+set -euo pipefail
+
+TASKMGR_HOME="${TASKMGR_HOME:-$HOME/scripts}"
+SYSTEMD_USER_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
+DELAY_DIR="${TASKMGR_RUNTIME:-$HOME/.taskmgr_delays}"
+UNIT_PREFIX="automation-toolkit"
+TOOL_DIR="$(cd "$(dirname "$0")" && pwd)"
+TASKS_DIR="$TOOL_DIR/tasks"
+RUNNER="$TOOL_DIR/_run_task.sh"
+
+die() { echo "❌ $*" >&2; exit 1; }
+ok()  { echo "✅ $*"; }
+
+_ensure_dirs() {
+    mkdir -p "$TASKMGR_HOME" "$SYSTEMD_USER_DIR" "$TASKS_DIR" "$DELAY_DIR"
+}
+
+_require_systemd() {
+    command -v systemctl >/dev/null 2>&1 || die "未找到 systemctl，本工具依赖 systemd"
+    systemctl --user show-environment >/dev/null 2>&1 || die "systemd 用户实例不可用，请确认已登录图形/用户会话"
+}
+
+_unit_slug() {
+    local name="$1"
+    local safe
+    safe=$(echo "$name" | sed 's/[^a-zA-Z0-9._-]/_/g' | tr '[:upper:]' '[:lower:]')
+    safe="${safe#_}"
+    safe="${safe%_}"
+    if [[ -z "$safe" ]]; then
+        if command -v md5sum >/dev/null 2>&1; then
+            safe="task-$(printf '%s' "$name" | md5sum | awk '{print substr($1,1,8)}')"
+        else
+            safe="task-$(printf '%s' "$name" | cksum | awk '{print $1}')"
+        fi
+    fi
+    echo "$safe"
+}
+
+_unit_name() {
+    echo "${UNIT_PREFIX}-$(_unit_slug "$1")"
+}
+
+_meta_path() { echo "$TASKS_DIR/$1.meta"; }
+
+_list_meta_names() {
+    local f name
+    shopt -s nullglob
+    for f in "$TASKS_DIR"/*.meta; do
+        name=$(basename "$f" .meta)
+        echo "$name"
+    done
+    shopt -u nullglob
+}
+
+_load_meta() {
+    local name="$1"
+    local meta
+    meta="$(_meta_path "$name")"
+    [[ -f "$meta" ]] || die "任务 '$name' 不存在"
+    # shellcheck disable=SC1090
+    source "$meta"
+}
+
+_timer_unit_path() {
+    echo "$SYSTEMD_USER_DIR/$(_unit_name "$1").timer"
+}
+
+_service_unit_path() {
+    echo "$SYSTEMD_USER_DIR/$(_unit_name "$1").service"
+}
+
+_timer_active() {
+    systemctl --user is-enabled "$(_unit_name "$1").timer" >/dev/null 2>&1
+}
+
+_timer_exists() {
+    [[ -f "$(_timer_unit_path "$1")" ]]
+}
+
+_schedule_label() {
+    local name="$1"
+    _load_meta "$name"
+    case "${schedule_type:-daily}" in
+        once)
+            echo "一次性 ${run_at:-?}"
+            ;;
+        *)
+            echo "每天 $(printf '%02d:%02d' "${hour:-0}" "${minute:-0}")"
+            ;;
+    esac
+}
+
+_status_text() {
+    local name="$1"
+    if ! _timer_exists "$name"; then
+        echo "未注册"
+        return
+    fi
+    if systemctl --user is-active "$(_unit_name "$name").service" >/dev/null 2>&1; then
+        echo "运行中"
+        return
+    fi
+    if _timer_active "$name"; then
+        echo "已启用"
+        return
+    fi
+    echo "已停用"
+}
+
+_delay_info() {
+    local name="$1"
+    local pidfile="$DELAY_DIR/${name}.pid"
+    [[ -f "$pidfile" ]] || return 0
+    local dpid ddeadline
+    dpid=$(awk '{print $1}' "$pidfile")
+    ddeadline=$(awk '{print $3}' "$pidfile")
+    if kill -0 "$dpid" 2>/dev/null; then
+        echo "$ddeadline"
+        return 0
+    fi
+    rm -f "$pidfile"
+}
+
+_write_systemd_units() {
+    local name="$1"
+    local unit
+    unit="$(_unit_name "$name")"
+    _load_meta "$name"
+
+    local service_file timer_file
+    service_file="$(_service_unit_path "$name")"
+    timer_file="$(_timer_unit_path "$name")"
+
+    cat >"$service_file" <<EOF
+[Unit]
+Description=Automation Toolkit task: ${task_name}
+
+[Service]
+Type=oneshot
+Environment=TASKMGR_HOME=${TASKMGR_HOME}
+Environment=TOOL_DIR=${TOOL_DIR}
+ExecStart=${RUNNER} ${task_name}
+EOF
+
+    local on_calendar=""
+    case "${schedule_type:-daily}" in
+        once)
+            on_calendar="${run_at}"
+            ;;
+        *)
+            on_calendar="*-*-* $(printf '%02d:%02d:00' "${hour:-9}" "${minute:-0}")"
+            ;;
+    esac
+
+    cat >"$timer_file" <<EOF
+[Unit]
+Description=Automation Toolkit timer: ${task_name}
+
+[Timer]
+OnCalendar=${on_calendar}
+Persistent=true
+Unit=${unit}.service
+
+[Install]
+WantedBy=timers.target
+EOF
+
+    chmod +x "$RUNNER" 2>/dev/null || true
+    systemctl --user daemon-reload
+}
+
+cmd_list() {
+    _ensure_dirs
+    local tasks
+    tasks=$(_list_meta_names)
+    if [[ -z "$tasks" ]]; then
+        echo "暂无托管任务"
+        return
+    fi
+
+    printf "%-20s %-10s %-12s %s\n" "NAME" "STATUS" "DELAY" "SCHEDULE"
+    printf "%-20s %-10s %-12s %s\n" "----" "------" "----------" "--------"
+    while IFS= read -r name; do
+        [[ -n "$name" ]] || continue
+        local delay="-"
+        delay=$(_delay_info "$name" || true)
+        [[ -n "$delay" ]] || delay="-"
+        printf "%-20s %-10s %-12s %s\n" \
+            "$name" "$(_status_text "$name")" "$delay" "$(_schedule_label "$name")"
+    done <<<"$tasks"
+}
+
+cmd_status() {
+    local name="${1:-}"
+    if [[ -z "$name" ]]; then
+        cmd_list
+        return
+    fi
+
+    _load_meta "$name"
+    echo "=== $name ==="
+    echo "meta  : $(_meta_path "$name")"
+    echo "unit  : $(_unit_name "$name")"
+    echo "命令  : $command"
+    echo "日志  : $TASKMGR_HOME/${name}.log"
+    echo "状态  : $(_status_text "$name")"
+    echo "调度  : $(_schedule_label "$name")"
+
+    if _timer_exists "$name"; then
+        systemctl --user list-timers "$(_unit_name "$name").timer" --no-pager 2>/dev/null | sed -n '1,5p' || true
+    fi
+
+    local delay
+    delay=$(_delay_info "$name" || true)
+    if [[ -n "$delay" ]]; then
+        local pid
+        pid=$(awk '{print $1}' "$DELAY_DIR/${name}.pid")
+        echo "延时  : ${delay} (PID=$pid)"
+    fi
+}
+
+cmd_log() {
+    local name="${1:-}"
+    [[ -n "$name" ]] || die "请指定任务名"
+    local logf="$TASKMGR_HOME/${name}.log"
+    if [[ -f "$logf" ]]; then
+        tail -30 "$logf"
+    else
+        echo "暂无日志"
+    fi
+}
+
+cmd_start() {
+    local name="${1:-}"
+    [[ -n "$name" ]] || die "请指定任务名"
+    _load_meta "$name"
+    _require_systemd
+    systemctl --user start "$(_unit_name "$name").service" || die "启动失败，任务是否已注册？"
+    sleep 2
+    tail -5 "$TASKMGR_HOME/${name}.log" 2>/dev/null || true
+    ok "$name 已触发"
+}
+
+cmd_delay() {
+    local name="${1:-}"
+    local mins="${2:-}"
+    [[ -n "$name" ]] || die "用法: taskmgr delay <name> <分钟数>"
+    [[ -n "$mins" && "$mins" =~ ^[0-9]+$ && "$mins" -gt 0 ]] || die "请提供有效的分钟数"
+    [[ -f "$(_meta_path "$name")" ]] || die "任务 '$name' 不存在"
+
+    _require_systemd
+    mkdir -p "$DELAY_DIR"
+    local pidfile="$DELAY_DIR/${name}.pid"
+    local deadline_fmt
+    deadline_fmt=$(date -d "+${mins} minutes" '+%H:%M' 2>/dev/null || date -v +"${mins}M" '+%H:%M')
+
+    if [[ -f "$pidfile" ]]; then
+        kill "$(awk '{print $1}' "$pidfile")" 2>/dev/null || true
+        rm -f "$pidfile"
+    fi
+
+    local secs=$((mins * 60))
+    local unit
+    unit="$(_unit_name "$name")"
+    nohup bash -c "sleep ${secs} && systemctl --user start ${unit}.service" >/dev/null 2>&1 &
+    local pid=$!
+    echo "$pid $(date -d "+${mins} minutes" '+%s' 2>/dev/null || date -v +"${mins}M" '+%s') $deadline_fmt" >"$pidfile"
+    ok "$name 将在 ${mins} 分钟后执行（约 $deadline_fmt）"
+}
+
+cmd_cancel() {
+    local name="${1:-}"
+    [[ -n "$name" ]] || die "用法: taskmgr cancel <name>"
+    local pidfile="$DELAY_DIR/${name}.pid"
+    if [[ -f "$pidfile" ]]; then
+        local pid
+        pid=$(awk '{print $1}' "$pidfile")
+        kill "$pid" 2>/dev/null && ok "$name 延时已取消" || true
+        rm -f "$pidfile"
+    else
+        echo "没有待执行的延时"
+    fi
+}
+
+cmd_stop() {
+    local name="${1:-}"
+    [[ -n "$name" ]] || die "请指定任务名"
+    _require_systemd
+    systemctl --user disable --now "$(_unit_name "$name").timer" 2>/dev/null || die "停用失败"
+    ok "$name 已停用"
+}
+
+cmd_enable() {
+    local name="${1:-}"
+    [[ -n "$name" ]] || die "请指定任务名"
+    _require_systemd
+    _write_systemd_units "$name"
+    systemctl --user enable --now "$(_unit_name "$name").timer" || die "启用失败"
+    ok "$name 已启用"
+}
+
+_read_default() {
+    local prompt="$1"
+    local default="$2"
+    local input
+    read -rp "$prompt" input
+    if [[ -z "$input" ]]; then
+        echo "$default"
+    else
+        echo "$input"
+    fi
+}
+
+_escape_meta() {
+    printf '%s' "$1" | sed "s/'/'\\\\''/g"
+}
+
+cmd_add() {
+    local name="${1:-}"
+    if [[ -z "$name" ]]; then
+        read -rp "任务名称 (Task name): " name
+        [[ -n "$name" ]] || die "任务名称不能为空"
+    fi
+
+    [[ -f "$(_meta_path "$name")" ]] && die "任务 '$name' 已存在"
+    _ensure_dirs
+    _require_systemd
+
+    echo "创建新定时任务: $name"
+    echo "-------------------------"
+
+    local sched hour minute command want_notify schedule_type run_at schedule_summary
+    sched=$(_read_default "调度方式 [1=每天, 2=指定时间一次, 3=N分钟后一次] [1]: " "1")
+
+    case "$sched" in
+        2)
+            schedule_type="once"
+            local default_run_at
+            default_run_at=$(date -d '+1 hour' '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date -v +1H '+%Y-%m-%d %H:%M:%S')
+            run_at=$(_read_default "执行时间 (yyyy-MM-dd HH:mm:ss) [${default_run_at}]: " "$default_run_at")
+            schedule_summary="一次性 ${run_at}"
+            hour=0
+            minute=0
+            ;;
+        3)
+            schedule_type="once"
+            local delay_mins
+            read -rp "多少分钟后执行: " delay_mins
+            [[ -n "$delay_mins" && "$delay_mins" =~ ^[0-9]+$ && "$delay_mins" -gt 0 ]] || die "请提供有效的分钟数"
+            run_at=$(date -d "+${delay_mins} minutes" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date -v +"${delay_mins}M" '+%Y-%m-%d %H:%M:%S')
+            schedule_summary="${delay_mins} 分钟后（约 $(date -d "$run_at" '+%H:%M:%S' 2>/dev/null || echo "$run_at")）"
+            hour=0
+            minute=0
+            ;;
+        *)
+            schedule_type="daily"
+            hour=$(_read_default "Hour   (0-23) [9]: " "9")
+            minute=$(_read_default "Minute (0-59) [0]: " "0")
+            [[ "$hour" =~ ^[0-9]+$ && "$minute" =~ ^[0-9]+$ && "$hour" -ge 0 && "$hour" -le 23 && "$minute" -ge 0 && "$minute" -le 59 ]] || die "时间格式无效"
+            schedule_summary="每天 $(printf '%02d:%02d' "$hour" "$minute")"
+            run_at=""
+            ;;
+    esac
+
+    echo "示例: python3 ~/script.py | node ~/task.js | bash ~/task.sh"
+    read -rp "启动命令: " command
+    [[ -n "$command" ]] || die "命令不能为空"
+    command="${command//\~/$HOME}"
+
+    want_notify=$(_read_default "执行后发送桌面通知? [Y/n]: " "y")
+    local notify_flag=0
+    [[ "$want_notify" =~ ^[Yy] ]] && notify_flag=1
+
+    local unit_slug_val
+    unit_slug_val="$(_unit_slug "$name")"
+
+    local escaped_command escaped_name
+    escaped_command="$(_escape_meta "$command")"
+    escaped_name="$(_escape_meta "$name")"
+
+    cat >"$(_meta_path "$name")" <<METAEOF
+task_name='${escaped_name}'
+unit_slug='${unit_slug_val}'
+command='${escaped_command}'
+work_dir='${HOME}'
+schedule_type='${schedule_type}'
+hour='${hour}'
+minute='${minute}'
+run_at='${run_at}'
+notify='${notify_flag}'
+METAEOF
+
+    _write_systemd_units "$name"
+    systemctl --user enable --now "$(_unit_name "$name").timer"
+
+    ok "任务 '$name' 已创建，${schedule_summary} 执行"
+    echo "  修改命令: taskmgr edit $name"
+    echo "  查看日志: taskmgr log  $name"
+    echo "  手动触发: taskmgr start $name"
+}
+
+cmd_edit() {
+    local name="${1:-}"
+    [[ -n "$name" ]] || die "用法: taskmgr edit <name>"
+    _load_meta "$name"
+
+    echo "当前命令: $command"
+    read -rp "新命令 (留空不修改): " new_cmd
+    if [[ -z "$new_cmd" ]]; then
+        return
+    fi
+
+    new_cmd="${new_cmd//\~/$HOME}"
+    local meta escaped_cmd tmp
+    meta="$(_meta_path "$name")"
+    escaped_cmd="$(_escape_meta "$new_cmd")"
+    tmp="${meta}.tmp"
+    awk -v cmd="$escaped_cmd" '
+        /^command=/ { print "command=\047" cmd "\047"; next }
+        { print }
+    ' "$meta" >"$tmp" && mv "$tmp" "$meta"
+
+    _write_systemd_units "$name"
+    systemctl --user restart "$(_unit_name "$name").timer" 2>/dev/null || systemctl --user enable --now "$(_unit_name "$name").timer"
+    ok "命令已更新"
+}
+
+cmd_remove() {
+    local name="${1:-}"
+    [[ -n "$name" ]] || die "用法: taskmgr remove <name>"
+    [[ -f "$(_meta_path "$name")" ]] || die "任务 '$name' 不存在"
+
+    cmd_cancel "$name" 2>/dev/null || true
+
+    _require_systemd
+    systemctl --user disable --now "$(_unit_name "$name").timer" 2>/dev/null || true
+    systemctl --user reset-failed "$(_unit_name "$name").service" 2>/dev/null || true
+
+    rm -f "$(_timer_unit_path "$name")" "$(_service_unit_path "$name")" "$(_meta_path "$name")"
+    rm -f "$TASKMGR_HOME/${name}.log" "$TASKMGR_HOME/${name}.err"
+    systemctl --user daemon-reload
+    ok "$name 已删除"
+}
+
+cmd_cleanup() {
+    local remove_logs="${1:-}"
+    _ensure_dirs
+    local names removed=()
+    while IFS= read -r name; do
+        [[ -n "$name" ]] || continue
+        if _timer_exists "$name"; then
+            continue
+        fi
+        rm -f "$(_meta_path "$name")"
+        if [[ "$remove_logs" == "logs" ]]; then
+            rm -f "$TASKMGR_HOME/${name}.log" "$TASKMGR_HOME/${name}.err"
+        fi
+        removed+=("$name")
+    done < <(_list_meta_names)
+
+    if [[ "${#removed[@]}" -eq 0 ]]; then
+        echo "没有发现孤儿配置"
+        return
+    fi
+
+    local suffix=""
+    [[ "$remove_logs" == "logs" ]] && suffix="（含日志）"
+    ok "已清理 ${#removed[@]} 个孤儿配置${suffix}: $(IFS=,; echo "${removed[*]}")"
+}
+
+cmd_help() {
+    echo "taskmgr — systemd 用户定时任务管理器"
+    echo ""
+    echo "  taskmgr list              列出所有任务"
+    echo "  taskmgr status [name]     查看任务详情"
+    echo "  taskmgr log    <name>     查看运行日志"
+    echo "  taskmgr start  <name>     立即触发一次"
+    echo "  taskmgr delay  <name> <m> N 分钟后延时执行"
+    echo "  taskmgr cancel <name>     取消待执行的延时"
+    echo "  taskmgr stop   <name>     停用调度"
+    echo "  taskmgr enable <name>     恢复定时调度"
+    echo "  taskmgr add    [name]     交互式创建新任务"
+    echo "  taskmgr edit   <name>     修改任务命令"
+    echo "  taskmgr remove <name>     删除任务"
+    echo "  taskmgr cleanup [logs]    清理无 systemd 单元的孤儿配置"
+    echo ""
+    echo "环境变量:"
+    echo "  TASKMGR_HOME      任务日志目录 (默认 ~/scripts)"
+    echo "  TASKMGR_RUNTIME   延时 PID 目录 (默认 ~/.taskmgr_delays)"
+    echo ""
+    echo "依赖: systemd 用户实例、bash；通知可选 notify-send (libnotify)"
+}
+
+# ---- 入口 ----
+
+_ensure_dirs
+
+case "${1:-help}" in
+    list) cmd_list ;;
+    status) cmd_status "${2:-}" ;;
+    log) cmd_log "${2:-}" ;;
+    start) cmd_start "${2:-}" ;;
+    delay) cmd_delay "${2:-}" "${3:-}" ;;
+    cancel) cmd_cancel "${2:-}" ;;
+    stop) cmd_stop "${2:-}" ;;
+    enable) cmd_enable "${2:-}" ;;
+    add) cmd_add "${2:-}" ;;
+    edit) cmd_edit "${2:-}" ;;
+    remove|rm) cmd_remove "${2:-}" ;;
+    cleanup) cmd_cleanup "${2:-}" ;;
+    help|-h|--help) cmd_help ;;
+    *) cmd_help ;;
+esac
