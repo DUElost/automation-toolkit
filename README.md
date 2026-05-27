@@ -20,6 +20,8 @@ automation-toolkit/
 │   └── universal_Factory-Reset/          # 通用恢复出厂设置
 ├── macos-tools/                           # macOS 专属工具
 │   └── system_Task-Scheduler/            # launchd 定时任务管理器
+├── linux-tools/                           # Linux 专属工具
+│   └── system_Task-Scheduler/            # systemd 定时任务管理器
 ├── windows-scheduler/                     # Windows 定时任务管理器
 ├── android-tools/                         # Android 工具集（规划中）
 ├── java-platforms/                        # Java 平台（规划中）
@@ -52,6 +54,12 @@ automation-toolkit/
 |---------|------|
 | [system_Task-Scheduler](macos-tools/system_Task-Scheduler/) | launchd 定时任务管理器 |
 
+### Linux 工具
+
+| 工具名称 | 说明 |
+|---------|------|
+| [system_Task-Scheduler](linux-tools/system_Task-Scheduler/) | systemd 用户定时任务管理器 |
+
 ### Windows 工具
 
 | 工具名称 | 说明 |
@@ -71,6 +79,19 @@ brew install terminal-notifier
 
 # 创建任务
 taskmgr add mytask
+```
+
+### Linux 定时任务
+
+```bash
+export PATH="$PATH:/path/to/automation-toolkit/linux-tools/system_Task-Scheduler"
+
+# 可选：桌面通知
+sudo apt install libnotify-bin   # Debian/Ubuntu
+
+taskmgr add mytask
+taskmgr list
+taskmgr start mytask
 ```
 
 ### Windows 定时任务

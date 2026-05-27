@@ -95,3 +95,4 @@ tmp_*.json
 windows-scheduler/tasks/
 windows-scheduler/logs/
 windows-scheduler/runtime/
+linux-tools/system_Task-Scheduler/tasks/

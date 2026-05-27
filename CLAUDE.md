@@ -9,6 +9,7 @@
 
 | 日期 | 变更内容 |
 |------|----------|
+| 2026-05-26 | 新增 linux-tools/system_Task-Scheduler（systemd taskmgr，对齐 macOS） |
 | 2026-03-25 | 新增 stability_Start-Log-Scan、stability_FTPserver-Check、universal_Automation-Create-Task 模块 |
 | 2026-02-06 | 新增 Top300 Result Filler、MemoryFusion、Factory-Reset 工具模块 |
 | 2026-02-04 19:23:02 | 初始化 CLAUDE.md 文档，完成全仓扫描与模块识别 |
@@ -31,23 +32,13 @@ Automation Toolkit 是为 Tinno Auto 内部测试团队设计的自动化工具�
 ```
 automation-toolkit/
 ├── python-tools/              # Python 工具集
-│   ├── performance_SMT_ResultFiller/     # SMT 性能测试结果填充工具
-│   ├── performance_Top300_ResultFiller/   # Top300 应用启动时间数据填充工具
-│   ├── system_MemoryFusion/              # 内存融合工具
-│   ├── stability_Start-Log-Scan/        # 稳定性测试日志扫描分析工具
-│   ├── stability_FTPserver-Check/       # FTP 服务器日志检查工具
-│   ├── universal_Factory-Reset/          # 通用恢复出厂设置工具
-│   └── universal_Automation-Create-Task/ # ITMS 自动化创建测试任务工具
-├── shared/                    # 共享资源
-│   └── python-utils/          # 共享 Python 工具库
-├── android-tools/             # Android 工具集（规划中）
-├── java-platforms/            # Java 平台（规划中）
-├── node-scripts/              # Node.js 脚本（规划中）
-├── docs/                      # 统一文档（规划中）
-├── toolkit.ps1                # Windows PowerShell 入口脚本
-├── toolkit.bat                # Windows Batch 入口脚本
-├── Makefile                   # Linux/Mac 入口
-└── .github/workflows/         # CI/CD 配置
+├── macos-tools/
+│   └── system_Task-Scheduler/ # launchd taskmgr
+├── linux-tools/
+│   └── system_Task-Scheduler/ # systemd taskmgr
+├── windows-scheduler/         # Windows taskmgr
+├── shared/
+│   └── python-utils/
 ```
 
 ---
@@ -91,6 +82,9 @@ graph TD
 | [python-tools/stability_FTPserver-Check](./python-tools/stability_FTPserver-Check/) | Python | FTP 服务器日志检查与未解析 dbg 报告工具 | 活跃 |
 | [python-tools/universal_Automation-Create-Task](./python-tools/universal_Automation-Create-Task/) | Python | ITMS 自动化批量创建测试任务工具 | 活跃 |
 | [shared/python-utils](./shared/python-utils/CLAUDE.md) | Python | 共享 Python 工具库 | 初始 |
+| [macos-tools/system_Task-Scheduler](./macos-tools/system_Task-Scheduler/) | Bash | launchd 定时任务管理器 | 活跃 |
+| [linux-tools/system_Task-Scheduler](./linux-tools/system_Task-Scheduler/) | Bash | systemd 用户定时任务管理器 | 活跃 |
+| [windows-scheduler](./windows-scheduler/) | PowerShell | Windows 任务计划程序定时管理 | 活跃 |
 
 ---
 

@@ -1,0 +1,4 @@
+linux-tools/system_Task-Scheduler/taskmgr text eol=lf
+linux-tools/system_Task-Scheduler/_run_task.sh text eol=lf
+linux-tools/system_Task-Scheduler/_notify_action.sh text eol=lf
+linux-tools/system_Task-Scheduler/scripts/*.sh text eol=lf
