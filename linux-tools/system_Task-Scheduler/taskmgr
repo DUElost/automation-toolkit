@@ -46,6 +46,12 @@ _unit_name() {
 
 _meta_path() { echo "$TASKS_DIR/$1.meta"; }
 
+_meta_exists() {
+    local meta_file
+    meta_file="$(_meta_path "$1")"
+    [[ -f "$meta_file" ]]
+}
+
 _list_meta_names() {
     local f name
     shopt -s nullglob
@@ -88,14 +94,38 @@ _schedule_label() {
         once)
             echo "一次性 ${run_at:-?}"
             ;;
-        *)
+        interval)
+            echo "每 ${interval_hours:-?} 小时"
+            ;;
+        daily)
             echo "每天 $(printf '%02d:%02d' "${hour:-0}" "${minute:-0}")"
+            ;;
+        *)
+            echo "${schedule_type:-?}"
             ;;
     esac
 }
 
+_once_is_past() {
+    local name="$1"
+    _load_meta "$name"
+    [[ "${schedule_type:-}" == "once" ]] || return 1
+    [[ -n "${run_at:-}" ]] || return 1
+    local now_ts run_ts
+    now_ts=$(date +%s)
+    run_ts=$(date -d "$run_at" +%s 2>/dev/null || return 1)
+    [[ "$now_ts" -ge "$run_ts" ]]
+}
+
 _status_text() {
     local name="$1"
+    if _meta_exists "$name" && _once_is_past "$name"; then
+        local logf="$TASKMGR_HOME/${name}.log"
+        if [[ -f "$logf" ]] && grep -q "Task finished:" "$logf" 2>/dev/null; then
+            echo "已完成"
+            return
+        fi
+    fi
     if ! _timer_exists "$name"; then
         echo "未注册"
         return
@@ -146,13 +176,20 @@ Environment=TOOL_DIR=${TOOL_DIR}
 ExecStart=${RUNNER} ${task_name}
 EOF
 
-    local on_calendar=""
+    local on_calendar="" persistent="true"
     case "${schedule_type:-daily}" in
         once)
             on_calendar="${run_at}"
+            persistent="false"
+            ;;
+        interval)
+            on_calendar="*-*-* $(printf '%02d' "${minute:-0}")/${interval_hours}:00"
+            ;;
+        daily)
+            on_calendar="*-*-* $(printf '%02d:%02d:00' "${hour:-9}" "${minute:-0}")"
             ;;
         *)
-            on_calendar="*-*-* $(printf '%02d:%02d:00' "${hour:-9}" "${minute:-0}")"
+            die "未知调度类型: ${schedule_type}"
             ;;
     esac
 
@@ -162,7 +199,8 @@ Description=Automation Toolkit timer: ${task_name}
 
 [Timer]
 OnCalendar=${on_calendar}
-Persistent=true
+Persistent=${persistent}
+AccuracySec=1min
 Unit=${unit}.service
 
 [Install]
@@ -206,6 +244,7 @@ cmd_status() {
     echo "meta  : $(_meta_path "$name")"
     echo "unit  : $(_unit_name "$name")"
     echo "命令  : $command"
+    echo "目录  : ${work_dir:-$HOME}"
     echo "日志  : $TASKMGR_HOME/${name}.log"
     echo "状态  : $(_status_text "$name")"
     echo "调度  : $(_schedule_label "$name")"
@@ -250,7 +289,7 @@ cmd_delay() {
     local mins="${2:-}"
     [[ -n "$name" ]] || die "用法: taskmgr delay <name> <分钟数>"
     [[ -n "$mins" && "$mins" =~ ^[0-9]+$ && "$mins" -gt 0 ]] || die "请提供有效的分钟数"
-    [[ -f "$(_meta_path "$name")" ]] || die "任务 '$name' 不存在"
+    _meta_exists "$name" || die "任务 '$name' 不存在"
 
     _require_systemd
     mkdir -p "$DELAY_DIR"
@@ -326,17 +365,27 @@ cmd_add() {
         [[ -n "$name" ]] || die "任务名称不能为空"
     fi
 
-    [[ -f "$(_meta_path "$name")" ]] && die "任务 '$name' 已存在"
+    _meta_exists "$name" && die "任务 '$name' 已存在"
     _ensure_dirs
     _require_systemd
 
     echo "创建新定时任务: $name"
     echo "-------------------------"
 
-    local sched hour minute command want_notify schedule_type run_at schedule_summary
-    sched=$(_read_default "调度方式 [1=每天, 2=指定时间一次, 3=N分钟后一次] [1]: " "1")
+    local sched hour minute command want_notify schedule_type run_at schedule_summary interval_hours
+    sched=$(_read_default "调度方式 [1=每天, 2=指定时间一次, 3=N分钟后一次, 4=每N小时] [1]: " "1")
 
     case "$sched" in
+        4)
+            schedule_type="interval"
+            interval_hours=$(_read_default "间隔小时数 [3]: " "3")
+            [[ "$interval_hours" =~ ^[0-9]+$ && "$interval_hours" -gt 0 && "$interval_hours" -le 168 ]] || die "间隔小时数须为 1-168 的整数"
+            minute=$(_read_default "对齐分钟 (0-59) [0]: " "0")
+            [[ "$minute" =~ ^[0-9]+$ && "$minute" -ge 0 && "$minute" -le 59 ]] || die "分钟格式无效"
+            hour=0
+            run_at=""
+            schedule_summary="每 ${interval_hours} 小时（:$(printf '%02d' "$minute") 对齐）"
+            ;;
         2)
             schedule_type="once"
             local default_run_at
@@ -378,18 +427,21 @@ cmd_add() {
     local unit_slug_val
     unit_slug_val="$(_unit_slug "$name")"
 
-    local escaped_command escaped_name
+    local escaped_command escaped_name escaped_work_dir task_work_dir
     escaped_command="$(_escape_meta "$command")"
     escaped_name="$(_escape_meta "$name")"
+    task_work_dir="$(pwd -P 2>/dev/null || pwd)"
+    escaped_work_dir="$(_escape_meta "$task_work_dir")"
 
     cat >"$(_meta_path "$name")" <<METAEOF
 task_name='${escaped_name}'
 unit_slug='${unit_slug_val}'
 command='${escaped_command}'
-work_dir='${HOME}'
+work_dir='${escaped_work_dir}'
 schedule_type='${schedule_type}'
 hour='${hour}'
 minute='${minute}'
+interval_hours='${interval_hours:-}'
 run_at='${run_at}'
 notify='${notify_flag}'
 METAEOF
@@ -398,6 +450,10 @@ METAEOF
     systemctl --user enable --now "$(_unit_name "$name").timer"
 
     ok "任务 '$name' 已创建，${schedule_summary} 执行"
+    echo "  工作目录: $task_work_dir"
+    if [[ "$schedule_type" == "once" ]]; then
+        echo "  说明: 一次性任务执行后将自动从 list 移除（日志保留）"
+    fi
     echo "  修改命令: taskmgr edit $name"
     echo "  查看日志: taskmgr log  $name"
     echo "  手动触发: taskmgr start $name"
@@ -409,6 +465,27 @@ cmd_edit() {
     _load_meta "$name"
 
     echo "当前命令: $command"
+    echo "当前目录: ${work_dir:-$HOME}"
+    read -rp "新工作目录 (留空不修改): " new_wd
+    if [[ -n "$new_wd" ]]; then
+        new_wd="${new_wd//\~/$HOME}"
+        if [[ ! -d "$new_wd" ]]; then
+            die "目录不存在: $new_wd"
+        fi
+        new_wd="$(cd "$new_wd" && pwd -P)"
+        local meta escaped_wd tmp
+        meta="$(_meta_path "$name")"
+        escaped_wd="$(_escape_meta "$new_wd")"
+        tmp="${meta}.tmp"
+        awk -v wd="$escaped_wd" '
+            /^work_dir=/ { print "work_dir=\047" wd "\047"; next }
+            { print }
+        ' "$meta" >"$tmp" && mv "$tmp" "$meta"
+        # shellcheck disable=SC1090
+        source "$meta"
+        ok "工作目录已更新"
+    fi
+
     read -rp "新命令 (留空不修改): " new_cmd
     if [[ -z "$new_cmd" ]]; then
         return
@@ -432,7 +509,7 @@ cmd_edit() {
 cmd_remove() {
     local name="${1:-}"
     [[ -n "$name" ]] || die "用法: taskmgr remove <name>"
-    [[ -f "$(_meta_path "$name")" ]] || die "任务 '$name' 不存在"
+    _meta_exists "$name" || die "任务 '$name' 不存在"
 
     cmd_cancel "$name" 2>/dev/null || true
 
@@ -452,6 +529,28 @@ cmd_cleanup() {
     local names removed=()
     while IFS= read -r name; do
         [[ -n "$name" ]] || continue
+
+        if _meta_exists "$name"; then
+            # shellcheck disable=SC1090
+            source "$(_meta_path "$name")"
+            if [[ "${schedule_type:-}" == "once" ]] && [[ -n "${run_at:-}" ]]; then
+                local now_ts run_ts logf
+                now_ts=$(date +%s)
+                run_ts=$(date -d "$run_at" +%s 2>/dev/null || echo 0)
+                logf="$TASKMGR_HOME/${name}.log"
+                if [[ "$now_ts" -ge "$run_ts" ]] && [[ -f "$logf" ]] && grep -q "Task finished:" "$logf" 2>/dev/null; then
+                    systemctl --user disable --now "$(_unit_name "$name").timer" 2>/dev/null || true
+                    rm -f "$(_timer_unit_path "$name")" "$(_service_unit_path "$name")"
+                    rm -f "$(_meta_path "$name")"
+                    if [[ "$remove_logs" == "logs" ]]; then
+                        rm -f "$logf" "$TASKMGR_HOME/${name}.err"
+                    fi
+                    removed+=("$name")
+                    continue
+                fi
+            fi
+        fi
+
         if _timer_exists "$name"; then
             continue
         fi
@@ -461,6 +560,10 @@ cmd_cleanup() {
         fi
         removed+=("$name")
     done < <(_list_meta_names)
+
+    if command -v systemctl >/dev/null 2>&1; then
+        systemctl --user daemon-reload 2>/dev/null || true
+    fi
 
     if [[ "${#removed[@]}" -eq 0 ]]; then
         echo "没有发现孤儿配置"

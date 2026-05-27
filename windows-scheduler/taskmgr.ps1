@@ -308,6 +308,13 @@ function Get-ScheduleLabel {
         return "一次性 $label"
     }
 
+    if ($Config.schedule.type -eq "Interval") {
+        if ($label -match '^Every\s+(\d+)h$') {
+            return "每 $($Matches[1]) 小时"
+        }
+        return $label
+    }
+
     return $label
 }
 
@@ -336,6 +343,14 @@ function Invoke-RegisterFromConfig {
     }
     elseif ($Config.schedule.type -eq "Once") {
         $registerArgs.RunAt = [string]$Config.schedule.label
+    }
+    elseif ($Config.schedule.type -eq "Interval") {
+        if ([string]$Config.schedule.label -match '^Every\s+(\d+)h$') {
+            $registerArgs.EveryHours = [int]$Matches[1]
+        }
+        else {
+            throw "无法从配置恢复 EveryHours: $($Config.schedule.label)"
+        }
     }
     else {
         throw "未知调度类型: $($Config.schedule.type)"
@@ -495,12 +510,22 @@ function Invoke-CmdAdd {
     Write-Host "创建新定时任务: $TaskNameValue"
     Write-Host "-------------------------"
 
-    $scheduleChoice = Read-HostDefault -Prompt "调度方式 [1=每天, 2=指定时间一次, 3=N分钟后一次] [1]" -DefaultValue "1"
+    $scheduleChoice = Read-HostDefault -Prompt "调度方式 [1=每天, 2=指定时间一次, 3=N分钟后一次, 4=每N小时] [1]" -DefaultValue "1"
     $dailyAt = $null
     $runAt = $null
+    $everyHours = 0
     $scheduleSummary = ""
 
     switch ($scheduleChoice) {
+        "4" {
+            $hoursInput = Read-HostDefault -Prompt "间隔小时数 [3]" -DefaultValue "3"
+            if ([string]::IsNullOrWhiteSpace($hoursInput) -or $hoursInput -notmatch '^\d+$' -or [int]$hoursInput -le 0 -or [int]$hoursInput -gt 168) {
+                Write-Die "间隔小时数须为 1-168 的整数"
+            }
+
+            $everyHours = [int]$hoursInput
+            $scheduleSummary = ("每 {0} 小时" -f $everyHours)
+        }
         "2" {
             $defaultRunAt = (Get-Date).AddHours(1).ToString("yyyy-MM-dd HH:mm:ss")
             $runAtInput = Read-HostDefault -Prompt ("执行时间 (yyyy-MM-dd HH:mm:ss) [{0}]" -f $defaultRunAt) -DefaultValue $defaultRunAt
@@ -571,7 +596,10 @@ function Invoke-CmdAdd {
         ReplaceExisting = $true
     }
 
-    if ($null -ne $dailyAt) {
+    if ($everyHours -gt 0) {
+        $registerParams.EveryHours = $everyHours
+    }
+    elseif ($null -ne $dailyAt) {
         $registerParams.DailyAt = $dailyAt
     }
     else {

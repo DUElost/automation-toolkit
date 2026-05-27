@@ -72,7 +72,23 @@ taskmgr log mytask
 |------|------|
 | `1` 每天 | 与 macOS 相同，按 Hour/Minute |
 | `2` 指定时间一次 | 输入 `yyyy-MM-dd HH:mm:ss` |
-| `3` N 分钟后一次 | 输入分钟数 |
+| `3` N 分钟后一次 | 输入分钟数；**执行后自动从 list 消失**（日志保留在 `TASKMGR_HOME`） |
+| `4` 每 N 小时 | 输入间隔小时数（1–168），可选对齐分钟 |
+
+创建任务时会自动记录**当前工作目录**（例如在 `~/Desktop/Stability` 下执行 `taskmgr add`，ansible 会在此目录运行）。
+
+若任务已创建但目录不对，可修正：
+
+```bash
+cd /path/to/Stability   # 含 inventory.ini 与 silence_android.yml 的目录
+taskmgr edit silence_android
+# 新工作目录: 直接回车使用当前目录，或粘贴完整路径
+# 新命令: 留空不修改
+taskmgr start silence_android   # 立即验证
+taskmgr log silence_android
+```
+
+已过期的一次性任务若仍留在 list，可执行：`taskmgr cleanup`
 
 ## 支持的命令
 

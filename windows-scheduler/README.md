@@ -21,7 +21,7 @@ taskmgr log mytask
 
 ```powershell
 taskmgr add mytask
-# 调度方式 [1=每天, 2=指定时间一次, 3=N分钟后一次] [1]:      ← 直接回车 = 每天
+# 调度方式 [1=每天, 2=指定时间一次, 3=N分钟后一次, 4=每N小时] [1]:  ← 直接回车 = 每天
 # Hour   (0-23) [9]:
 # Minute (0-59) [0]:
 # 启动命令: python .\python-tools\performance_SMT_ResultFiller\main.py
@@ -94,7 +94,18 @@ taskmgr add
   -ReplaceExisting
 ```
 
-参数说明：`TaskName`、`FilePath`、`Arguments`、`WorkDir`、`DailyAt`、`RunAt`、`ReminderMinutes`、`WakeToRun`、`ReplaceExisting`。`DailyAt` 与 `RunAt` 二选一。
+参数说明：`TaskName`、`FilePath`、`Arguments`、`WorkDir`、`DailyAt`、`RunAt`、`EveryHours`、`ReminderMinutes`、`WakeToRun`、`ReplaceExisting`。`DailyAt`、`RunAt`、`EveryHours` 三选一。
+
+```powershell
+# 每 3 小时执行
+.\windows-scheduler\Register-ScheduledTool.ps1 `
+  -TaskName "周期巡检" `
+  -FilePath ".\python-tools\stability_Start-Log-Scan\start_log_scan.py" `
+  -WorkDir ".\python-tools\stability_Start-Log-Scan" `
+  -EveryHours 3 `
+  -ReminderMinutes 10 `
+  -ReplaceExisting
+```
 
 ## 查看结果
 

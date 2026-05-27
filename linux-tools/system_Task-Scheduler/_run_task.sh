@@ -29,6 +29,7 @@ timestamp() { date '+%Y-%m-%d %H:%M:%S'; }
 
 {
     echo "[$(timestamp)] Task started: $NAME"
+    echo "[$(timestamp)] WorkDir: ${work_dir:-$HOME}"
     echo "[$(timestamp)] Command: $command"
 } >>"$LOG_OUT"
 
@@ -40,9 +41,26 @@ set +e
 rc=$?
 set -e
 
+if [[ "$rc" -ne 0 ]]; then
+    {
+        echo "[$(timestamp)] Hint: playbook/script not found? Check WorkDir with: taskmgr status $NAME"
+    } >>"$LOG_OUT"
+fi
+
 {
     echo "[$(timestamp)] Task finished: $NAME; exit=$rc"
 } >>"$LOG_OUT"
+
+if [[ "$rc" -ne 0 && -s "$LOG_ERR" ]]; then
+    {
+        echo "[$(timestamp)] stderr:"
+        tail -30 "$LOG_ERR"
+    } >>"$LOG_OUT"
+fi
+
+if [[ "${schedule_type:-}" == "once" ]]; then
+    bash "$TOOL_DIR/_finalize_once.sh" "$NAME" || true
+fi
 
 if [[ "${notify:-0}" == "1" ]] && command -v notify-send >/dev/null 2>&1; then
     if [[ "$rc" -eq 0 ]]; then

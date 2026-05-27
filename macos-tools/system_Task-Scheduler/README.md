@@ -17,10 +17,16 @@ brew install terminal-notifier
 ```bash
 # 创建每天 9:00 执行的任务
 taskmgr add mytask
+# 调度方式 [1=每天, 4=每N小时] [1]:
 # Hour   (0-23) [9]: 9
 # Minute (0-59) [0]: 0
 # 启动命令: python3 ~/my_script.py
 # 执行后发送通知? [Y/n]: y
+
+# 每 3 小时执行一次
+taskmgr add hourly-task
+# 调度方式: 4
+# 间隔小时数 [3]: 3
 
 # 查看所有任务
 taskmgr list

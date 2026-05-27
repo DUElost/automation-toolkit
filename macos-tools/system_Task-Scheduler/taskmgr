@@ -59,9 +59,15 @@ cmd_list() {
             fi
         fi
 
-        schedule=$(/usr/libexec/PlistBuddy -c "Print :StartCalendarInterval:Hour" "$plist" 2>/dev/null || echo "?")
-        minute=$(/usr/libexec/PlistBuddy -c "Print :StartCalendarInterval:Minute" "$plist" 2>/dev/null || echo "?")
-        [[ "$schedule" == "?" ]] && schedule="手动" || schedule="每天 ${schedule}:$(printf '%02d' "${minute:-0}")"
+        local interval_sec
+        interval_sec=$(/usr/libexec/PlistBuddy -c "Print :StartInterval" "$plist" 2>/dev/null || echo "")
+        if [[ -n "$interval_sec" && "$interval_sec" =~ ^[0-9]+$ ]]; then
+            schedule="每 $((interval_sec / 3600)) 小时"
+        else
+            schedule=$(/usr/libexec/PlistBuddy -c "Print :StartCalendarInterval:Hour" "$plist" 2>/dev/null || echo "?")
+            minute=$(/usr/libexec/PlistBuddy -c "Print :StartCalendarInterval:Minute" "$plist" 2>/dev/null || echo "?")
+            [[ "$schedule" == "?" ]] && schedule="手动" || schedule="每天 ${schedule}:$(printf '%02d' "${minute:-0}")"
+        fi
         printf "%-20s %-10s %-12s %s\n" "$name" "$status" "$delay_info" "$schedule"
     done <<< "$tasks"
 }
@@ -182,8 +188,20 @@ cmd_add() {
 
     echo "创建新定时任务: $name"
     echo "-------------------------"
-    read -rp "Hour   (0-23) [9]: " hour; hour=${hour:-9}
-    read -rp "Minute (0-59) [0]: " minute; minute=${minute:-0}
+    local sched interval_hours interval_sec hour minute
+    read -rp "调度方式 [1=每天, 4=每N小时] [1]: " sched; sched=${sched:-1}
+
+    if [[ "$sched" == "4" ]]; then
+        read -rp "间隔小时数 [3]: " interval_hours; interval_hours=${interval_hours:-3}
+        [[ "$interval_hours" =~ ^[0-9]+$ && "$interval_hours" -gt 0 ]] || die "请提供有效的间隔小时数"
+        interval_sec=$((interval_hours * 3600))
+        hour=""
+        minute=""
+    else
+        read -rp "Hour   (0-23) [9]: " hour; hour=${hour:-9}
+        read -rp "Minute (0-59) [0]: " minute; minute=${minute:-0}
+        interval_sec=""
+    fi
 
     echo "示例: python3 ~/script.py | node ~/task.js | curl https://..."
     read -rp "启动命令: " cmd
@@ -214,7 +232,29 @@ WRAPEOF
         args_xml+="        <string>${arg}</string>"$'\n'
     done
 
-    cat > "$plist" <<PLISTEOF
+    if [[ -n "$interval_sec" ]]; then
+        cat > "$plist" <<PLISTEOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+ "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>${PREFIX}.${name}</string>
+    <key>ProgramArguments</key>
+    <array>
+${args_xml}    </array>
+    <key>StartInterval</key>
+    <integer>${interval_sec}</integer>
+    <key>StandardOutPath</key>
+    <string>${TASKMGR_HOME}/${name}.log</string>
+    <key>StandardErrorPath</key>
+    <string>${TASKMGR_HOME}/${name}.err</string>
+</dict>
+</plist>
+PLISTEOF
+    else
+        cat > "$plist" <<PLISTEOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -237,9 +277,14 @@ ${args_xml}    </array>
 </dict>
 </plist>
 PLISTEOF
+    fi
 
     launchctl load "$plist"
-    ok "任务 '$name' 已创建，每天 ${hour}:$(printf '%02d' "$minute") 执行"
+    if [[ -n "$interval_sec" ]]; then
+        ok "任务 '$name' 已创建，每 ${interval_hours} 小时执行"
+    else
+        ok "任务 '$name' 已创建，每天 ${hour}:$(printf '%02d' "$minute") 执行"
+    fi
     echo "  修改命令: taskmgr edit $name"
     echo "  查看日志: taskmgr log  $name"
     echo "  手动触发: taskmgr start $name"
