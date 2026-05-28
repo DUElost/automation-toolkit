@@ -546,6 +546,28 @@ main() {
   collect_apps
   collect_devices
 
+  local mode src
+  if [[ "$PARALLEL_DEVICES" -eq 1 && ${#DEVICE_SERIALS[@]} -gt 1 ]]; then
+    if [[ "$MAX_JOBS" -eq 0 ]]; then
+      mode="并行(不限)"
+    else
+      mode="并行(${MAX_JOBS})"
+    fi
+  else
+    mode="串行"
+  fi
+  if [[ "$NO_CACHE" -eq 1 ]]; then
+    src="直读NFS"
+  elif [[ "$SKIP_CACHE" -eq 1 ]]; then
+    src="沿用缓存"
+  else
+    src="缓存(${CACHE_JOBS}路)"
+  fi
+  printf '[开始] 应用=%d 设备=%d 任务=%d 模式=%s 来源=%s\n' \
+    "${#APP_NAMES[@]}" "${#DEVICE_SERIALS[@]}" \
+    "$(( ${#APP_NAMES[@]} * ${#DEVICE_SERIALS[@]} ))" \
+    "$mode" "$src" >&2
+
   local rc=0
   if [[ "$DRY_RUN" -eq 0 ]]; then
     prepare_all_caches || rc=1
