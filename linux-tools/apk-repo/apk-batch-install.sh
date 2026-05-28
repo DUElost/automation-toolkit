@@ -7,9 +7,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 APPS_DIR="${APK_REPO_DIR:-$REPO_ROOT/incoming}"
-# 普通用户默认可写；管理员可用环境变量指向 /var/cache、/var/log
 CACHE_ROOT="${APK_CACHE_ROOT:-${XDG_CACHE_HOME:-$HOME/.cache}/apk-repo}"
-LOG_DIR="${APK_LOG_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/apk-batch-install}"
+LOG_DIR="${APK_LOG_DIR:-}"
 RETRIES="${APK_INSTALL_RETRIES:-3}"
 
 declare -a APP_NAMES=()
@@ -39,7 +38,7 @@ usage() {
 环境变量:
   APK_REPO_DIR          应用目录，默认 <repo>/incoming
   APK_CACHE_ROOT        本地缓存，默认 ~/.cache/apk-repo
-  APK_LOG_DIR           日志目录，默认 ~/.local/state/apk-batch-install
+  APK_LOG_DIR           日志目录，默认 <scripts>/logs（不可写时用 ~/logs/apk-repo）
   APK_INSTALL_RETRIES   失败重试次数，默认 3
 
 示例:
@@ -62,6 +61,19 @@ die() {
   exit 1
 }
 
+init_log_dir() {
+  if [[ -n "$LOG_DIR" ]]; then
+    mkdir -p "$LOG_DIR"
+    return
+  fi
+  if mkdir -p "$SCRIPT_DIR/logs" 2>/dev/null; then
+    LOG_DIR="$SCRIPT_DIR/logs"
+    return
+  fi
+  LOG_DIR="${HOME}/logs"
+  mkdir -p "$LOG_DIR"
+}
+
 ensure_repo_ready() {
   if [[ ! -d "$APPS_DIR" ]]; then
     if mountpoint -q /mnt/apk-repo 2>/dev/null || mount /mnt/apk-repo 2>/dev/null; then
@@ -75,7 +87,8 @@ ensure_repo_ready() {
   fi
 
   command -v adb >/dev/null 2>&1 || die "未找到 adb，请安装: apt install android-tools-adb"
-  mkdir -p "$CACHE_ROOT" "$LOG_DIR"
+  init_log_dir
+  mkdir -p "$CACHE_ROOT"
 }
 
 read_list_file() {

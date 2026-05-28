@@ -14,7 +14,8 @@
     ├── import-apks.sh
     ├── apk-batch-install.sh
     ├── apk-install-app.sh
-    └── apps.example.txt
+    ├── apps.example.txt
+    └── logs/              # 安装日志（源站可写；NFS 只读节点回退 ~/logs）
 ```
 
 **不需要单独的 `apps/` 目录。**
