@@ -54,7 +54,8 @@ usage() {
   apk-batch-install.sh -l /mnt/apk-repo/scripts/apps.example.txt
   apk-batch-install.sh -A
   apk-batch-install.sh -f batch_dir -d DEVICE1 -d DEVICE2 -p
-  apk-batch-install.sh -f batch_dir -P -c
+  apk-batch-install.sh -f batch_dir -P -j 5 -c
+  apk-batch-install.sh -f batch_dir -P -j 0 -c
   apk-batch-install.sh -l batch.txt -c
 
 依赖: adb, mount.nfs 已挂载, rsync 或 cp
@@ -292,6 +293,44 @@ run_for_device() {
   [[ "$failed" -eq 0 ]]
 }
 
+run_devices_parallel() {
+  local max_jobs="$1"
+  local serial running=0
+  local rc=0
+
+  if [[ "$max_jobs" -eq 0 ]]; then
+    log "并行上限: 不限制（${#DEVICE_SERIALS[@]} 台同时）"
+    local pids=() pid
+    for serial in "${DEVICE_SERIALS[@]}"; do
+      (
+        if ! run_for_device "$serial"; then exit 1; fi
+      ) &
+      pids+=($!)
+    done
+    for pid in "${pids[@]}"; do
+      wait "$pid" || rc=1
+    done
+    return "$rc"
+  fi
+
+  log "并行上限: 最多同时 ${max_jobs} 台"
+  for serial in "${DEVICE_SERIALS[@]}"; do
+    while (( running >= max_jobs )); do
+      wait -n || rc=1
+      ((running--)) || true
+    done
+    (
+      if ! run_for_device "$serial"; then exit 1; fi
+    ) &
+    ((running++)) || true
+  done
+  while (( running > 0 )); do
+    wait -n || rc=1
+    ((running--)) || true
+  done
+  return "$rc"
+}
+
 write_summary() {
   local summary_file="$LOG_DIR/last-run.summary"
   {
@@ -332,9 +371,15 @@ main() {
         DEVICE_SERIALS+=("$2")
         shift 2
         ;;
-      -p|--parallel-devices|--parallel)
+      -p|-P|--parallel-devices|--parallel)
         PARALLEL_DEVICES=1
         shift
+        ;;
+      -j|--jobs)
+        [[ $# -ge 2 ]] || die "$1 需要参数"
+        [[ "$2" =~ ^[0-9]+$ ]] || die "-j 需要非负整数"
+        MAX_JOBS="$2"
+        shift 2
         ;;
       -n|--dry-run)
         DRY_RUN=1
@@ -369,7 +414,7 @@ main() {
   log "仓库: $REPO_ROOT"
   log "应用数: ${#APP_NAMES[@]}, 设备数: ${#DEVICE_SERIALS[@]}"
   if [[ "$PARALLEL_DEVICES" -eq 1 && ${#DEVICE_SERIALS[@]} -gt 1 ]]; then
-    log "模式: 多设备并行"
+    log "模式: 多设备并行（-j ${MAX_JOBS}）"
   else
     log "模式: 逐设备串行（单设备内应用也串行）"
   fi
@@ -377,20 +422,7 @@ main() {
 
   local rc=0
   if [[ "$PARALLEL_DEVICES" -eq 1 && ${#DEVICE_SERIALS[@]} -gt 1 ]]; then
-    local pids=() serial
-    for serial in "${DEVICE_SERIALS[@]}"; do
-      (
-        if ! run_for_device "$serial"; then
-          exit 1
-        fi
-      ) &
-      pids+=($!)
-    done
-    for pid in "${pids[@]}"; do
-      if ! wait "$pid"; then
-        rc=1
-      fi
-    done
+    run_devices_parallel "$MAX_JOBS" || rc=1
   else
     local serial
     for serial in "${DEVICE_SERIALS[@]}"; do
