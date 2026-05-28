@@ -33,6 +33,7 @@ usage() {
   -A, --all               安装 incoming 下全部应用
   -d, --device SERIAL     指定设备序列号（可重复；默认本节点全部在线设备）
   -p, --parallel-devices  多设备并行安装（默认逐设备串行）
+  -P, --parallel          同 --parallel-devices
   -n, --dry-run           只打印计划，不执行安装
   -c, --continue-on-error 某个应用/设备失败后继续
   -h, --help              显示帮助

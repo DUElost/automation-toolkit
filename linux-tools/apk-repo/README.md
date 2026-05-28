@@ -93,8 +93,9 @@ adb devices
 # 单应用
 /mnt/apk-repo/scripts/apk-install-app.sh cn_xender
 
-# 多设备
-/mnt/apk-repo/scripts/apk-batch-install.sh -a cn_xender -d SERIAL1 -d SERIAL2 -p
+# 多设备并行（2 台及以上 USB/无线设备时加 -p 或 -P）
+/mnt/apk-repo/scripts/apk-batch-install.sh -f extracted_apks_Infinix-X6851_Android16 -P -c
+/mnt/apk-repo/scripts/apk-batch-install.sh -f batch_dir -d SERIAL1 -d SERIAL2 -p
 ```
 
 路径对应：`/mnt/apk-repo/incoming/<应用名>/`
