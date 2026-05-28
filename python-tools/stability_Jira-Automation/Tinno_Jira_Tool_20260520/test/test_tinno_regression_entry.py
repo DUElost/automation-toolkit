@@ -110,6 +110,16 @@ class TinnoRegressionEntryTest(unittest.TestCase):
 
         self.assertIsNone(matched)
 
+    def test_extract_specialty_from_row_normalizes_test_case_label(self) -> None:
+        row = {
+            "Summary": "普通摘要",
+            "Test Case": "MTBF专项",
+        }
+
+        specialty = self.module.extract_specialty_from_row(row, self.defaults)
+
+        self.assertEqual("MTBF", specialty)
+
     def test_build_regression_pass_comment_uses_structured_template_for_tinno(self) -> None:
         comment = self.module.build_regression_pass_comment(
             pass_count=2,

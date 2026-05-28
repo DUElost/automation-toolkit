@@ -198,6 +198,24 @@ class TinnoRegressionExecutorTest(unittest.TestCase):
         self.assertFalse(decision.comment_required)
         self.assertFalse(decision.recreate_issue)
 
+    def test_duplicate_resolution_returns_manual_review_when_build_version_is_not_comparable(self) -> None:
+        decision = executor.decide_action(
+            current_row={"project": "VFFCA"},
+            history={
+                "status": "Resolved",
+                "resolution": "重复问题",
+                "build_version": "recognizeexception",
+                "affect_project": "VFFCA",
+            },
+            current_version="MLD-LX2-16-260523V6",
+            strict_version_project_keys=["VFFCA"],
+        )
+
+        self.assertEqual("MANUAL_REVIEW", decision.action)
+        self.assertTrue(decision.manual_review)
+        self.assertFalse(decision.comment_required)
+        self.assertFalse(decision.recreate_issue)
+
     def test_regression_pass_skip_when_build_version_missing_for_vffca(self) -> None:
         decision = executor.evaluate_regression_pass(
             pass_count=0,

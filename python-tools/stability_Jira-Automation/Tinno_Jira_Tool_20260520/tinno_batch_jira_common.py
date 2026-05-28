@@ -32,6 +32,7 @@ EXCEL_FIELD_CANDIDATES = {
     "description": ["Description", "description"],
     "priority": ["Priority", "priority"],
     "bug_severity": ["Bug Severity", "bug_severity", "Severity Level", "severity_level", "问题等级"],
+    "test_case": ["Test Case", "TestCase", "test_case", "测试项", "测试专项", "专项"],
     "key_information": ["key_information", "Key Information", "CausedBy", "Cause By", "caused_by"],
     "assignee": ["Assignee", "assignee"],
     "reporter": ["Reporter", "reporter"],

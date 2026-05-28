@@ -60,6 +60,11 @@ def _version_key(version: Any) -> tuple[str, ...]:
     return tuple(normalized)
 
 
+def _is_comparable_version(version: Any) -> bool:
+    text = _normalize_text(version)
+    return bool(text and re.search(r"\d", text))
+
+
 def _compare_versions(current_version: Any, fix_version: Any) -> int:
     current_key = _version_key(current_version)
     fix_key = _version_key(fix_version)
@@ -181,7 +186,14 @@ def decide_action(
 
     if _is_duplicate_resolution(resolution):
         current_version_text = _normalize_text(current_version)
-        if build_version and current_version_text and _compare_versions(current_version_text, build_version) > 0:
+        if not _is_comparable_version(current_version_text) or not _is_comparable_version(build_version):
+            return ActionDecision(
+                action="MANUAL_REVIEW",
+                update_jira=False,
+                manual_review=True,
+                comment_required=False,
+            )
+        if _compare_versions(current_version_text, build_version) > 0:
             return ActionDecision(
                 action="DUPLICATE_COMMENT",
                 update_jira=False,

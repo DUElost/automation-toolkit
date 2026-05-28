@@ -690,20 +690,28 @@ def extract_specialty_from_summary(summary: Any) -> str:
     return _extract_summary_test_case(summary)
 
 
-def extract_specialty_from_row(row: Any) -> str:
-    specialty = str(getattr(row, "get", lambda *_args, **_kwargs: "")("specialty") or "").strip()
+def extract_specialty_from_row(row: Any, defaults: Dict[str, Any] | None = None) -> str:
+    def _normalize_specialty(value: Any) -> str:
+        specialty_text = str(value or "").strip()
+        if not specialty_text:
+            return ""
+        if defaults is not None:
+            return resolve_regression_specialty(specialty_text, defaults)
+        return specialty_text
+
+    specialty = _normalize_specialty(getattr(row, "get", lambda *_args, **_kwargs: "")("specialty"))
     if specialty:
         return specialty
     specialty = extract_specialty_from_summary(find_first_value(row, "summary", ""))
     if specialty:
         return specialty
-    return str(find_first_value(row, "test_case", "") or "").strip()
+    return _normalize_specialty(find_first_value(row, "test_case", ""))
 
 
 def collect_batch_specialties(df: pd.DataFrame, defaults: Dict[str, Any]) -> set[str]:
     specialties: set[str] = set()
     for _, row in df.iterrows():
-        specialty = extract_specialty_from_row(row)
+        specialty = extract_specialty_from_row(row, defaults)
         if not specialty:
             specialty = resolve_regression_specialty(find_first_value(row, "test_case", ""), defaults)
         if specialty:
