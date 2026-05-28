@@ -263,6 +263,7 @@ prepare_all_caches() {
   return 0
 }
 
+install_to_device() {
   local app="$1"
   local serial="$2"
   local attempt=1
