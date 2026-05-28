@@ -27,6 +27,7 @@ STATS_OK=""
 STATS_FAIL=""
 STATS_LOCK=""
 CACHE_SKIP=""
+PROGRESS_DIR=""
 
 usage() {
   cat <<'EOF'
@@ -86,7 +87,8 @@ init_stats() {
   STATS_FAIL="$(mktemp)"
   STATS_LOCK="$(mktemp)"
   CACHE_SKIP="$(mktemp)"
-  trap 'rm -f "$STATS_OK" "$STATS_FAIL" "$STATS_LOCK" "$CACHE_SKIP"' EXIT
+  PROGRESS_DIR="$(mktemp -d)"
+  trap 'rm -rf "$STATS_OK" "$STATS_FAIL" "$STATS_LOCK" "$CACHE_SKIP" "$PROGRESS_DIR"' EXIT
 }
 
 record_success() {
@@ -308,6 +310,29 @@ mark_cache_failed() {
   echo "$1" >>"$CACHE_SKIP"
 }
 
+mark_app_device_done() {
+  local app="$1"
+  local key file lock done_count completed app_total device_total ok_n
+  key="$(printf '%s' "$app" | tr -c 'A-Za-z0-9_.-' '_')"
+  file="$PROGRESS_DIR/$key.cnt"
+  lock="$PROGRESS_DIR/.lock"
+  device_total=${#DEVICE_SERIALS[@]}
+  app_total=${#APP_NAMES[@]}
+  (
+    flock -x 200
+    echo 1 >>"$file"
+    done_count=$(wc -l <"$file" | tr -d ' ')
+    if (( done_count == device_total )); then
+      echo 1 >>"$PROGRESS_DIR/.global"
+      completed=$(wc -l <"$PROGRESS_DIR/.global" | tr -d ' ')
+      ok_n=0
+      [[ -f "$STATS_OK" ]] && ok_n=$(awk -F'\t' -v a="$app" '$1==a{n++} END{print n+0}' "$STATS_OK")
+      printf '[%d/%d] %s 完成 %d/%d\n' \
+        "$completed" "$app_total" "$app" "$ok_n" "$device_total" >&2
+    fi
+  ) 200>"$lock"
+}
+
 prepare_one_cache() {
   local app="$1"
 
@@ -407,12 +432,13 @@ install_to_device() {
 
 run_for_device() {
   local serial="$1"
-  local app failed=0
+  local app failed=0 rc_install
 
   for app in "${APP_NAMES[@]}"; do
     if [[ ! -d "$APPS_DIR/$app" ]]; then
       record_failure "$app" "$serial" "应用目录不存在"
       err "应用不存在: $app -> $serial"
+      mark_app_device_done "$app"
       ((failed++)) || true
       [[ "$CONTINUE_ON_ERROR" -eq 1 ]] && continue
       return 1
@@ -424,14 +450,16 @@ run_for_device() {
 
     if is_cache_failed "$app"; then
       record_failure "$app" "$serial" "缓存失败"
+      mark_app_device_done "$app"
       ((failed++)) || true
       [[ "$CONTINUE_ON_ERROR" -eq 1 ]] && continue
       return 1
     fi
 
-    if install_to_device "$app" "$serial"; then
-      :
-    else
+    rc_install=0
+    install_to_device "$app" "$serial" || rc_install=1
+    mark_app_device_done "$app"
+    if (( rc_install != 0 )); then
       ((failed++)) || true
       [[ "$CONTINUE_ON_ERROR" -eq 1 ]] && continue
       return 1
