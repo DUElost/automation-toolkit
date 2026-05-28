@@ -310,26 +310,20 @@ mark_cache_failed() {
   echo "$1" >>"$CACHE_SKIP"
 }
 
-mark_app_device_done() {
-  local app="$1"
-  local key file lock done_count completed app_total device_total ok_n
-  key="$(printf '%s' "$app" | tr -c 'A-Za-z0-9_.-' '_')"
-  file="$PROGRESS_DIR/$key.cnt"
-  lock="$PROGRESS_DIR/.lock"
-  device_total=${#DEVICE_SERIALS[@]}
-  app_total=${#APP_NAMES[@]}
+record_task_done() {
+  local status="$1" app="$2" serial="$3"
+  local lock="$PROGRESS_DIR/.lock"
+  local total done_n ok_n fail_n
+  total=$(( ${#APP_NAMES[@]} * ${#DEVICE_SERIALS[@]} ))
   (
     flock -x 200
-    echo 1 >>"$file"
-    done_count=$(wc -l <"$file" | tr -d ' ')
-    if (( done_count == device_total )); then
-      echo 1 >>"$PROGRESS_DIR/.global"
-      completed=$(wc -l <"$PROGRESS_DIR/.global" | tr -d ' ')
-      ok_n=0
-      [[ -f "$STATS_OK" ]] && ok_n=$(awk -F'\t' -v a="$app" '$1==a{n++} END{print n+0}' "$STATS_OK")
-      printf '[%d/%d] %s 完成 %d/%d\n' \
-        "$completed" "$app_total" "$app" "$ok_n" "$device_total" >&2
-    fi
+    echo 1 >>"$PROGRESS_DIR/.done"
+    done_n=$(wc -l <"$PROGRESS_DIR/.done" | tr -d ' ')
+    ok_n=0; fail_n=0
+    [[ -f "$STATS_OK" ]] && ok_n=$(wc -l <"$STATS_OK" | tr -d ' ')
+    [[ -f "$STATS_FAIL" ]] && fail_n=$(wc -l <"$STATS_FAIL" | tr -d ' ')
+    printf '[%d/%d] %s -> %s %s  累计 ok=%d fail=%d\n' \
+      "$done_n" "$total" "$app" "$serial" "$status" "$ok_n" "$fail_n" >&2
   ) 200>"$lock"
 }
 
@@ -437,8 +431,7 @@ run_for_device() {
   for app in "${APP_NAMES[@]}"; do
     if [[ ! -d "$APPS_DIR/$app" ]]; then
       record_failure "$app" "$serial" "应用目录不存在"
-      err "应用不存在: $app -> $serial"
-      mark_app_device_done "$app"
+      record_task_done FAIL "$app" "$serial"
       ((failed++)) || true
       [[ "$CONTINUE_ON_ERROR" -eq 1 ]] && continue
       return 1
@@ -450,7 +443,7 @@ run_for_device() {
 
     if is_cache_failed "$app"; then
       record_failure "$app" "$serial" "缓存失败"
-      mark_app_device_done "$app"
+      record_task_done FAIL "$app" "$serial"
       ((failed++)) || true
       [[ "$CONTINUE_ON_ERROR" -eq 1 ]] && continue
       return 1
@@ -458,8 +451,10 @@ run_for_device() {
 
     rc_install=0
     install_to_device "$app" "$serial" || rc_install=1
-    mark_app_device_done "$app"
-    if (( rc_install != 0 )); then
+    if (( rc_install == 0 )); then
+      record_task_done OK "$app" "$serial"
+    else
+      record_task_done FAIL "$app" "$serial"
       ((failed++)) || true
       [[ "$CONTINUE_ON_ERROR" -eq 1 ]] && continue
       return 1
