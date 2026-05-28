@@ -18,6 +18,7 @@ MAX_JOBS="${APK_MAX_PARALLEL:-5}"
 DRY_RUN=0
 CONTINUE_ON_ERROR=0
 SKIP_CACHE=0
+NO_CACHE=0
 LIST_FILE=""
 FOLDER=""
 CACHE_JOBS="${APK_CACHE_PARALLEL:-4}"
@@ -46,6 +47,7 @@ usage() {
   -n, --dry-run           只打印计划，不执行安装
   -c, --continue-on-error 某个应用/设备失败后继续
   -S, --skip-cache        跳过 NFS→本地缓存（沿用 ~/.cache/apk-repo 已有内容）
+  -N, --no-cache          完全不缓存，直接从 NFS 路径 adb install（立即开跑）
   -h, --help              显示帮助
 
 环境变量:
@@ -289,7 +291,13 @@ sync_app_cache() {
 
 list_apks() {
   local app="$1"
-  find "$CACHE_ROOT/$app" -maxdepth 1 -name '*.apk' | sort
+  local root
+  if [[ "$NO_CACHE" -eq 1 ]]; then
+    root="$APPS_DIR/$app"
+  else
+    root="$CACHE_ROOT/$app"
+  fi
+  find "$root" -maxdepth 1 -name '*.apk' | sort
 }
 
 is_cache_failed() {
@@ -321,7 +329,7 @@ prepare_all_caches() {
   local total=${#APP_NAMES[@]}
   local app idx=0 failed=0 rc=0 running=0 jobs="$CACHE_JOBS"
 
-  if [[ "$SKIP_CACHE" -eq 1 ]]; then
+  if [[ "$NO_CACHE" -eq 1 || "$SKIP_CACHE" -eq 1 ]]; then
     return 0
   fi
 
@@ -516,6 +524,10 @@ main() {
         ;;
       -S|--skip-cache)
         SKIP_CACHE=1
+        shift
+        ;;
+      -N|--no-cache)
+        NO_CACHE=1
         shift
         ;;
       -h|--help)
