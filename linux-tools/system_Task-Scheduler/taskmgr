@@ -273,15 +273,41 @@ cmd_log() {
     fi
 }
 
+_last_task_exit() {
+    local name="$1"
+    local logf="$TASKMGR_HOME/${name}.log"
+    if [[ ! -f "$logf" ]]; then
+        echo ""
+        return 1
+    fi
+    local line
+    line=$(grep "Task finished: ${name}; exit=" "$logf" 2>/dev/null | tail -1 || true)
+    [[ -n "$line" ]] || return 1
+    echo "${line##*exit=}"
+}
+
 cmd_start() {
     local name="${1:-}"
     [[ -n "$name" ]] || die "请指定任务名"
-    _load_meta "$name"
+    _meta_exists "$name" || die "任务 '$name' 不存在"
     _require_systemd
-    systemctl --user start "$(_unit_name "$name").service" || die "启动失败，任务是否已注册？"
+
+    if ! systemctl --user start "$(_unit_name "$name").service" 2>/dev/null; then
+        if ! _last_task_exit "$name" >/dev/null 2>&1; then
+            die "启动失败，任务是否已注册？可执行: systemctl --user status $(_unit_name "$name").service"
+        fi
+    fi
+
     sleep 2
-    tail -5 "$TASKMGR_HOME/${name}.log" 2>/dev/null || true
-    ok "$name 已触发"
+    tail -15 "$TASKMGR_HOME/${name}.log" 2>/dev/null || true
+
+    local task_rc
+    task_rc=$(_last_task_exit "$name" || echo "")
+    if [[ -z "$task_rc" || "$task_rc" == "0" ]]; then
+        ok "$name 已触发"
+    else
+        ok "$name 已触发（命令退出码 ${task_rc}，详见 taskmgr log ${name}）"
+    fi
 }
 
 cmd_delay() {

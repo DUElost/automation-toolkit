@@ -42,9 +42,15 @@ rc=$?
 set -e
 
 if [[ "$rc" -ne 0 ]]; then
-    {
-        echo "[$(timestamp)] Hint: playbook/script not found? Check WorkDir with: taskmgr status $NAME"
-    } >>"$LOG_OUT"
+    if [[ -s "$LOG_ERR" ]] && grep -q "could not be found" "$LOG_ERR" 2>/dev/null; then
+        {
+            echo "[$(timestamp)] Hint: playbook/script not found? Check WorkDir: taskmgr status $NAME"
+        } >>"$LOG_OUT"
+    else
+        {
+            echo "[$(timestamp)] Hint: command exit=$rc (ansible 等非 0 可能表示部分主机失败，详见上方输出)"
+        } >>"$LOG_OUT"
+    fi
 fi
 
 {
@@ -70,4 +76,5 @@ if [[ "${notify:-0}" == "1" ]] && command -v notify-send >/dev/null 2>&1; then
     fi
 fi
 
-exit "$rc"
+# 业务命令退出码已写入日志；对 systemd 返回 0，表示「已投递执行」
+exit 0
