@@ -456,16 +456,17 @@ main() {
   fi
 
   if [[ "$rc" -eq 0 ]]; then
-  if [[ "$PARALLEL_DEVICES" -eq 1 && ${#DEVICE_SERIALS[@]} -gt 1 ]]; then
-    run_devices_parallel "$MAX_JOBS" || rc=1
-  else
-    local serial
-    for serial in "${DEVICE_SERIALS[@]}"; do
-      if ! run_for_device "$serial"; then
-        rc=1
-        [[ "$CONTINUE_ON_ERROR" -eq 1 ]] || break
-      fi
-    done
+    if [[ "$PARALLEL_DEVICES" -eq 1 && ${#DEVICE_SERIALS[@]} -gt 1 ]]; then
+      run_devices_parallel "$MAX_JOBS" || rc=1
+    else
+      local serial
+      for serial in "${DEVICE_SERIALS[@]}"; do
+        if ! run_for_device "$serial"; then
+          rc=1
+          [[ "$CONTINUE_ON_ERROR" -eq 1 ]] || break
+        fi
+      done
+    fi
   fi
 
   write_summary
