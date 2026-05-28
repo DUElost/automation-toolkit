@@ -87,6 +87,9 @@ adb devices
 /mnt/apk-repo/scripts/apk-batch-install.sh -l /mnt/apk-repo/scripts/apps.example.txt
 /mnt/apk-repo/scripts/apk-batch-install.sh -A -c
 
+# 指定文件夹（整包目录）
+/mnt/apk-repo/scripts/apk-batch-install.sh -f downloaded_apks_Infinix_X6852_Android16_0522 -c
+
 # 单应用
 /mnt/apk-repo/scripts/apk-install-app.sh cn_xender
 
@@ -95,3 +98,9 @@ adb devices
 ```
 
 路径对应：`/mnt/apk-repo/incoming/<应用名>/`
+
+## 日志
+
+- 默认：`/mnt/apk-repo/scripts/logs/`（与脚本同目录）
+- NFS 只读无法写入时，自动改用：`~/logs/apk-repo/`
+- 手动指定：`APK_LOG_DIR=/path/to/logs ./apk-batch-install.sh ...`

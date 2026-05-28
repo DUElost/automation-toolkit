@@ -18,6 +18,7 @@ PARALLEL_DEVICES=0
 DRY_RUN=0
 CONTINUE_ON_ERROR=0
 LIST_FILE=""
+FOLDER=""
 
 usage() {
   cat <<'EOF'
@@ -27,6 +28,7 @@ usage() {
 
 选项:
   -a, --app NAME          安装指定应用目录（可重复）
+  -f, --folder PATH       安装指定文件夹下全部应用（相对 incoming 或绝对路径）
   -l, --list FILE         从文件读取应用目录列表（每行一个，# 开头为注释）
   -A, --all               安装 incoming 下全部应用
   -d, --device SERIAL     指定设备序列号（可重复；默认本节点全部在线设备）
@@ -43,6 +45,8 @@ usage() {
 
 示例:
   apk-batch-install.sh -a cn_xender -a com_whatsapp
+  apk-batch-install.sh -f downloaded_apks_Infinix_X6852_Android16_0522
+  apk-batch-install.sh -f /mnt/apk-repo/incoming/downloaded_apks_Infinix_X6852_Android16_0522 -c
   apk-batch-install.sh -l /mnt/apk-repo/scripts/apps.example.txt
   apk-batch-install.sh -A
   apk-batch-install.sh -a cn_xender -d DEVICE1 -d DEVICE2 -p
@@ -108,17 +112,62 @@ read_list_file() {
 }
 
 discover_app_dirs() {
-  find "$APPS_DIR" -mindepth 1 -type f -name '*.apk' -printf '%h\n' 2>/dev/null | sort -u
+  local root="${1:-$APPS_DIR}"
+  find "$root" -mindepth 1 -type f -name '*.apk' -printf '%h\n' 2>/dev/null | sort -u
+}
+
+resolve_folder() {
+  local input="$1"
+  if [[ -d "$input" ]]; then
+    cd "$input" && pwd
+    return
+  fi
+  if [[ -d "$APPS_DIR/$input" ]]; then
+    cd "$APPS_DIR/$input" && pwd
+    return
+  fi
+  if [[ -d "$REPO_ROOT/$input" ]]; then
+    cd "$REPO_ROOT/$input" && pwd
+    return
+  fi
+  die "文件夹不存在: $input"
+}
+
+add_apps_from_dirs() {
+  local appdir rel
+  while IFS= read -r appdir; do
+    [[ -n "$appdir" ]] || continue
+    if [[ "$appdir" == "$APPS_DIR" ]]; then
+      continue
+    fi
+    rel="${appdir#"$APPS_DIR"/}"
+    [[ -n "$rel" ]] || continue
+    APP_NAMES+=("$rel")
+  done
+}
+
+collect_from_folder() {
+  local folder
+  folder="$(resolve_folder "$1")"
+  log "指定文件夹: $folder"
+
+  if find "$folder" -maxdepth 1 -name '*.apk' -print -quit | grep -q .; then
+    local rel="${folder#"$APPS_DIR"/}"
+    [[ -n "$rel" ]] || rel="$(basename "$folder")"
+    APP_NAMES+=("$rel")
+    return
+  fi
+
+  add_apps_from_dirs < <(discover_app_dirs "$folder")
 }
 
 collect_apps() {
+  if [[ -n "$FOLDER" ]]; then
+    collect_from_folder "$FOLDER"
+  fi
+
   if [[ "$INSTALL_ALL" -eq 1 ]]; then
-    local appdir rel
-    while IFS= read -r appdir; do
-      [[ -n "$appdir" ]] || continue
-      rel="${appdir#"$APPS_DIR"/}"
-      APP_NAMES+=("$rel")
-    done < <(discover_app_dirs)
+    add_apps_from_dirs < <(discover_app_dirs "$APPS_DIR")
   fi
 
   if [[ ${#APP_NAMES[@]} -eq 0 ]]; then
@@ -130,7 +179,7 @@ collect_apps() {
     else
       hint+="；可尝试先运行 import-apks.sh 展平/合并分片"
     fi
-    die "未找到可安装应用（$hint）"
+    die "未找到可安装应用（$hint）。使用 -a / -f / -l / -A"
   fi
 
   # 去重
@@ -256,6 +305,11 @@ main() {
       -a|--app)
         [[ $# -ge 2 ]] || die "$1 需要参数"
         APP_NAMES+=("$2")
+        shift 2
+        ;;
+      -f|--folder)
+        [[ $# -ge 2 ]] || die "$1 需要参数"
+        FOLDER="$2"
         shift 2
         ;;
       -l|--list)
