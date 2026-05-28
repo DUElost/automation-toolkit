@@ -7,8 +7,9 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 APPS_DIR="${APK_REPO_DIR:-$REPO_ROOT/incoming}"
-CACHE_ROOT="${APK_CACHE_ROOT:-/var/cache/apk-repo}"
-LOG_DIR="${APK_LOG_DIR:-/var/log/apk-batch-install}"
+# 普通用户默认可写；管理员可用环境变量指向 /var/cache、/var/log
+CACHE_ROOT="${APK_CACHE_ROOT:-${XDG_CACHE_HOME:-$HOME/.cache}/apk-repo}"
+LOG_DIR="${APK_LOG_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/apk-batch-install}"
 RETRIES="${APK_INSTALL_RETRIES:-3}"
 
 declare -a APP_NAMES=()
@@ -37,8 +38,8 @@ usage() {
 
 环境变量:
   APK_REPO_DIR          应用目录，默认 <repo>/incoming
-  APK_CACHE_ROOT        本地缓存目录，默认 /var/cache/apk-repo
-  APK_LOG_DIR           日志目录，默认 /var/log/apk-batch-install
+  APK_CACHE_ROOT        本地缓存，默认 ~/.cache/apk-repo
+  APK_LOG_DIR           日志目录，默认 ~/.local/state/apk-batch-install
   APK_INSTALL_RETRIES   失败重试次数，默认 3
 
 示例:
