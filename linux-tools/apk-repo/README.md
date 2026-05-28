@@ -101,6 +101,5 @@ adb devices
 
 ## 日志
 
-- 默认：`/mnt/apk-repo/scripts/logs/`（与脚本同目录）
-- NFS 只读无法写入时，自动改用：`~/logs/apk-repo/`
-- 手动指定：`APK_LOG_DIR=/path/to/logs ./apk-batch-install.sh ...`
+- 默认：可写时用 `scripts/logs/`，NFS 只读时自动改用 `~/logs/`
+- 手动指定：`APK_LOG_DIR=~/logs ./apk-batch-install.sh ...`

@@ -40,7 +40,7 @@ usage() {
 环境变量:
   APK_REPO_DIR          应用目录，默认 <repo>/incoming
   APK_CACHE_ROOT        本地缓存，默认 ~/.cache/apk-repo
-  APK_LOG_DIR           日志目录，默认 <scripts>/logs（不可写时用 ~/logs/apk-repo）
+  APK_LOG_DIR           日志目录，默认可写则 scripts/logs，否则 ~/logs
   APK_INSTALL_RETRIES   失败重试次数，默认 3
 
 示例:
@@ -66,16 +66,17 @@ die() {
 }
 
 init_log_dir() {
-  if [[ -n "$LOG_DIR" ]]; then
-    mkdir -p "$LOG_DIR"
-    return
-  fi
-  if mkdir -p "$SCRIPT_DIR/logs" 2>/dev/null; then
-    LOG_DIR="$SCRIPT_DIR/logs"
-    return
-  fi
-  LOG_DIR="${HOME}/logs"
-  mkdir -p "$LOG_DIR"
+  local candidate
+  for candidate in "${APK_LOG_DIR:-}" "$SCRIPT_DIR/logs" "${HOME}/logs"; do
+    [[ -n "$candidate" ]] || continue
+    mkdir -p "$candidate" 2>/dev/null || continue
+    if touch "$candidate/.apk-write-test" 2>/dev/null; then
+      rm -f "$candidate/.apk-write-test"
+      LOG_DIR="$candidate"
+      return
+    fi
+  done
+  die "无法创建可写日志目录（尝试过 scripts/logs 与 ~/logs）"
 }
 
 ensure_repo_ready() {
@@ -354,6 +355,9 @@ main() {
   collect_devices
 
   local log_file="$LOG_DIR/run-$(date '+%Y%m%d-%H%M%S').log"
+  if ! touch "$log_file" 2>/dev/null; then
+    die "无法写入日志: $log_file"
+  fi
   exec > >(tee -a "$log_file") 2>&1
 
   log "APK 批量安装开始"
