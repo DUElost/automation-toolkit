@@ -1,0 +1,8 @@
+# 每行一个应用目录名（对应 /mnt/apk-repo/apps/<名称>）
+# 以 # 开头的行为注释
+
+cn_xender
+com_whatsapp
+com_instagram_android
+com_spotify_music
+com_twitter_android
