@@ -20,11 +20,14 @@
 
 ```text
 /data/apk-repo/
-├── incoming/          # Windows 上传区（Samba 可写）
-├── apps/              # 正式 APK 仓库（NFS 只读给节点）
-└── scripts/
-    └── import-apks.sh # 入库 + 合并分片
+├── incoming/          # 唯一 APK 目录：Windows 上传 + 节点 NFS 安装
+└── scripts/           # 安装/整理脚本（Windows 可访问）
+    ├── import-apks.sh
+    ├── apk-batch-install.sh
+    └── apk-install-app.sh
 ```
+
+> **不需要单独的 `apps/` 目录。** 上传与安装均使用 `incoming/`。
 
 ---
 
@@ -33,18 +36,16 @@
 ### 1.1 基础目录与权限
 
 ```bash
-mkdir -p /data/apk-repo/{incoming,apps,scripts}
+mkdir -p /data/apk-repo/{incoming,scripts}
 
 groupadd smbshare 2>/dev/null
 
-chown root:smbshare /data/apk-repo/incoming
-chmod 775 /data/apk-repo/incoming
+chown root:smbshare /data/apk-repo/incoming /data/apk-repo/scripts
+chmod 775 /data/apk-repo/incoming /data/apk-repo/scripts
 
-chown -R nobody:nogroup /data/apk-repo/apps
-chmod -R 755 /data/apk-repo/apps
-
-chown root:root /data/apk-repo/scripts
-chmod 755 /data/apk-repo/scripts
+# NFS 只读访问，保持 incoming 可读
+chown -R nobody:nogroup /data/apk-repo/incoming
+chmod -R 755 /data/apk-repo/incoming
 ```
 
 ### 1.2 NFS 服务（Linux 节点只读访问）
@@ -69,7 +70,7 @@ showmount -e 172.21.8.202
 
 # 用局域网 IP 测试（不要用 127.0.0.1）
 mount -t nfs 172.21.8.202:/data/apk-repo /mnt/apk-test -o ro,vers=4.2
-ls /mnt/apk-test/apps | wc -l
+ls /mnt/apk-test/incoming | wc -l
 umount /mnt/apk-test
 ```
 
@@ -98,12 +99,15 @@ smbpasswd -a apkadmin
    directory mask = 0775
    force group = smbshare
 
-[apk-apps]
-   path = /data/apk-repo/apps
+[apk-scripts]
+   path = /data/apk-repo/scripts
    browseable = yes
-   read only = yes
+   read only = no
    guest ok = no
    valid users = apkadmin
+   create mask = 0664
+   directory mask = 0775
+   force group = smbshare
 ```
 
 **生效：**
@@ -118,85 +122,42 @@ systemctl restart smbd
 
 | 路径 | 用途 |
 |------|------|
-| `\\172.21.8.202\apk-incoming` | 上传（可写） |
-| `\\172.21.8.202\apk-apps` | 浏览（只读） |
+| `\\172.21.8.202\apk-incoming` | 上传/管理 APK（可写） |
+| `\\172.21.8.202\apk-scripts` | 查看/更新安装脚本（可写） |
 
 - 用户名：`apkadmin`
 - 密码：`smbpasswd` 时设置的密码
 
-### 1.4 入库脚本（合并 .segments + 导入 apps）
+### 1.4 整理脚本（incoming 内就地合并分片）
+
+从 `automation-toolkit` 复制 `linux-tools/apk-repo/*` 到 `/data/apk-repo/scripts/`，或见仓库内 `import-apks.sh`。
+
+**作用：** 合并 `.segments`、展平整包上传子目录，**不复制到 apps**。
 
 ```bash
-cat > /data/apk-repo/scripts/import-apks.sh <<'SCRIPT'
-#!/usr/bin/env bash
-set -euo pipefail
-
-IN=/data/apk-repo/incoming
-APPS=/data/apk-repo/apps
-
-merge_segments() {
-  local appdir="$1"
-  for segdir in "$appdir"/.*.segments; do
-    [[ -d "$segdir" ]] || continue
-    local outname
-    outname=$(basename "$segdir" .segments)
-    outname=${outname#.}
-    mapfile -t parts < <(find "$segdir" -type f -name '*.part*' | sort)
-    if [[ ${#parts[@]} -eq 0 ]]; then
-      rm -rf "$segdir"
-      continue
-    fi
-    echo "  合并 $outname (${#parts[@]} 片)"
-    cat "${parts[@]}" > "$appdir/$outname"
-    rm -rf "$segdir"
-  done
-}
-
-import_one() {
-  local src="$1"
-  local name="$2"
-  find "$src" \( -name '*.apk' -o -name '*.part*' \) -print -quit | grep -q . || return 0
-  mkdir -p "$APPS/$name"
-  cp -a "$src/." "$APPS/$name/"
-  merge_segments "$APPS/$name"
-  echo "IMPORT: $name"
-}
-
-shopt -s nullglob
-for item in "$IN"/*; do
-  [[ -e "$item" ]] || continue
-  [[ -d "$item" ]] || continue
-
-  # 整包目录：incoming/downloaded_apks_xxx/com_xxx/
-  if find "$item" -mindepth 1 -maxdepth 1 -type d | grep -q .; then
-    for d in "$item"/*/; do
-      import_one "$d" "$(basename "$d")"
-    done
-  else
-    import_one "$item" "$(basename "$item")"
-  fi
-done
-
-chown -R nobody:nogroup "$APPS"
-chmod -R 755 "$APPS"
-echo "完成。apps: $(du -sh $APPS | cut -f1), 应用数: $(find $APPS -mindepth 1 -maxdepth 1 -type d | wc -l)"
-SCRIPT
-
-chmod +x /data/apk-repo/scripts/import-apks.sh
-```
-
-**手动入库：**
-
-```bash
+chmod +x /data/apk-repo/scripts/*.sh
 /data/apk-repo/scripts/import-apks.sh
 ```
 
-**可选：每 5 分钟自动入库**
+**可选：每 5 分钟自动整理**
 
 ```bash
 cat > /etc/cron.d/apk-import <<'EOF'
 */5 * * * * root /data/apk-repo/scripts/import-apks.sh >> /var/log/apk-import.log 2>&1
 EOF
+```
+
+### 1.4.1 从旧版 apps/ 迁移（一次性）
+
+```bash
+mkdir -p /data/apk-repo/incoming
+for d in /data/apk-repo/apps/*/; do
+  name=$(basename "$d")
+  mkdir -p "/data/apk-repo/incoming/$name"
+  cp -a "$d/." "/data/apk-repo/incoming/$name/"
+done
+/data/apk-repo/scripts/import-apks.sh
+# 确认无误后：rm -rf /data/apk-repo/apps
 ```
 
 ### 1.5 源站长期运行
@@ -213,8 +174,8 @@ systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target
 ```bash
 exportfs -v
 systemctl is-active nfs-server smbd
-du -sh /data/apk-repo/apps
-find /data/apk-repo/apps -name '*.segments' -o -name '*.part*' | wc -l
+du -sh /data/apk-repo/incoming
+find /data/apk-repo/incoming -name '*.segments' -o -name '*.part*' | wc -l
 /data/apk-repo/scripts/import-apks.sh
 ```
 
@@ -226,13 +187,8 @@ find /data/apk-repo/apps -name '*.segments' -o -name '*.part*' | wc -l
 
 1. 映射 `\\172.21.8.202\apk-incoming`
 2. 拖入单个应用目录（如 `cn_xender`）或整包 `downloaded_apks_...`
-3. 源站执行入库：
-
-   ```bash
-   /data/apk-repo/scripts/import-apks.sh
-   ```
-
-4. 在 `\\172.21.8.202\apk-apps` 浏览确认
+3. 源站执行整理：`/data/apk-repo/scripts/import-apks.sh`
+4. 在 `\\172.21.8.202\apk-incoming` 确认应用目录
 
 ### 2.2 重要提醒
 
@@ -302,7 +258,7 @@ sudo systemctl daemon-reload
 sudo mount /mnt/apk-repo
 
 mount | grep apk-repo
-ls /mnt/apk-repo/apps | head
+ls /mnt/apk-repo/incoming | head
 ```
 
 ### 3.3 ADB（USB 调试）
@@ -326,90 +282,39 @@ adb devices
 
 手机需开启 **USB 调试** 并点 **允许**。
 
-### 3.4 安装脚本
+### 3.4 批量安装（使用 NFS 上的 scripts）
+
+脚本位于 `/mnt/apk-repo/scripts/`，源站更新后节点自动可用：
 
 ```bash
-sudo tee /usr/local/bin/apk-install-app <<'SCRIPT'
-#!/usr/bin/env bash
-set -euo pipefail
-
-MOUNT=/mnt/apk-repo
-APP="${1:?用法: apk-install-app <应用目录名> [设备序列号]}"
-SERIAL="${2:-}"
-DIR="$MOUNT/apps/$APP"
-CACHE="/var/cache/apk-repo/$APP"
-
-mountpoint -q "$MOUNT" || mount "$MOUNT"
-[[ -d "$DIR" ]] || { echo "不存在: $DIR"; exit 1; }
-
-sudo mkdir -p "$CACHE"
-rsync -a "$DIR/" "$CACHE/" 2>/dev/null || cp -a "$DIR/"* "$CACHE/"
-
-mapfile -t APKS < <(find "$CACHE" -maxdepth 1 -name '*.apk' | sort)
-[[ ${#APKS[@]} -gt 0 ]] || { echo "无 apk"; exit 1; }
-
-install_one() {
-  local dev="$1"
-  if [[ ${#APKS[@]} -eq 1 ]]; then
-    adb ${dev:+-s "$dev"} install -r "${APKS[0]}"
-  else
-    adb ${dev:+-s "$dev"} install-multiple "${APKS[@]}"
-  fi
-}
-
-if [[ -n "$SERIAL" ]]; then
-  install_one "$SERIAL"
-else
-  mapfile -t DEVS < <(adb devices | awk 'NR>1 && $2=="device" {print $1}')
-  [[ ${#DEVS[@]} -gt 0 ]] || { echo "无在线设备"; exit 1; }
-  for d in "${DEVS[@]}"; do
-    echo "==> $d : $APP"
-    install_one "$d" || echo "失败: $d"
-  done
-fi
-SCRIPT
-
-sudo chmod +x /usr/local/bin/apk-install-app
+/mnt/apk-repo/scripts/apk-install-app.sh cn_xender
+/mnt/apk-repo/scripts/apk-batch-install.sh -a cn_xender -a com_whatsapp
+/mnt/apk-repo/scripts/apk-batch-install.sh -l /mnt/apk-repo/scripts/apps.example.txt
+/mnt/apk-repo/scripts/apk-batch-install.sh -A -c
 ```
 
-### 3.5 试装
+多设备：
 
 ```bash
-apk-install-app cn_xender
-apk-install-app com_whatsapp
-apk-install-app com_twitter_android
+/mnt/apk-repo/scripts/apk-batch-install.sh -a cn_xender -d SERIAL1 -d SERIAL2 -p
 ```
 
-### 3.6 无线 ADB（可选）
+### 3.5 无线 ADB（可选）
 
 ```bash
 adb tcpip 5555
 adb connect <手机IP>:5555
 adb devices
-apk-install-app cn_xender
+/mnt/apk-repo/scripts/apk-install-app.sh cn_xender
 ```
 
-### 3.7 批量安装
-
-```bash
-# 指定列表
-for app in cn_xender com_whatsapp com_instagram_android; do
-  apk-install-app "$app" || echo "FAIL: $app"
-done
-
-# 全部（耗时长）
-for d in /mnt/apk-repo/apps/*/; do
-  apk-install-app "$(basename "$d")" || echo "FAIL: $(basename "$d")"
-done
-```
-
-### 3.8 节点验收
+### 3.6 节点验收
 
 ```bash
 ping -c 2 172.21.8.202
 mountpoint /mnt/apk-repo
 adb devices
-apk-install-app cn_xender
+/mnt/apk-repo/scripts/apk-install-app.sh cn_xender
 ```
 
 ---
@@ -453,7 +358,7 @@ df -h | grep sonic_tinno
 | Split APK | `base.apk` + `config.*.apk` 等 | `adb install-multiple *.apk` |
 | 含 `.segments` 分片 | `.base.apk.segments/` 等 | 必须先 `import-apks.sh` 合并 |
 
-**推荐：** 统一使用 `apk-install-app <目录名>`，自动处理单包/分包。
+**推荐：** 使用 `/mnt/apk-repo/scripts/apk-install-app.sh <目录名>` 或 `apk-batch-install.sh`。
 
 ---
 
@@ -461,16 +366,15 @@ df -h | grep sonic_tinno
 
 ```text
 Windows
-  │ Samba 写入 \\172.21.8.202\apk-incoming
+  │ Samba → \\172.21.8.202\apk-incoming（APK）
+  │         \\172.21.8.202\apk-scripts（脚本）
   ▼
-/data/apk-repo/incoming/
-  │ import-apks.sh（合并 .segments → base.apk）
-  ▼
-/data/apk-repo/apps/
+/data/apk-repo/incoming/     ← 唯一 APK 目录
+  │ import-apks.sh（就地合并 .segments）
   │ NFS 只读（172.21.0.0/16）
   ▼
-节点 /mnt/apk-repo/apps/
-  │ adb install / install-multiple
+节点 /mnt/apk-repo/incoming/
+  │ /mnt/apk-repo/scripts/apk-batch-install.sh
   ▼
 Android 设备
 ```
@@ -498,25 +402,25 @@ Android 设备
 
 ### 源站 debian13
 
-- [ ] `/data/apk-repo/{incoming,apps,scripts}` 已创建
+- [ ] `/data/apk-repo/{incoming,scripts}` 已创建
 - [ ] NFS exports `172.21.0.0/16`，`exportfs -v` 有输出
-- [ ] Samba `apk-incoming` / `apk-apps` Windows 可访问
+- [ ] Samba `apk-incoming` / `apk-scripts` Windows 可访问
 - [ ] `import-apks.sh` 可执行
-- [ ] `apps` 无 `.part*` / 空 `.segments`
+- [ ] `incoming` 无 `.part*` / 空 `.segments`
 - [ ] 源站 IP 固定为 172.21.8.202
 
 ### Windows
 
-- [ ] 已映射 `\\172.21.8.202\apk-incoming`
+- [ ] 已映射 `\\172.21.8.202\apk-incoming` 与 `apk-scripts`
 - [ ] 上传测试目录成功
-- [ ] 执行 import 后在 `apk-apps` 可见
+- [ ] 执行 import 后在 incoming 可见
 
 ### 每个 Linux 节点
 
 - [ ] `/mnt/apk-repo` NFS 挂载成功
 - [ ] `/etc/fstab` 已写入 NFS 行
 - [ ] `adb devices` 可见设备
-- [ ] `apk-install-app cn_xender` 安装成功
+- [ ] `/mnt/apk-repo/scripts/apk-install-app.sh cn_xender` 安装成功
 
 ### OptiPlex 额外
 

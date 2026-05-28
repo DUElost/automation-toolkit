@@ -6,7 +6,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-APPS_DIR="${APK_REPO_APPS:-$REPO_ROOT/apps}"
+APPS_DIR="${APK_REPO_DIR:-$REPO_ROOT/incoming}"
 CACHE_ROOT="${APK_CACHE_ROOT:-/var/cache/apk-repo}"
 LOG_DIR="${APK_LOG_DIR:-/var/log/apk-batch-install}"
 RETRIES="${APK_INSTALL_RETRIES:-3}"
@@ -23,12 +23,12 @@ usage() {
   cat <<'EOF'
 用法: apk-batch-install.sh [选项]
 
-从 /mnt/apk-repo/apps 批量安装 APK 到本节点已连接的多台 Android 设备。
+从 /mnt/apk-repo/incoming 批量安装 APK 到本节点已连接的多台 Android 设备。
 
 选项:
   -a, --app NAME          安装指定应用目录（可重复）
   -l, --list FILE         从文件读取应用目录列表（每行一个，# 开头为注释）
-  -A, --all               安装 apps 下全部应用
+  -A, --all               安装 incoming 下全部应用
   -d, --device SERIAL     指定设备序列号（可重复；默认本节点全部在线设备）
   -p, --parallel-devices  多设备并行安装（默认逐设备串行）
   -n, --dry-run           只打印计划，不执行安装
@@ -36,7 +36,7 @@ usage() {
   -h, --help              显示帮助
 
 环境变量:
-  APK_REPO_APPS         应用目录，默认 <repo>/apps
+  APK_REPO_DIR          应用目录，默认 <repo>/incoming
   APK_CACHE_ROOT        本地缓存目录，默认 /var/cache/apk-repo
   APK_LOG_DIR           日志目录，默认 /var/log/apk-batch-install
   APK_INSTALL_RETRIES   失败重试次数，默认 3
@@ -65,7 +65,7 @@ ensure_repo_ready() {
   if [[ ! -d "$APPS_DIR" ]]; then
     if mountpoint -q /mnt/apk-repo 2>/dev/null || mount /mnt/apk-repo 2>/dev/null; then
       REPO_ROOT="/mnt/apk-repo"
-      APPS_DIR="$REPO_ROOT/apps"
+      APPS_DIR="$REPO_ROOT/incoming"
     fi
   fi
 
