@@ -207,16 +207,29 @@ sync_app_cache() {
   local app="$1"
   local src="$APPS_DIR/$app"
   local dest="$CACHE_ROOT/$app"
+  local lock_dir="$CACHE_ROOT/.locks"
+  local lock_file="$lock_dir/$(echo "$app" | tr '/ ' '__').lock"
 
   [[ -d "$src" ]] || return 1
 
-  mkdir -p "$dest"
-  if command -v rsync >/dev/null 2>&1; then
-    rsync -a --delete "$src/" "$dest/"
+  mkdir -p "$dest" "$lock_dir"
+  do_sync() {
+    if command -v rsync >/dev/null 2>&1; then
+      rsync -a --delete "$src/" "$dest/"
+    else
+      rm -rf "$dest"
+      mkdir -p "$dest"
+      cp -a "$src/." "$dest/"
+    fi
+  }
+
+  if command -v flock >/dev/null 2>&1; then
+    (
+      flock -x 200
+      do_sync
+    ) 200>"$lock_file"
   else
-    rm -rf "$dest"
-    mkdir -p "$dest"
-    cp -a "$src/." "$dest/"
+    do_sync
   fi
   return 0
 }
@@ -226,7 +239,30 @@ list_apks() {
   find "$CACHE_ROOT/$app" -maxdepth 1 -name '*.apk' | sort
 }
 
-install_to_device() {
+prepare_all_caches() {
+  local app failed=0
+
+  log "准备本地缓存: ${#APP_NAMES[@]} 个应用 -> $CACHE_ROOT"
+  for app in "${APP_NAMES[@]}"; do
+    if [[ ! -d "$APPS_DIR/$app" ]]; then
+      log "SKIP 不存在: $app"
+      ((failed++)) || true
+      [[ "$CONTINUE_ON_ERROR" -eq 1 ]] && continue
+      return 1
+    fi
+    if ! sync_app_cache "$app"; then
+      log "FAIL 缓存失败: $app"
+      ((failed++)) || true
+      [[ "$CONTINUE_ON_ERROR" -eq 1 ]] && continue
+      return 1
+    fi
+  done
+  if [[ "$failed" -gt 0 && "$CONTINUE_ON_ERROR" -eq 0 ]]; then
+    return 1
+  fi
+  return 0
+}
+
   local app="$1"
   local serial="$2"
   local attempt=1
@@ -269,13 +305,6 @@ run_for_device() {
     if [[ "$DRY_RUN" -eq 1 ]]; then
       log "DRY-RUN: $app -> $serial"
       continue
-    fi
-
-    if ! sync_app_cache "$app"; then
-      log "FAIL 缓存失败: $app ($serial)"
-      ((failed++)) || true
-      [[ "$CONTINUE_ON_ERROR" -eq 1 ]] && continue
-      return 1
     fi
 
     if install_to_device "$app" "$serial"; then
@@ -421,6 +450,11 @@ main() {
   log "日志: $log_file"
 
   local rc=0
+  if [[ "$DRY_RUN" -eq 0 ]]; then
+    prepare_all_caches || rc=1
+  fi
+
+  if [[ "$rc" -eq 0 ]]; then
   if [[ "$PARALLEL_DEVICES" -eq 1 && ${#DEVICE_SERIALS[@]} -gt 1 ]]; then
     run_devices_parallel "$MAX_JOBS" || rc=1
   else
