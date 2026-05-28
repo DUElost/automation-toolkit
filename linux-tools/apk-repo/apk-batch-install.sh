@@ -50,7 +50,8 @@ usage() {
   apk-batch-install.sh -f /mnt/apk-repo/incoming/downloaded_apks_Infinix_X6852_Android16_0522 -c
   apk-batch-install.sh -l /mnt/apk-repo/scripts/apps.example.txt
   apk-batch-install.sh -A
-  apk-batch-install.sh -a cn_xender -d DEVICE1 -d DEVICE2 -p
+  apk-batch-install.sh -f batch_dir -d DEVICE1 -d DEVICE2 -p
+  apk-batch-install.sh -f batch_dir -P -c
   apk-batch-install.sh -l batch.txt -c
 
 依赖: adb, mount.nfs 已挂载, rsync 或 cp
@@ -328,7 +329,7 @@ main() {
         DEVICE_SERIALS+=("$2")
         shift 2
         ;;
-      -p|--parallel-devices)
+      -p|--parallel-devices|--parallel)
         PARALLEL_DEVICES=1
         shift
         ;;
@@ -364,6 +365,11 @@ main() {
   log "APK 批量安装开始"
   log "仓库: $REPO_ROOT"
   log "应用数: ${#APP_NAMES[@]}, 设备数: ${#DEVICE_SERIALS[@]}"
+  if [[ "$PARALLEL_DEVICES" -eq 1 && ${#DEVICE_SERIALS[@]} -gt 1 ]]; then
+    log "模式: 多设备并行"
+  else
+    log "模式: 逐设备串行（单设备内应用也串行）"
+  fi
   log "日志: $log_file"
 
   local rc=0
