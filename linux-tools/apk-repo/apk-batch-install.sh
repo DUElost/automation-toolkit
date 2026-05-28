@@ -8,7 +8,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 APPS_DIR="${APK_REPO_DIR:-$REPO_ROOT/incoming}"
 CACHE_ROOT="${APK_CACHE_ROOT:-${XDG_CACHE_HOME:-$HOME/.cache}/apk-repo}"
-LOG_DIR="${APK_LOG_DIR:-}"
 RETRIES="${APK_INSTALL_RETRIES:-3}"
 
 declare -a APP_NAMES=()
@@ -23,11 +22,17 @@ LIST_FILE=""
 FOLDER=""
 CACHE_JOBS="${APK_CACHE_PARALLEL:-4}"
 
+STATS_OK=""
+STATS_FAIL=""
+STATS_LOCK=""
+CACHE_SKIP=""
+
 usage() {
   cat <<'EOF'
 用法: apk-batch-install.sh [选项]
 
 从 /mnt/apk-repo/incoming 批量安装 APK 到本节点已连接的多台 Android 设备。
+终端仅输出错误与最终汇总，不写日志文件。
 
 选项:
   -a, --app NAME          安装指定应用目录（可重复）
@@ -47,7 +52,6 @@ usage() {
   APK_REPO_DIR          应用目录，默认 <repo>/incoming
   APK_CACHE_ROOT        本地缓存，默认 ~/.cache/apk-repo
   APK_CACHE_PARALLEL    缓存 rsync 并行数，默认 4（各应用目录互不冲突）
-  APK_LOG_DIR           日志目录，默认可写则 scripts/logs，否则 ~/logs
   APK_INSTALL_RETRIES   失败重试次数，默认 3
   APK_MAX_PARALLEL      并行设备上限，默认 5（等同 -j 5）
 
@@ -66,27 +70,76 @@ usage() {
 EOF
 }
 
-log() {
-  printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*"
+err() {
+  printf '[错误] %s\n' "$*" >&2
 }
 
 die() {
-  log "ERROR: $*"
+  err "$*"
   exit 1
 }
 
-init_log_dir() {
-  local candidate
-  for candidate in "${APK_LOG_DIR:-}" "$SCRIPT_DIR/logs" "${HOME}/logs"; do
-    [[ -n "$candidate" ]] || continue
-    mkdir -p "$candidate" 2>/dev/null || continue
-    if touch "$candidate/.apk-write-test" 2>/dev/null; then
-      rm -f "$candidate/.apk-write-test"
-      LOG_DIR="$candidate"
-      return
-    fi
-  done
-  die "无法创建可写日志目录（尝试过 scripts/logs 与 ~/logs）"
+init_stats() {
+  STATS_OK="$(mktemp)"
+  STATS_FAIL="$(mktemp)"
+  STATS_LOCK="$(mktemp)"
+  CACHE_SKIP="$(mktemp)"
+  trap 'rm -f "$STATS_OK" "$STATS_FAIL" "$STATS_LOCK" "$CACHE_SKIP"' EXIT
+}
+
+record_success() {
+  local app="$1" serial="$2"
+  (
+    flock -x 200
+    printf '%s\t%s\n' "$app" "$serial" >>"$STATS_OK"
+  ) 200>"$STATS_LOCK"
+}
+
+record_failure() {
+  local app="$1" serial="$2" reason="${3:-}"
+  (
+    flock -x 200
+    printf '%s\t%s\t%s\n' "$app" "$serial" "$reason" >>"$STATS_FAIL"
+  ) 200>"$STATS_LOCK"
+}
+
+print_summary() {
+  local app_count=${#APP_NAMES[@]}
+  local device_count=${#DEVICE_SERIALS[@]}
+  local total_tasks=$((app_count * device_count))
+  local ok_count=0 fail_count=0
+  local -a failed_apps=()
+
+  [[ -f "$STATS_OK" ]] && ok_count=$(wc -l <"$STATS_OK" | tr -d ' ')
+  [[ -f "$STATS_FAIL" ]] && fail_count=$(wc -l <"$STATS_FAIL" | tr -d ' ')
+
+  if [[ -f "$STATS_FAIL" && "$fail_count" -gt 0 ]]; then
+    mapfile -t failed_apps < <(cut -f1 "$STATS_FAIL" | sort -u)
+  fi
+
+  echo ""
+  echo "========== 安装汇总 =========="
+  echo "应用数:   $app_count"
+  echo "设备数:   $device_count"
+  echo "安装任务: $total_tasks"
+  echo "成功:     $ok_count"
+  echo "失败:     $fail_count"
+  if [[ "$fail_count" -gt 0 ]]; then
+    echo "失败应用 (${#failed_apps[@]}):"
+    local app
+    for app in "${failed_apps[@]}"; do
+      echo "  $app"
+    done
+    echo "失败明细:"
+    while IFS=$'\t' read -r app serial reason; do
+      if [[ -n "$reason" ]]; then
+        echo "  $app -> $serial ($reason)"
+      else
+        echo "  $app -> $serial"
+      fi
+    done <"$STATS_FAIL"
+  fi
+  echo "=============================="
 }
 
 ensure_repo_ready() {
@@ -98,7 +151,6 @@ ensure_repo_ready() {
   fi
 
   if [[ ! -d "$APPS_DIR" ]]; then
-    # 兼容：尚未迁移时回退到 apps/
     if [[ -d "$REPO_ROOT/apps" ]]; then
       APPS_DIR="$REPO_ROOT/apps"
     else
@@ -107,7 +159,6 @@ ensure_repo_ready() {
   fi
 
   command -v adb >/dev/null 2>&1 || die "未找到 adb，请安装: apt install android-tools-adb"
-  init_log_dir
   mkdir -p "$CACHE_ROOT"
 }
 
@@ -160,7 +211,6 @@ add_apps_from_dirs() {
 collect_from_folder() {
   local folder
   folder="$(resolve_folder "$1")"
-  log "指定文件夹: $folder"
 
   if find "$folder" -maxdepth 1 -name '*.apk' -print -quit | grep -q .; then
     local rel="${folder#"$APPS_DIR"/}"
@@ -193,7 +243,6 @@ collect_apps() {
     die "未找到可安装应用（$hint）。使用 -a / -f / -l / -A"
   fi
 
-  # 去重
   mapfile -t APP_NAMES < <(printf '%s\n' "${APP_NAMES[@]}" | awk '!seen[$0]++')
 }
 
@@ -219,7 +268,7 @@ sync_app_cache() {
   mkdir -p "$dest" "$lock_dir"
   do_sync() {
     if command -v rsync >/dev/null 2>&1; then
-      rsync -a --delete "$src/" "$dest/"
+      rsync -a --delete "$src/" "$dest/" 2>/dev/null
     else
       rm -rf "$dest"
       mkdir -p "$dest"
@@ -243,26 +292,28 @@ list_apks() {
   find "$CACHE_ROOT/$app" -maxdepth 1 -name '*.apk' | sort
 }
 
+is_cache_failed() {
+  [[ -f "$CACHE_SKIP" ]] && grep -Fxq "$1" "$CACHE_SKIP" 2>/dev/null
+}
+
+mark_cache_failed() {
+  echo "$1" >>"$CACHE_SKIP"
+}
+
 prepare_one_cache() {
   local app="$1"
-  local idx="$2"
-  local total="$3"
-  local t0 t1 elapsed
 
   if [[ ! -d "$APPS_DIR/$app" ]]; then
-    log "缓存 [$idx/$total] SKIP 不存在: $app"
+    err "应用不存在: $app"
+    mark_cache_failed "$app"
     return 2
   fi
 
-  t0="$(date +%s)"
-  log "缓存 [$idx/$total] 开始: $app"
   if ! sync_app_cache "$app"; then
-    log "缓存 [$idx/$total] FAIL: $app"
+    err "缓存失败: $app"
+    mark_cache_failed "$app"
     return 1
   fi
-  t1="$(date +%s)"
-  elapsed=$((t1 - t0))
-  log "缓存 [$idx/$total] 完成: $app (${elapsed}s)"
   return 0
 }
 
@@ -271,30 +322,25 @@ prepare_all_caches() {
   local app idx=0 failed=0 rc=0 running=0 jobs="$CACHE_JOBS"
 
   if [[ "$SKIP_CACHE" -eq 1 ]]; then
-    log "跳过缓存同步（--skip-cache），使用 $CACHE_ROOT"
     return 0
   fi
 
   if [[ "$jobs" -le 1 || "$total" -le 1 ]]; then
-    log "准备本地缓存: $total 个应用 -> $CACHE_ROOT（串行）"
     for app in "${APP_NAMES[@]}"; do
-      ((idx++)) || true
-      if ! prepare_one_cache "$app" "$idx" "$total"; then
+      if ! prepare_one_cache "$app"; then
         ((failed++)) || true
         [[ "$CONTINUE_ON_ERROR" -eq 1 ]] && continue
         return 1
       fi
     done
   else
-    log "准备本地缓存: $total 个应用 -> $CACHE_ROOT（${jobs} 路并行）"
     for app in "${APP_NAMES[@]}"; do
-      ((idx++)) || true
       while (( running >= jobs )); do
         wait -n || rc=1
         ((running--)) || true
       done
       (
-        prepare_one_cache "$app" "$idx" "$total"
+        prepare_one_cache "$app"
       ) &
       ((running++)) || true
     done
@@ -312,7 +358,6 @@ prepare_all_caches() {
   if [[ "$failed" -gt 0 && "$CONTINUE_ON_ERROR" -eq 0 ]]; then
     return 1
   fi
-  log "本地缓存就绪: $total 个应用"
   return 0
 }
 
@@ -320,59 +365,71 @@ install_to_device() {
   local app="$1"
   local serial="$2"
   local attempt=1
-  local apk_count
+  local apk_count out
   mapfile -t apks < <(list_apks "$app")
 
   apk_count=${#apks[@]}
-  [[ "$apk_count" -gt 0 ]] || return 1
+  if [[ "$apk_count" -eq 0 ]]; then
+    record_failure "$app" "$serial" "本地无 APK 文件"
+    err "无 APK: $app -> $serial"
+    return 1
+  fi
 
   while [[ "$attempt" -le "$RETRIES" ]]; do
     if [[ "$apk_count" -eq 1 ]]; then
-      if adb -s "$serial" install -r "${apks[0]}"; then
+      if out="$(adb -s "$serial" install -r "${apks[0]}" 2>&1)"; then
+        record_success "$app" "$serial"
         return 0
       fi
     else
-      if adb -s "$serial" install-multiple "${apks[@]}"; then
+      if out="$(adb -s "$serial" install-multiple "${apks[@]}" 2>&1)"; then
+        record_success "$app" "$serial"
         return 0
       fi
     fi
-    log "重试 $attempt/$RETRIES: $app -> $serial"
-    sleep 2
     ((attempt++)) || true
+    [[ "$attempt" -le "$RETRIES" ]] && sleep 2
   done
+
+  record_failure "$app" "$serial" "${out:-adb 安装失败}"
+  err "安装失败: $app -> $serial"
+  printf '%s\n' "$out" >&2
   return 1
 }
 
 run_for_device() {
   local serial="$1"
-  local app failed=0 ok=0
+  local app failed=0
 
-  log "设备 $serial 开始安装 (${#APP_NAMES[@]} 个应用)"
   for app in "${APP_NAMES[@]}"; do
     if [[ ! -d "$APPS_DIR/$app" ]]; then
-      log "SKIP 不存在: $app ($serial)"
+      record_failure "$app" "$serial" "应用目录不存在"
+      err "应用不存在: $app -> $serial"
       ((failed++)) || true
       [[ "$CONTINUE_ON_ERROR" -eq 1 ]] && continue
       return 1
     fi
 
     if [[ "$DRY_RUN" -eq 1 ]]; then
-      log "DRY-RUN: $app -> $serial"
       continue
     fi
 
+    if is_cache_failed "$app"; then
+      record_failure "$app" "$serial" "缓存失败"
+      ((failed++)) || true
+      [[ "$CONTINUE_ON_ERROR" -eq 1 ]] && continue
+      return 1
+    fi
+
     if install_to_device "$app" "$serial"; then
-      log "OK: $app -> $serial"
-      ((ok++)) || true
+      :
     else
-      log "FAIL: $app -> $serial"
       ((failed++)) || true
       [[ "$CONTINUE_ON_ERROR" -eq 1 ]] && continue
       return 1
     fi
   done
 
-  log "设备 $serial 完成: 成功 $ok, 失败 $failed"
   [[ "$failed" -eq 0 ]]
 }
 
@@ -382,7 +439,6 @@ run_devices_parallel() {
   local rc=0
 
   if [[ "$max_jobs" -eq 0 ]]; then
-    log "并行上限: 不限制（${#DEVICE_SERIALS[@]} 台同时）"
     local pids=() pid
     for serial in "${DEVICE_SERIALS[@]}"; do
       (
@@ -396,7 +452,6 @@ run_devices_parallel() {
     return "$rc"
   fi
 
-  log "并行上限: 最多同时 ${max_jobs} 台"
   for serial in "${DEVICE_SERIALS[@]}"; do
     while (( running >= max_jobs )); do
       wait -n || rc=1
@@ -412,19 +467,6 @@ run_devices_parallel() {
     ((running--)) || true
   done
   return "$rc"
-}
-
-write_summary() {
-  local summary_file="$LOG_DIR/last-run.summary"
-  {
-    echo "time=$(date -Iseconds)"
-    echo "repo_root=$REPO_ROOT"
-    echo "apps_dir=$APPS_DIR"
-    echo "app_count=${#APP_NAMES[@]}"
-    echo "device_count=${#DEVICE_SERIALS[@]}"
-    printf 'apps=%s\n' "${APP_NAMES[*]}"
-    printf 'devices=%s\n' "${DEVICE_SERIALS[*]}"
-  } >"$summary_file"
 }
 
 main() {
@@ -486,26 +528,11 @@ main() {
     esac
   done
 
+  init_stats
   ensure_repo_ready
   [[ -n "$LIST_FILE" ]] && read_list_file "$LIST_FILE"
   collect_apps
   collect_devices
-
-  local log_file="$LOG_DIR/run-$(date '+%Y%m%d-%H%M%S').log"
-  if ! touch "$log_file" 2>/dev/null; then
-    die "无法写入日志: $log_file"
-  fi
-  exec > >(tee -a "$log_file") 2>&1
-
-  log "APK 批量安装开始"
-  log "仓库: $REPO_ROOT"
-  log "应用数: ${#APP_NAMES[@]}, 设备数: ${#DEVICE_SERIALS[@]}"
-  if [[ "$PARALLEL_DEVICES" -eq 1 && ${#DEVICE_SERIALS[@]} -gt 1 ]]; then
-    log "模式: 多设备并行（-j ${MAX_JOBS}）"
-  else
-    log "模式: 逐设备串行（单设备内应用也串行）"
-  fi
-  log "日志: $log_file"
 
   local rc=0
   if [[ "$DRY_RUN" -eq 0 ]]; then
@@ -526,12 +553,7 @@ main() {
     fi
   fi
 
-  write_summary
-  if [[ "$rc" -eq 0 ]]; then
-    log "全部完成"
-  else
-    log "完成，存在失败项"
-  fi
+  print_summary
   exit "$rc"
 }
 
