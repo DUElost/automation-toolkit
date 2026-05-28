@@ -18,8 +18,10 @@ PARALLEL_DEVICES=0
 MAX_JOBS="${APK_MAX_PARALLEL:-5}"
 DRY_RUN=0
 CONTINUE_ON_ERROR=0
+SKIP_CACHE=0
 LIST_FILE=""
 FOLDER=""
+CACHE_JOBS="${APK_CACHE_PARALLEL:-4}"
 
 usage() {
   cat <<'EOF'
@@ -38,11 +40,13 @@ usage() {
   -j, --jobs N           并行时最多同时 N 台设备（默认 5；0 表示不限制）
   -n, --dry-run           只打印计划，不执行安装
   -c, --continue-on-error 某个应用/设备失败后继续
+  -S, --skip-cache        跳过 NFS→本地缓存（沿用 ~/.cache/apk-repo 已有内容）
   -h, --help              显示帮助
 
 环境变量:
   APK_REPO_DIR          应用目录，默认 <repo>/incoming
   APK_CACHE_ROOT        本地缓存，默认 ~/.cache/apk-repo
+  APK_CACHE_PARALLEL    缓存 rsync 并行数，默认 4（各应用目录互不冲突）
   APK_LOG_DIR           日志目录，默认可写则 scripts/logs，否则 ~/logs
   APK_INSTALL_RETRIES   失败重试次数，默认 3
   APK_MAX_PARALLEL      并行设备上限，默认 5（等同 -j 5）
@@ -239,27 +243,76 @@ list_apks() {
   find "$CACHE_ROOT/$app" -maxdepth 1 -name '*.apk' | sort
 }
 
-prepare_all_caches() {
-  local app failed=0
+prepare_one_cache() {
+  local app="$1"
+  local idx="$2"
+  local total="$3"
+  local t0 t1 elapsed
 
-  log "准备本地缓存: ${#APP_NAMES[@]} 个应用 -> $CACHE_ROOT"
-  for app in "${APP_NAMES[@]}"; do
-    if [[ ! -d "$APPS_DIR/$app" ]]; then
-      log "SKIP 不存在: $app"
-      ((failed++)) || true
-      [[ "$CONTINUE_ON_ERROR" -eq 1 ]] && continue
-      return 1
-    fi
-    if ! sync_app_cache "$app"; then
-      log "FAIL 缓存失败: $app"
-      ((failed++)) || true
-      [[ "$CONTINUE_ON_ERROR" -eq 1 ]] && continue
-      return 1
-    fi
-  done
+  if [[ ! -d "$APPS_DIR/$app" ]]; then
+    log "缓存 [$idx/$total] SKIP 不存在: $app"
+    return 2
+  fi
+
+  t0="$(date +%s)"
+  log "缓存 [$idx/$total] 开始: $app"
+  if ! sync_app_cache "$app"; then
+    log "缓存 [$idx/$total] FAIL: $app"
+    return 1
+  fi
+  t1="$(date +%s)"
+  elapsed=$((t1 - t0))
+  log "缓存 [$idx/$total] 完成: $app (${elapsed}s)"
+  return 0
+}
+
+prepare_all_caches() {
+  local total=${#APP_NAMES[@]}
+  local app idx=0 failed=0 rc=0 running=0 jobs="$CACHE_JOBS"
+
+  if [[ "$SKIP_CACHE" -eq 1 ]]; then
+    log "跳过缓存同步（--skip-cache），使用 $CACHE_ROOT"
+    return 0
+  fi
+
+  if [[ "$jobs" -le 1 || "$total" -le 1 ]]; then
+    log "准备本地缓存: $total 个应用 -> $CACHE_ROOT（串行）"
+    for app in "${APP_NAMES[@]}"; do
+      ((idx++)) || true
+      if ! prepare_one_cache "$app" "$idx" "$total"; then
+        ((failed++)) || true
+        [[ "$CONTINUE_ON_ERROR" -eq 1 ]] && continue
+        return 1
+      fi
+    done
+  else
+    log "准备本地缓存: $total 个应用 -> $CACHE_ROOT（${jobs} 路并行）"
+    for app in "${APP_NAMES[@]}"; do
+      ((idx++)) || true
+      while (( running >= jobs )); do
+        wait -n || rc=1
+        ((running--)) || true
+      done
+      (
+        prepare_one_cache "$app" "$idx" "$total"
+      ) &
+      ((running++)) || true
+    done
+    while (( running > 0 )); do
+      if wait -n; then
+        :
+      else
+        rc=1
+        ((failed++)) || true
+      fi
+      ((running--)) || true
+    done
+  fi
+
   if [[ "$failed" -gt 0 && "$CONTINUE_ON_ERROR" -eq 0 ]]; then
     return 1
   fi
+  log "本地缓存就绪: $total 个应用"
   return 0
 }
 
@@ -417,6 +470,10 @@ main() {
         ;;
       -c|--continue-on-error)
         CONTINUE_ON_ERROR=1
+        shift
+        ;;
+      -S|--skip-cache)
+        SKIP_CACHE=1
         shift
         ;;
       -h|--help)
