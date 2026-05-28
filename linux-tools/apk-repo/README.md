@@ -93,9 +93,15 @@ adb devices
 # 单应用
 /mnt/apk-repo/scripts/apk-install-app.sh cn_xender
 
-# 多设备并行（2 台及以上 USB/无线设备时加 -p 或 -P）
-/mnt/apk-repo/scripts/apk-batch-install.sh -f extracted_apks_Infinix-X6851_Android16 -P -c
-/mnt/apk-repo/scripts/apk-batch-install.sh -f batch_dir -d SERIAL1 -d SERIAL2 -p
+# 多设备并行，最多同时 5 台（默认 -j 5）
+/mnt/apk-repo/scripts/apk-batch-install.sh -f batch_dir -P -c
+
+# 最多同时 3 台；0 表示不限制
+/mnt/apk-repo/scripts/apk-batch-install.sh -f batch_dir -P -j 3 -c
+/mnt/apk-repo/scripts/apk-batch-install.sh -f batch_dir -P -j 0 -c
+
+# 环境变量
+# APK_MAX_PARALLEL=5
 ```
 
 路径对应：`/mnt/apk-repo/incoming/<应用名>/`

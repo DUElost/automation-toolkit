@@ -15,6 +15,7 @@ declare -a APP_NAMES=()
 declare -a DEVICE_SERIALS=()
 INSTALL_ALL=0
 PARALLEL_DEVICES=0
+MAX_JOBS="${APK_MAX_PARALLEL:-5}"
 DRY_RUN=0
 CONTINUE_ON_ERROR=0
 LIST_FILE=""
@@ -34,6 +35,7 @@ usage() {
   -d, --device SERIAL     指定设备序列号（可重复；默认本节点全部在线设备）
   -p, --parallel-devices  多设备并行安装（默认逐设备串行）
   -P, --parallel          同 --parallel-devices
+  -j, --jobs N           并行时最多同时 N 台设备（默认 5；0 表示不限制）
   -n, --dry-run           只打印计划，不执行安装
   -c, --continue-on-error 某个应用/设备失败后继续
   -h, --help              显示帮助
@@ -43,6 +45,7 @@ usage() {
   APK_CACHE_ROOT        本地缓存，默认 ~/.cache/apk-repo
   APK_LOG_DIR           日志目录，默认可写则 scripts/logs，否则 ~/logs
   APK_INSTALL_RETRIES   失败重试次数，默认 3
+  APK_MAX_PARALLEL      并行设备上限，默认 5（等同 -j 5）
 
 示例:
   apk-batch-install.sh -a cn_xender -a com_whatsapp
