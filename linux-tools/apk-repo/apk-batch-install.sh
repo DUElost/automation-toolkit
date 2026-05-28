@@ -83,7 +83,12 @@ ensure_repo_ready() {
   fi
 
   if [[ ! -d "$APPS_DIR" ]]; then
-    die "应用目录不存在: $APPS_DIR （请先挂载 NFS: sudo mount /mnt/apk-repo）"
+    # 兼容：尚未迁移时回退到 apps/
+    if [[ -d "$REPO_ROOT/apps" ]]; then
+      APPS_DIR="$REPO_ROOT/apps"
+    else
+      die "应用目录不存在: $REPO_ROOT/incoming （请先挂载 NFS: sudo mount /mnt/apk-repo）"
+    fi
   fi
 
   command -v adb >/dev/null 2>&1 || die "未找到 adb，请安装: apt install android-tools-adb"
@@ -102,21 +107,30 @@ read_list_file() {
   done <"$file"
 }
 
+discover_app_dirs() {
+  find "$APPS_DIR" -mindepth 1 -type f -name '*.apk' -printf '%h\n' 2>/dev/null | sort -u
+}
+
 collect_apps() {
   if [[ "$INSTALL_ALL" -eq 1 ]]; then
-    local d name
-    shopt -s nullglob
-    for d in "$APPS_DIR"/*/; do
-      name="$(basename "$d")"
-      if find "$d" -maxdepth 1 -name '*.apk' -print -quit | grep -q .; then
-        APP_NAMES+=("$name")
-      fi
-    done
-    shopt -u nullglob
+    local appdir rel
+    while IFS= read -r appdir; do
+      [[ -n "$appdir" ]] || continue
+      rel="${appdir#"$APPS_DIR"/}"
+      APP_NAMES+=("$rel")
+    done < <(discover_app_dirs)
   fi
 
   if [[ ${#APP_NAMES[@]} -eq 0 ]]; then
-    die "未指定应用。使用 -a / -l / -A"
+    local hint="目录: $APPS_DIR"
+    if [[ -d "$REPO_ROOT/apps" ]] && [[ -n "$(ls -A "$REPO_ROOT/apps" 2>/dev/null)" ]]; then
+      hint+="；检测到旧目录 apps/ 有内容，请迁移到 incoming 或运行 import-apks.sh"
+    elif [[ -d "$APPS_DIR" ]] && [[ -z "$(ls -A "$APPS_DIR" 2>/dev/null)" ]]; then
+      hint+="；incoming 为空，请从 Windows 上传 APK"
+    else
+      hint+="；可尝试先运行 import-apks.sh 展平/合并分片"
+    fi
+    die "未找到可安装应用（$hint）"
   fi
 
   # 去重
