@@ -83,12 +83,16 @@ die() {
 }
 
 init_stats() {
-  STATS_OK="$(mktemp)"
-  STATS_FAIL="$(mktemp)"
-  STATS_LOCK="$(mktemp)"
-  CACHE_SKIP="$(mktemp)"
-  PROGRESS_DIR="$(mktemp -d)"
-  trap 'rm -rf "$STATS_OK" "$STATS_FAIL" "$STATS_LOCK" "$CACHE_SKIP" "$PROGRESS_DIR"' EXIT
+  local base="$CACHE_ROOT/.runs/$$"
+  mkdir -p "$base"
+  STATS_OK="$base/ok"
+  STATS_FAIL="$base/fail"
+  STATS_LOCK="$base/lock"
+  CACHE_SKIP="$base/cache_skip"
+  PROGRESS_DIR="$base/progress"
+  mkdir -p "$PROGRESS_DIR"
+  : >"$STATS_OK" >"$STATS_FAIL" >"$STATS_LOCK" >"$CACHE_SKIP"
+  trap "rm -rf '$base'" EXIT
 }
 
 record_success() {
@@ -315,6 +319,7 @@ record_task_done() {
   local lock="$PROGRESS_DIR/.lock"
   local total done_n ok_n fail_n
   total=$(( ${#APP_NAMES[@]} * ${#DEVICE_SERIALS[@]} ))
+  mkdir -p "$PROGRESS_DIR" 2>/dev/null || true
   (
     flock -x 200
     echo 1 >>"$PROGRESS_DIR/.done"
