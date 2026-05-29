@@ -131,11 +131,14 @@ print_summary() {
   local ok_count=0 fail_count=0
   local -a failed_apps=()
 
-  [[ -f "$STATS_OK" ]] && ok_count=$(wc -l <"$STATS_OK" | tr -d ' ')
-  [[ -f "$STATS_FAIL" ]] && fail_count=$(wc -l <"$STATS_FAIL" | tr -d ' ')
+  [[ -f "$STATS_OK" ]] && ok_count=$(awk -F'\t' 'NF>=2 && $1!="" && $2!=""' "$STATS_OK" | wc -l | tr -d ' ')
+  [[ -f "$STATS_FAIL" ]] && fail_count=$(awk -F'\t' 'NF>=2 && $1!="" && $2!=""' "$STATS_FAIL" | wc -l | tr -d ' ')
 
   if [[ -f "$STATS_FAIL" && "$fail_count" -gt 0 ]]; then
-    mapfile -t failed_apps < <(cut -f1 "$STATS_FAIL" | sort -u)
+    mapfile -t failed_apps < <(
+      awk -F'\t' 'NF>=2 && $1!="" && $2!="" && $1 !~ /^(adb:|error:|Performing)/ {print $1}' \
+        "$STATS_FAIL" | sort -u
+    )
   fi
 
   echo ""
@@ -153,6 +156,8 @@ print_summary() {
     done
     echo "失败明细:"
     while IFS=$'\t' read -r app serial reason; do
+      [[ -n "$app" && -n "$serial" ]] || continue
+      [[ "$app" =~ ^(adb:|error:|Performing) ]] && continue
       if [[ -n "$reason" ]]; then
         echo "  $app -> $serial ($reason)"
       else
@@ -268,13 +273,49 @@ collect_apps() {
 }
 
 collect_devices() {
+  local serial count
+  declare -a adb_dup=() filtered=()
+
   if [[ ${#DEVICE_SERIALS[@]} -eq 0 ]]; then
     mapfile -t DEVICE_SERIALS < <(adb devices | awk 'NR>1 && $2=="device" {print $1}')
   fi
 
-  if [[ ${#DEVICE_SERIALS[@]} -eq 0 ]]; then
-    die "无在线 Android 设备（adb devices）"
+  mapfile -t DEVICE_SERIALS < <(printf '%s\n' "${DEVICE_SERIALS[@]}" | awk '!seen[$0]++')
+
+  for serial in "${DEVICE_SERIALS[@]}"; do
+    count=$(adb devices | awk -v s="$serial" '$1==s && $2=="device" {c++} END{print c+0}')
+    if (( count > 1 )); then
+      adb_dup+=("$serial")
+    fi
+  done
+
+  if [[ ${#adb_dup[@]} -gt 0 ]]; then
+    err "以下序列号在 adb devices 中出现多次（adb -s 会失败），已跳过: ${adb_dup[*]}"
+    err "请断开重复 USB/网络调试后重试: adb devices"
+    for serial in "${DEVICE_SERIALS[@]}"; do
+      local skip=0 d
+      for d in "${adb_dup[@]}"; do
+        [[ "$serial" == "$d" ]] && skip=1
+      done
+      (( skip )) || filtered+=("$serial")
+    done
+    DEVICE_SERIALS=("${filtered[@]}")
   fi
+
+  if [[ ${#DEVICE_SERIALS[@]} -eq 0 ]]; then
+    die "无可用在线设备（adb devices）；若曾出现重复序列号，请先修复连接"
+  fi
+}
+
+adb_install_reason() {
+  local out="$1"
+  local line
+  line="$(printf '%s\n' "$out" | grep -E '^(Failure|Error|error:|adb:)' | tail -1)"
+  [[ -n "$line" ]] || line="$(printf '%s\n' "$out" | tail -1)"
+  line="${line//$'\n'/ }"
+  line="${line//$'\r'/}"
+  [[ ${#line} -gt 200 ]] && line="${line:0:200}..."
+  printf '%s' "$line"
 }
 
 sync_app_cache() {
@@ -335,8 +376,8 @@ record_task_done() {
     echo 1 >>"$1"
     done_n=$(wc -l <"$1" | tr -d " ")
     ok_n=0; fail_n=0
-    [[ -f "$2" ]] && ok_n=$(wc -l <"$2" | tr -d " ")
-    [[ -f "$3" ]] && fail_n=$(wc -l <"$3" | tr -d " ")
+    [[ -f "$2" ]] && ok_n=$(awk -F"\t" "NF>=2 && \$1!=\"\" && \$2!=\"\"" "$2" | wc -l | tr -d " ")
+    [[ -f "$3" ]] && fail_n=$(awk -F"\t" "NF>=2 && \$1!=\"\" && \$2!=\"\"" "$3" | wc -l | tr -d " ")
     printf "[%d/%d] %s -> %s %s  累计 ok=%d fail=%d\n" \
       "$done_n" "$4" "$5" "$6" "$7" "$ok_n" "$fail_n" >&2
   ' _ "$PROGRESS_DONE" "$STATS_OK" "$STATS_FAIL" "$total" "$app" "$serial" "$status"
@@ -431,7 +472,7 @@ install_to_device() {
     [[ "$attempt" -le "$RETRIES" ]] && sleep 2
   done
 
-  record_failure "$app" "$serial" "${out:-adb 安装失败}"
+  record_failure "$app" "$serial" "$(adb_install_reason "$out")"
   err "安装失败: $app -> $serial"
   printf '%s\n' "$out" >&2
   return 1
