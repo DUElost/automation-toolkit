@@ -1445,7 +1445,7 @@ def sync_issue_to_project_history_db(
             "exp_type": exp_type or existing.get("exp_type") or "",
             "cur_process": cur_process or existing.get("cur_process") or "",
             "version": current_version or existing.get("version") or "",
-            "count": occurrence_count or existing.get("count") or 0,
+            "count": (occurrence_count or 0) + (existing.get("count") or 0),
             "source_file": source_file or existing.get("source_file") or "",
             "raw_data": raw_data,
             "fix_version": str(fix_version or existing.get("fix_version") or ""),
@@ -1977,6 +1977,18 @@ def execute_decision(
     try:
         if matched_row and not getattr(decision, "recreate_issue", False):
             if action == "OPEN_LIKE_UPDATE":
+                if issue_fields and "summary" in issue_fields and matched_row:
+                    existing_summary = str(matched_row.get("summary") or "")
+                    existing_count = _extract_total_number(existing_summary)
+                    current_count = _extract_total_number(str(issue_fields.get("summary", "")))
+                    if existing_count > 0 and current_count > 0:
+                        new_total = existing_count + current_count
+                        issue_fields["summary"] = re.sub(
+                            r"\[Total Number\s+\d+\]",
+                            f"[Total Number {new_total}]",
+                            issue_fields["summary"],
+                            flags=re.IGNORECASE,
+                        )
                 update_fields = build_update_fields(issue_fields)
                 if update_fields:
                     update_issue_fields(jira_client, issue_key, update_fields)

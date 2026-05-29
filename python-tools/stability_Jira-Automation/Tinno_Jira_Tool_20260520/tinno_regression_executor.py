@@ -10,7 +10,7 @@ OPEN_LIKE_STATUSES = {"Open", "开放", "Reopened", "重新打开", "处理中",
 WONT_FIX_RESOLUTIONS = {"问题不修改", "非问题", "Won't Fix", "Won't Do", "不解决"}
 DUPLICATE_RESOLUTIONS = {"重复问题", "Duplicate"}
 RESOLVED_STATUSES = {"Resolved", "已解决", "Verified"}
-RESOLVED_FIXED_RESOLUTION = "完成"
+RESOLVED_FIXED_RESOLUTIONS = {"完成", "Done"}
 CLOSED_STATUSES = {"Closed", "已关闭", "已关单"}
 
 
@@ -216,7 +216,7 @@ def decide_action(
             recreate_issue=True,
         )
 
-    if _is_resolved(status) and resolution == RESOLVED_FIXED_RESOLUTION:
+    if _is_resolved(status) and resolution in RESOLVED_FIXED_RESOLUTIONS:
         if not fix_version:
             return ActionDecision(
                 action="MANUAL_REVIEW",
