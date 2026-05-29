@@ -23,11 +23,12 @@ LIST_FILE=""
 FOLDER=""
 CACHE_JOBS="${APK_CACHE_PARALLEL:-4}"
 
+RUN_BASE=""
 STATS_OK=""
 STATS_FAIL=""
 STATS_LOCK=""
 CACHE_SKIP=""
-PROGRESS_DIR=""
+PROGRESS_DONE=""
 
 usage() {
   cat <<'EOF'
@@ -83,32 +84,44 @@ die() {
 }
 
 init_stats() {
-  local base="$CACHE_ROOT/.runs/$$"
-  mkdir -p "$base"
-  STATS_OK="$base/ok"
-  STATS_FAIL="$base/fail"
-  STATS_LOCK="$base/lock"
-  CACHE_SKIP="$base/cache_skip"
-  PROGRESS_DIR="$base/progress"
-  mkdir -p "$PROGRESS_DIR"
-  : >"$STATS_OK" >"$STATS_FAIL" >"$STATS_LOCK" >"$CACHE_SKIP"
-  trap "rm -rf '$base'" EXIT
+  RUN_BASE="$CACHE_ROOT/.runs/$$"
+  mkdir -p "$RUN_BASE"
+  STATS_OK="$RUN_BASE/ok"
+  STATS_FAIL="$RUN_BASE/fail"
+  STATS_LOCK="$RUN_BASE/lock"
+  CACHE_SKIP="$RUN_BASE/cache_skip"
+  PROGRESS_DONE="$RUN_BASE/done"
+  : >"$STATS_OK" >"$STATS_FAIL" >"$STATS_LOCK" >"$CACHE_SKIP" >"$PROGRESS_DONE"
+}
+
+cleanup_run_state() {
+  [[ -n "$RUN_BASE" && -d "$RUN_BASE" ]] && rm -rf "$RUN_BASE"
+}
+
+# 后台子 shell 会继承 EXIT trap，误删 RUN_BASE；并行任务必须清掉继承的 trap
+run_bg() {
+  (
+    trap - EXIT INT TERM HUP
+    if ! "$@"; then exit 1; fi
+  ) &
+}
+
+with_stats_lock() {
+  (
+    trap - EXIT INT TERM HUP
+    flock -x 200
+    "$@"
+  ) 200>>"$STATS_LOCK"
 }
 
 record_success() {
   local app="$1" serial="$2"
-  (
-    flock -x 200
-    printf '%s\t%s\n' "$app" "$serial" >>"$STATS_OK"
-  ) 200>"$STATS_LOCK"
+  with_stats_lock bash -c 'printf "%s\t%s\n" "$1" "$2" >>"$3"' _ "$app" "$serial" "$STATS_OK"
 }
 
 record_failure() {
   local app="$1" serial="$2" reason="${3:-}"
-  (
-    flock -x 200
-    printf '%s\t%s\t%s\n' "$app" "$serial" "$reason" >>"$STATS_FAIL"
-  ) 200>"$STATS_LOCK"
+  with_stats_lock bash -c 'printf "%s\t%s\t%s\n" "$1" "$2" "$3" >>"$4"' _ "$app" "$serial" "$reason" "$STATS_FAIL"
 }
 
 print_summary() {
@@ -316,20 +329,17 @@ mark_cache_failed() {
 
 record_task_done() {
   local status="$1" app="$2" serial="$3"
-  local lock="$PROGRESS_DIR/.lock"
   local total done_n ok_n fail_n
   total=$(( ${#APP_NAMES[@]} * ${#DEVICE_SERIALS[@]} ))
-  mkdir -p "$PROGRESS_DIR" 2>/dev/null || true
-  (
-    flock -x 200
-    echo 1 >>"$PROGRESS_DIR/.done"
-    done_n=$(wc -l <"$PROGRESS_DIR/.done" | tr -d ' ')
+  with_stats_lock bash -c '
+    echo 1 >>"$1"
+    done_n=$(wc -l <"$1" | tr -d " ")
     ok_n=0; fail_n=0
-    [[ -f "$STATS_OK" ]] && ok_n=$(wc -l <"$STATS_OK" | tr -d ' ')
-    [[ -f "$STATS_FAIL" ]] && fail_n=$(wc -l <"$STATS_FAIL" | tr -d ' ')
-    printf '[%d/%d] %s -> %s %s  累计 ok=%d fail=%d\n' \
-      "$done_n" "$total" "$app" "$serial" "$status" "$ok_n" "$fail_n" >&2
-  ) 200>"$lock"
+    [[ -f "$2" ]] && ok_n=$(wc -l <"$2" | tr -d " ")
+    [[ -f "$3" ]] && fail_n=$(wc -l <"$3" | tr -d " ")
+    printf "[%d/%d] %s -> %s %s  累计 ok=%d fail=%d\n" \
+      "$done_n" "$4" "$5" "$6" "$7" "$ok_n" "$fail_n" >&2
+  ' _ "$PROGRESS_DONE" "$STATS_OK" "$STATS_FAIL" "$total" "$app" "$serial" "$status"
 }
 
 prepare_one_cache() {
@@ -371,9 +381,7 @@ prepare_all_caches() {
         wait -n || rc=1
         ((running--)) || true
       done
-      (
-        prepare_one_cache "$app"
-      ) &
+      run_bg prepare_one_cache "$app"
       ((running++)) || true
     done
     while (( running > 0 )); do
@@ -477,9 +485,7 @@ run_devices_parallel() {
   if [[ "$max_jobs" -eq 0 ]]; then
     local pids=() pid
     for serial in "${DEVICE_SERIALS[@]}"; do
-      (
-        if ! run_for_device "$serial"; then exit 1; fi
-      ) &
+      run_bg run_for_device "$serial"
       pids+=($!)
     done
     for pid in "${pids[@]}"; do
@@ -493,9 +499,7 @@ run_devices_parallel() {
       wait -n || rc=1
       ((running--)) || true
     done
-    (
-      if ! run_for_device "$serial"; then exit 1; fi
-    ) &
+    run_bg run_for_device "$serial"
     ((running++)) || true
   done
   while (( running > 0 )); do
@@ -616,6 +620,7 @@ main() {
   fi
 
   print_summary
+  cleanup_run_state
   exit "$rc"
 }
 
