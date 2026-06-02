@@ -134,6 +134,24 @@ def _select_fix_version_for_comparison(fix_version: Any) -> str:
     return max(versions, key=_version_key)
 
 
+def _normalize_compare_version(version: str) -> str:
+    """Normalize build/fix versions to MLD-style for VFFCA version comparison.
+
+    Fix versions like V552AA-HONOR-LX2-16-260521V5_Release_user_...
+    embed an MLD-style version (LX2-16-260521V5).  Extract that so it
+    can be compared with Monkey report versions (MLD-LX3-16-260521V5).
+    """
+    text = _normalize_text(version)
+    if not text:
+        return text
+    if re.match(r'^MLD-LX\d+', text, re.IGNORECASE):
+        return text
+    match = re.search(r'(LX\d+-\d+-\d+V\d+)', text, re.IGNORECASE)
+    if match:
+        return f"MLD-{match.group(1)}"
+    return text
+
+
 def _normalize_verified_versions(value: Any) -> list[str]:
     if value is None:
         return []
@@ -234,14 +252,9 @@ def decide_action(
                 comment_required=False,
             )
         if _is_strict_version_project(project_key, strict_version_project_keys):
+            comparison_fix_version = _normalize_compare_version(comparison_fix_version)
+            current_version_text = _normalize_compare_version(current_version_text)
             if not build_version:
-                return ActionDecision(
-                    action="MANUAL_REVIEW",
-                    update_jira=False,
-                    manual_review=True,
-                    comment_required=False,
-                )
-            if _compare_versions(comparison_fix_version, build_version) <= 0:
                 return ActionDecision(
                     action="MANUAL_REVIEW",
                     update_jira=False,
@@ -318,6 +331,8 @@ def evaluate_regression_pass(
         )
 
     if _is_strict_version_project(normalized_project_key, strict_version_project_keys):
+        comparison_fix_version = _normalize_compare_version(comparison_fix_version)
+        current_version_text = _normalize_compare_version(current_version_text)
         if not normalized_build_version:
             return RegressionPassDecision(
                 action="REGRESSION_PASS_SKIP",
