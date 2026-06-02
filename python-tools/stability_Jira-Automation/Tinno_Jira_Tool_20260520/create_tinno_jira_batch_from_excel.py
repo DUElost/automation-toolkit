@@ -1794,6 +1794,7 @@ def process_regression_pass_candidates(
             strict_version_project_keys=strict_version_project_keys,
         )
         reason = pass_decision.reason or "回归PASS判定"
+        logger.info("回归验证候选 %s: action=%s reason=%s", jira_key, pass_decision.action, reason)
 
         if pass_decision.action == "REGRESSION_PASS_SKIP":
             result_message = f"skip: {reason}"
