@@ -76,14 +76,16 @@ def _compare_versions(current_version: Any, fix_version: Any) -> int:
 
 
 def _compare_mld_versions(current_version: str, fix_version: str) -> int:
-    """Compare MLD-style versions by date, then board, then V-number.
+    """Compare MLD-style versions by build date.
 
     MLD format: MLD-LX{N}-{date}V{ver}  (e.g. MLD-LX3-16-260521V5)
     Fix versions with embedded MLD styles should already be normalized
     by _normalize_compare_version before calling this.
 
-    Primary sort is by BUILD DATE (earlier date = older), so regression
-    PASS only proceeds when the fix version date is <= current date.
+    Primary sort is by BUILD DATE (earlier date = older).  Board
+    variants (LX3 vs LX2) are not comparable, so only the date
+    determines ordering.  Regression PASS proceeds when the fix
+    version date <= current test version date.
     """
     cur_match = re.search(r'(\d+)(V\d+)', current_version)
     fix_match = re.search(r'(\d+)(V\d+)', fix_version)
@@ -99,18 +101,7 @@ def _compare_mld_versions(current_version: str, fix_version: str) -> int:
     if cur_date > fix_date:
         return 1
 
-    # Same date → compare LX number
-    cur_lx_match = re.search(r'LX(\d+)', current_version)
-    fix_lx_match = re.search(r'LX(\d+)', fix_version)
-    if cur_lx_match and fix_lx_match:
-        cur_lx = int(cur_lx_match.group(1))
-        fix_lx = int(fix_lx_match.group(1))
-        if cur_lx < fix_lx:
-            return -1
-        if cur_lx > fix_lx:
-            return 1
-
-    # Same date and LX → compare V-number
+    # Same date → compare V-number as tiebreaker
     cur_ver = int(cur_match.group(2)[1:])
     fix_ver = int(fix_match.group(2)[1:])
     if cur_ver < fix_ver:
