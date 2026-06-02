@@ -254,7 +254,15 @@ def decide_action(
         if _is_strict_version_project(project_key, strict_version_project_keys):
             comparison_fix_version = _normalize_compare_version(comparison_fix_version)
             current_version_text = _normalize_compare_version(current_version_text)
+            build_version = _normalize_compare_version(build_version)
             if not build_version:
+                return ActionDecision(
+                    action="MANUAL_REVIEW",
+                    update_jira=False,
+                    manual_review=True,
+                    comment_required=False,
+                )
+            if _compare_versions(comparison_fix_version, build_version) <= 0:
                 return ActionDecision(
                     action="MANUAL_REVIEW",
                     update_jira=False,
@@ -333,6 +341,7 @@ def evaluate_regression_pass(
     if _is_strict_version_project(normalized_project_key, strict_version_project_keys):
         comparison_fix_version = _normalize_compare_version(comparison_fix_version)
         current_version_text = _normalize_compare_version(current_version_text)
+        normalized_build_version = _normalize_compare_version(normalized_build_version)
         if not normalized_build_version:
             return RegressionPassDecision(
                 action="REGRESSION_PASS_SKIP",
