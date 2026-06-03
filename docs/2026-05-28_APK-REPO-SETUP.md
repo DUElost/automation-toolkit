@@ -440,9 +440,7 @@ echo '172.21.8.202:/data/apk-repo  /mnt/apk-repo  nfs  ro,vers=4.2,_netdev,nofai
 sudo systemctl daemon-reload
 sudo mount /mnt/apk-repo
 
-# 安装 apk-install-app 脚本（见第三节 3.4）
-# 配置 udev + adb devices
-# 试装：apk-install-app cn_xender
+# 试装：/mnt/apk-repo/scripts/apk-install-app.sh cn_xender
 ```
 
 ---
