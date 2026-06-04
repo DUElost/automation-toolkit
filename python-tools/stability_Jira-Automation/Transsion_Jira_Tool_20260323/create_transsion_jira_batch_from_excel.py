@@ -1477,6 +1477,7 @@ def run_excel_mode(args: argparse.Namespace) -> int:
             )
             issue_fields: Dict[str, Any] = {}
             target_assignee: str | None = None
+            version_fuzzy_map: Dict[str, str] = {}
             if requires_issue_fields:
                 bundle = get_meta_bundle(jira, project_key, issue_type_name, meta_cache)
                 target_assignee_raw = find_first_value(row, "assignee", defaults.get("default_assignee"))
@@ -1498,6 +1499,7 @@ def run_excel_mode(args: argparse.Namespace) -> int:
                     project_cache=project_cache,
                     create_assignee_override=current_user,
                     create_reporter_override=current_user,
+                    version_fuzzy_map=version_fuzzy_map,
                 )
             reason = "命中历史单" if matched_row else "未命中历史单"
             logger.info("第 %d 行准备处理: [%s] %s", row_number, project_key, summary)
@@ -1580,6 +1582,14 @@ def run_excel_mode(args: argparse.Namespace) -> int:
                 result_status,
                 result_message,
             )
+
+            if success_flag and issue_key and version_fuzzy_map:
+                for original_version, matched_version in version_fuzzy_map.items():
+                    comment_text = f"建单版本为「{original_version}」，实际提交版本为「{matched_version}」（模糊匹配）。"
+                    add_issue_comment(jira, issue_key, comment_text)
+                    logger.info(
+                        "第 %d 行已添加版本备注: %s", row_number, comment_text
+                    )
 
             if regression_enabled and store is not None:
                 store.save_execution_result(

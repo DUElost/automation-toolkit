@@ -328,6 +328,82 @@ def extract_allowed_values(create_fields: Dict[str, Any]) -> Dict[str, Dict[str,
     return result
 
 
+def _fuzzy_match_version(submitted: str, allowed_names: List[str]) -> Optional[str]:
+    parenthesized_pattern = re.search(r"\(([^)]+)\)", submitted)
+    variant = parenthesized_pattern.group(1) if parenthesized_pattern else None
+    prefix = submitted.split("(")[0] if "(" in submitted else submitted
+    suffix = submitted.split(")")[-1] if ")" in submitted else ""
+
+    scored: List[Tuple[int, str]] = []
+    for name in allowed_names:
+        score = 0
+        if name == submitted:
+            score = 1000
+        elif variant and variant in name:
+            score += 50
+            name_prefix = name.split("(")[0] if "(" in name else name
+            common = os.path.commonprefix([prefix, name_prefix])
+            score += len(common) * 3
+            if suffix and name.endswith(suffix):
+                score += 20
+        if score > 0:
+            scored.append((score, name))
+
+    scored.sort(key=lambda x: (-x[0], -len(x[1])))
+    if scored:
+        match = scored[0]
+        if match[0] > 20:
+            logger.info("版本模糊匹配: %s → %s (score=%d)", submitted, match[1], match[0])
+            return match[1]
+    return None
+
+
+def ensure_versions_exist(
+    jira_client: JIRA,
+    project_key: str,
+    versions: List[str],
+    allowed_values: Dict[str, Dict[str, Any]],
+    version_fuzzy_map: Optional[Dict[str, str]] = None,
+) -> List[str]:
+    version_allowed = allowed_values.get("versions", {})
+    missing = [v for v in versions if v not in version_allowed]
+    if not missing:
+        return versions
+    allowed_names = list(version_allowed.keys())
+    resolved: List[str] = []
+    for name in versions:
+        if name in version_allowed:
+            resolved.append(name)
+            continue
+        try:
+            existing = jira_client.get_project_version_by_name(project_key, name)
+            if existing:
+                logger.info("版本 %s 已存在（跳过创建）", name)
+                resolved.append(name)
+                continue
+        except Exception:
+            pass
+        try:
+            jira_client.create_version(name=name, project=project_key)
+            logger.info("已在项目 %s 中自动创建版本: %s", project_key, name)
+            resolved.append(name)
+            continue
+        except Exception as exc:
+            logger.warning("创建版本 %s 失败: %s", name, exc)
+        fuzzy = _fuzzy_match_version(name, allowed_names)
+        if fuzzy:
+            if version_fuzzy_map is not None:
+                version_fuzzy_map[name] = fuzzy
+            resolved.append(fuzzy)
+        else:
+            raise ValueError(
+                f"版本 '{name}' 在项目 {project_key} 中不存在，且无法自动创建（权限不足），"
+                f"也未找到可用的模糊匹配。请先联系管理员在 JIRA 中添加该版本，"
+                f"或修改 Excel 中使用已有的版本名。"
+            )
+    return resolved
+
+
 def resolve_user_name(
     jira_client: JIRA,
     raw_value: Optional[str],
@@ -575,6 +651,7 @@ def build_issue_fields(
     project_cache: Dict[str, str],
     create_assignee_override: Optional[str] = None,
     create_reporter_override: Optional[str] = None,
+    version_fuzzy_map: Optional[Dict[str, str]] = None,
 ) -> Dict[str, Any]:
     field_ids = defaults.get("field_ids", {})
     project_key = resolve_project_key(jira_client, find_first_value(row, "project", defaults.get("project_key")), project_cache)
@@ -607,19 +684,8 @@ def build_issue_fields(
 
     components = resolve_components_for_create(components, allowed_values)
     validate_multi_values("Components", "components", components, allowed_values)
-    try:
-        validate_multi_values("Versions", "versions", versions, allowed_values)
-    except ValueError:
-        version_allowed = allowed_values.get("versions", {})
-        logger.error(
-            "Versions 校验失败: project=%s issue_type=%s submitted=%s allowed_count=%d allowed_sample=%s",
-            project_key,
-            issue_type_name,
-            versions,
-            len(version_allowed),
-            list(version_allowed.keys())[:10],
-        )
-        raise
+    versions = ensure_versions_exist(jira_client, project_key, versions, allowed_values, version_fuzzy_map)
+    validate_multi_values("Versions", "versions", versions, allowed_values)
 
     issue_fields: Dict[str, Any] = {
         "project": {"key": str(project_key)},
@@ -694,6 +760,14 @@ def build_issue_fields(
         issue_fields[field_ids["importance"]] = option_payload(field_ids["importance"], importance_value, allowed_values)
     if is_field_available(create_fields, field_ids.get("opener", "")) and opener_value:
         issue_fields[field_ids["opener"]] = {"name": opener_value}
+    if is_field_available(create_fields, field_ids.get("country", "")):
+        country_value = find_first_value(row, "country", defaults.get("default_country", ""))
+        if country_value:
+            field_schema = create_fields.get(field_ids["country"], {}).get("schema", {})
+            is_multi = field_schema.get("type") == "array"
+            issue_fields[field_ids["country"]] = option_payload(
+                field_ids["country"], country_value, allowed_values, multi=is_multi,
+            )
     if "security" in create_fields and clean_cell_value(security_value):
         issue_fields["security"] = {"name": str(security_value)}
 

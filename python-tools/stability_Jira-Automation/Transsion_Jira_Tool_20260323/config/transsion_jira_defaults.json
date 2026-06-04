@@ -21,6 +21,7 @@
   "default_ref_result": "无需对比",
   "default_accessories": "无",
   "default_recovery": "不涉及恢复",
+  "default_country": "China(中国)",
   "default_wait_between_issues_seconds": 5,
   "field_ids": {
     "risk": "customfield_10204",
@@ -35,6 +36,7 @@
     "clients": "customfield_12617",
     "fix_way": "customfield_14102",
     "importance": "customfield_13004",
-    "opener": "customfield_14400"
+    "opener": "customfield_14400",
+    "country": "customfield_16202"
   }
 }

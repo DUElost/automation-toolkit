@@ -1,7 +1,8 @@
 {
   "X6726B": {
     "jira_project": "X6726BO151",
-    "affect_project": "X6726B"
+    "affect_project": "X6726B",
+    "monkey_project": "X6726BAEE"
   },
   "X6851": {
     "jira_project": "X6851OS16",
