@@ -3,3 +3,8 @@ extracted_apks/
 extracted_apks_*/
 snapshots/
 *.pyc
+
+# 本地设备画像与 Play 下载产物（不入库）
+device_profiles/
+downloaded_apks*/
+recent_24h_pkgs.txt
