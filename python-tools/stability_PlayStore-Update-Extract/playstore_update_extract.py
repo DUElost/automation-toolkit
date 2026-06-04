@@ -18,6 +18,7 @@ Google Play 更新检测与 APK 提取工具
   python playstore_update_extract.py snapshot           # 创建当前版本快照
   python playstore_update_extract.py diff <前> <后>      # 对比两次快照
   python playstore_update_extract.py extract <diff文件>  # 提取变更的 APK
+  python playstore_update_extract.py pull-recent --hours 24  # 最近24h更新/安装
   python playstore_update_extract.py full-flow          # 交互式完整流程
 """
 
@@ -33,7 +34,7 @@ import re
 import tempfile
 import shutil
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 
@@ -536,6 +537,368 @@ class PackageSnapshot:
 
 
 # ---------------------------------------------------------------------------
+# 2b) 最近 N 小时内安装/更新的应用
+# ---------------------------------------------------------------------------
+
+_PKG_LINE_RE = re.compile(r"^\s*Package \[([^\]]+)\]")
+_LAST_UPDATE_RE = re.compile(r"^\s*lastUpdateTime=(.+)$")
+_APK_PATH_PKG_RE = re.compile(r"/data/app/[^/]+/([^/]+)/")
+
+# Trichrome 共享库更新时，主应用 lastUpdateTime 可能不变
+_TRICHROME_INFER_PARENTS = (
+    "com.android.chrome",
+    "com.google.android.webview",
+)
+
+# 默认排除：明显系统/框架包（不含 com.android.chrome 等可分发应用）
+_DEFAULT_EXCLUDE_PREFIXES = (
+    "com.android.internal.",
+    "com.android.server.",
+    "com.android.providers.",
+    "com.android.shell",
+    "com.android.keychain",
+    "com.android.location.fused",
+    "com.android.inputdevices",
+    "com.android.dynsystem",
+)
+
+_PLAY_STORE_TIME_COLUMNS = (
+    "last_update_timestamp_ms",
+    "delivery_data_timestamp_ms",
+    "install_request_timestamp_ms",
+)
+
+
+def get_device_epoch_ms(adb: AdbHelper) -> int:
+    out = adb.shell("date +%s").strip().split()
+    if out and out[0].isdigit():
+        return int(out[0]) * 1000
+    return int(time.time() * 1000)
+
+
+def _epoch_ms_to_local_str(epoch_ms: int) -> str:
+    return datetime.fromtimestamp(epoch_ms / 1000.0).strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _pkg_from_data_app_dirname(dirname: str) -> str:
+    """从 /data/app 下目录名还原包名（去掉随机后缀与 ==）。"""
+    name = dirname[:-2] if dirname.endswith("==") else dirname
+    name = name.rstrip("-")
+    # 典型格式: com.foo.bar-RandomSuffix 或 com.foo.bar_Random
+    m = re.match(r"^([a-zA-Z][\w.]*(?:\.[a-zA-Z][\w.]*)+)-[A-Za-z0-9_]+$", name)
+    if m:
+        return m.group(1)
+    if "-" in name:
+        base, suffix = name.rsplit("-", 1)
+        if "." not in suffix and "." in base:
+            return base
+    return name
+
+
+def normalize_to_installed_package(candidate: str, installed: set[str]) -> str:
+    """将 APK 目录解析结果对齐到已安装的真实包名。"""
+    if candidate in installed:
+        return candidate
+    # 最长前缀匹配（处理 maps-A9yRImC1K- 这类目录名）
+    matches = [
+        p for p in installed
+        if candidate == p or candidate.startswith(p + "-") or candidate.startswith(p + "_")
+    ]
+    if matches:
+        return max(matches, key=len)
+    if "-" in candidate:
+        base = candidate.rsplit("-", 1)[0].rstrip("-")
+        if base in installed:
+            return base
+    return candidate
+
+
+def _should_include_package(
+    pkg: str,
+    *,
+    third_party_only: bool,
+    third_party: set[str],
+    exclude_system: bool,
+    exclude_prefixes: tuple[str, ...],
+) -> bool:
+    if third_party_only and pkg not in third_party:
+        return False
+    if exclude_system and any(pkg.startswith(p) for p in exclude_prefixes):
+        return False
+    return True
+
+
+def _merge_hit(
+    merged: dict[str, dict],
+    pkg: str,
+    ts_ms: int,
+    source: str,
+    *,
+    title: str = "",
+    note: str = "",
+) -> None:
+    if ts_ms <= 0:
+        return
+    prev = merged.get(pkg)
+    if prev and prev["timestamp_ms"] > ts_ms:
+        return
+    if prev and prev["timestamp_ms"] == ts_ms:
+        sources = prev.setdefault("sources", [prev["source"]])
+        if source not in sources:
+            sources.append(source)
+        if title and not prev.get("title"):
+            prev["title"] = title
+        if note and not prev.get("note"):
+            prev["note"] = note
+        return
+    merged[pkg] = {
+        "package": pkg,
+        "timestamp_ms": ts_ms,
+        "source": source,
+        "sources": [source],
+        "title": title or (prev or {}).get("title", ""),
+        "note": note or (prev or {}).get("note", ""),
+    }
+
+
+def from_play_store_recent(adb: AdbHelper, cutoff_ms: int) -> dict[str, dict]:
+    """Play Store localappstate.db → appstate.last_update_timestamp_ms（最贴近 Play 更新）。"""
+    merged: dict[str, dict] = {}
+    if not adb.check_root():
+        eprint("[Play] 跳过：需要 root 读取 localappstate.db")
+        return merged
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        local_db = os.path.join(tmpdir, "localappstate.db")
+        try:
+            adb.pull_db(DB_APPSTATE, local_db)
+        except Exception as exc:
+            eprint(f"[Play] 无法拉取 localappstate.db: {exc}")
+            return merged
+
+        if os.path.getsize(local_db) < 1024:
+            eprint("[Play] localappstate.db 为空")
+            return merged
+
+        conn = sqlite3.connect(local_db)
+        cur = conn.cursor()
+        cur.execute("PRAGMA table_info(appstate)")
+        columns = {row[1] for row in cur.fetchall()}
+        time_cols = [c for c in _PLAY_STORE_TIME_COLUMNS if c in columns]
+        if not time_cols:
+            eprint("[Play] appstate 表无时间戳字段")
+            conn.close()
+            return merged
+
+        title_col = "title" if "title" in columns else "''"
+        select_cols = ", ".join(["package_name", title_col] + time_cols)
+        cur.execute(f"SELECT {select_cols} FROM appstate")
+        rows = cur.fetchall()
+        conn.close()
+
+    for row in rows:
+        pkg = row[0]
+        title = row[1] if len(row) > 1 else ""
+        ts_values = row[2:] if len(row) > 2 else []
+        ts_ms = max((int(v) for v in ts_values if v and int(v) > 0), default=0)
+        if ts_ms < cutoff_ms:
+            continue
+        _merge_hit(merged, pkg, ts_ms, "play_store", title=title or "")
+
+    eprint(f"[Play] localappstate.db 命中 {len(merged)} 个")
+    return merged
+
+
+def from_apk_mtime_recent(adb: AdbHelper, cutoff_ms: int) -> dict[str, dict]:
+    """扫描 /data/app 下 APK 文件 mtime（对 Chrome/Photos 等更敏感）。"""
+    merged: dict[str, dict] = {}
+    cutoff_s = cutoff_ms // 1000
+    out = adb.shell(
+        f"find /data/app -name '*.apk' -exec stat -c '%Y %n' {{}} \\; 2>/dev/null"
+    )
+    if not out:
+        eprint("[APK] 未扫描到 /data/app 下 APK（需 root）")
+        return merged
+
+    for line in out.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        parts = line.split(maxsplit=1)
+        if len(parts) != 2 or not parts[0].isdigit():
+            continue
+        mtime_s = int(parts[0])
+        if mtime_s < cutoff_s:
+            continue
+        path = parts[1]
+        m = _APK_PATH_PKG_RE.search(path)
+        if not m:
+            continue
+        raw_pkg = _pkg_from_data_app_dirname(m.group(1))
+        _merge_hit(merged, raw_pkg, mtime_s * 1000, "apk_mtime")
+
+    eprint(f"[APK] /data/app mtime 命中 {len(merged)} 个")
+    return merged
+
+
+def from_dumpsys_recent(adb: AdbHelper, cutoff_ms: int) -> dict[str, dict]:
+    """dumpsys package 的 lastUpdateTime（仅使用毫秒时间戳，避免时区误判）。"""
+    merged: dict[str, dict] = {}
+    dumpsys_out = adb.shell("dumpsys package")
+    current_pkg: Optional[str] = None
+    skipped_human = 0
+
+    for line in dumpsys_out.splitlines():
+        m_pkg = _PKG_LINE_RE.match(line)
+        if m_pkg:
+            current_pkg = m_pkg.group(1).strip()
+            continue
+        if not current_pkg:
+            continue
+        m_time = _LAST_UPDATE_RE.match(line)
+        if not m_time:
+            continue
+        raw = m_time.group(1).strip()
+        if not raw.isdigit():
+            skipped_human += 1
+            continue
+        ts_ms = int(raw)
+        if ts_ms < 10**12:
+            ts_ms *= 1000
+        if ts_ms < cutoff_ms:
+            continue
+        _merge_hit(merged, current_pkg, ts_ms, "dumpsys_epoch")
+
+    if skipped_human:
+        eprint(f"[dumpsys] 跳过 {skipped_human} 条非 epoch 的 lastUpdateTime（易时区偏差）")
+    eprint(f"[dumpsys] epoch lastUpdateTime 命中 {len(merged)} 个")
+    return merged
+
+
+def expand_trichrome_parents(merged: dict[str, dict], installed: set[str]) -> None:
+    """Trichrome 库更新时，推断 Chrome/WebView 主包也已更新。"""
+    for pkg, info in list(merged.items()):
+        if not pkg.startswith("com.google.android.trichromelibrary"):
+            continue
+        for parent in _TRICHROME_INFER_PARENTS:
+            if parent not in installed or parent in merged:
+                continue
+            _merge_hit(
+                merged,
+                parent,
+                info["timestamp_ms"],
+                "inferred_trichrome",
+                note=f"from {pkg}",
+            )
+
+
+def list_recently_updated_packages(
+    adb: AdbHelper,
+    hours: float = 24.0,
+    *,
+    sources: str = "all",
+    third_party_only: bool = False,
+    exclude_system: bool = True,
+    extra_exclude_prefixes: Optional[list[str]] = None,
+) -> list[dict]:
+    """
+    列出最近 hours 小时内通过 Play 更新/安装的应用。
+
+    数据源（默认 all）：
+      - play_store: com.android.vending/databases/localappstate.db
+      - apk_mtime: /data/app 下 APK 文件修改时间
+      - dumpsys_epoch: dumpsys package 的 epoch lastUpdateTime
+    """
+    device_ms = get_device_epoch_ms(adb)
+    cutoff_ms = device_ms - int(hours * 3600 * 1000)
+    eprint(
+        f"[扫描] 窗口最近 {hours}h | 设备时间 {_epoch_ms_to_local_str(device_ms)} "
+        f"| 截止 {_epoch_ms_to_local_str(cutoff_ms)}"
+    )
+
+    use = {s.strip().lower() for s in sources.split(",")} if sources != "all" else {
+        "play", "play_store", "apk", "apk_mtime", "dumpsys", "dumpsys_epoch", "all",
+    }
+    if "all" in use:
+        use = {"play", "apk", "dumpsys"}
+
+    merged: dict[str, dict] = {}
+    if use & {"play", "play_store"}:
+        for pkg, hit in from_play_store_recent(adb, cutoff_ms).items():
+            merged[pkg] = hit
+    if use & {"apk", "apk_mtime"}:
+        for pkg, hit in from_apk_mtime_recent(adb, cutoff_ms).items():
+            _merge_hit(
+                merged, pkg, hit["timestamp_ms"], hit["source"],
+                title=hit.get("title", ""),
+            )
+    if use & {"dumpsys", "dumpsys_epoch"}:
+        for pkg, hit in from_dumpsys_recent(adb, cutoff_ms).items():
+            _merge_hit(merged, pkg, hit["timestamp_ms"], hit["source"])
+
+    installed = {
+        line.replace("package:", "").strip()
+        for line in adb.shell("pm list packages").splitlines()
+        if line.strip().startswith("package:")
+    }
+    expand_trichrome_parents(merged, installed)
+
+    # 将 apk_mtime 产生的目录名规范为真实包名，并合并重复项
+    normalized: dict[str, dict] = {}
+    for pkg, hit in merged.items():
+        real_pkg = normalize_to_installed_package(pkg, installed)
+        _merge_hit(
+            normalized,
+            real_pkg,
+            hit["timestamp_ms"],
+            hit["source"],
+            title=hit.get("title", ""),
+            note=hit.get("note", "") if real_pkg == pkg else f"dir:{pkg}",
+        )
+    merged = normalized
+
+    third_party: set[str] = set()
+    if third_party_only:
+        third_party = {
+            line.replace("package:", "").strip()
+            for line in adb.shell("pm list packages -3").splitlines()
+            if line.strip().startswith("package:")
+        }
+        eprint(f"[过滤] 仅第三方应用: {len(third_party)} 个")
+
+    exclude_prefixes = tuple(_DEFAULT_EXCLUDE_PREFIXES)
+    if extra_exclude_prefixes:
+        exclude_prefixes = exclude_prefixes + tuple(extra_exclude_prefixes)
+
+    recent: list[dict] = []
+    for pkg, hit in merged.items():
+        if pkg not in installed:
+            continue
+        if not _should_include_package(
+            pkg,
+            third_party_only=third_party_only,
+            third_party=third_party,
+            exclude_system=exclude_system,
+            exclude_prefixes=exclude_prefixes,
+        ):
+            continue
+        ts_ms = hit["timestamp_ms"]
+        recent.append({
+            "package": pkg,
+            "title": hit.get("title", ""),
+            "source": hit.get("source", ""),
+            "sources": hit.get("sources", []),
+            "note": hit.get("note", ""),
+            "last_update_time": _epoch_ms_to_local_str(ts_ms),
+            "hours_ago": round((device_ms - ts_ms) / 3600000.0, 2),
+        })
+
+    recent.sort(key=lambda x: x["last_update_time"], reverse=True)
+    eprint(f"[扫描] 合并后命中 {len(recent)} 个应用")
+    return recent
+
+
+# ---------------------------------------------------------------------------
 # 3) 快照比对
 # ---------------------------------------------------------------------------
 
@@ -636,11 +999,39 @@ class ApkExtractor:
         "com.google.android.webview": ["com.google.android.trichromelibrary"],
     }
 
+    _TRICHROME_PKG_RE = re.compile(r"^(com\.google\.android\.trichromelibrary_\d+)")
+
+    def _find_trichrome_package(self, chrome_version_code: str = "") -> Optional[str]:
+        """在 /data/app 中定位带版本号的 Trichrome 包名（如 ...trichromelibrary_777817833）。"""
+        find_out = self.adb.shell(
+            "find /data/app -maxdepth 3 -type d "
+            "-name 'com.google.android.trichromelibrary_*' 2>/dev/null"
+        )
+        candidates: list[str] = []
+        for line in find_out.strip().split("\n"):
+            line = line.strip().rstrip("/")
+            if not line:
+                continue
+            dirname = os.path.basename(line).rstrip("=").rstrip("-")
+            m = self._TRICHROME_PKG_RE.match(dirname)
+            if m:
+                candidates.append(m.group(1))
+        if not candidates:
+            return None
+        if chrome_version_code:
+            exact = f"com.google.android.trichromelibrary_{chrome_version_code}"
+            if exact in candidates:
+                return exact
+        # 多个候选时取版本号最大（通常最新）
+        def _vc(pkg: str) -> int:
+            suffix = pkg.rsplit("_", 1)[-1]
+            return int(suffix) if suffix.isdigit() else 0
+        return max(candidates, key=_vc)
+
     def _ensure_shared_libs(self, packages: list[str]) -> list[str]:
         """确保共享库依赖也被提取（如 Chrome/WebView → Trichrome Library）
 
-        Trichrome Library 等共享库不作为常规包注册，pm path 查不到。
-        先尝试 pm path，失败时回退到 /data/app/ 文件系统搜索。
+        Trichrome 在设备上为带版本号包名（非 pm 可见的泛化名），须与 Chrome 版本一致。
         """
         needed = set()
         for pkg in packages:
@@ -649,13 +1040,31 @@ class ApkExtractor:
                     needed.add(lib)
         if not needed:
             return packages
+
+        chrome_vc = ""
+        if "com.android.chrome" in packages:
+            chrome_vc = self._get_version_code("com.android.chrome")
+
         for lib in sorted(needed):
+            if lib == "com.google.android.trichromelibrary":
+                real_pkg = self._find_trichrome_package(chrome_vc)
+                if not real_pkg:
+                    eprint("[依赖] 未找到 Trichrome 共享库目录，Chrome/WebView 可能无法侧载安装")
+                    continue
+                if real_pkg in packages:
+                    continue
+                eprint(
+                    f"[依赖] {real_pkg} (Trichrome，须先于 Chrome/WebView 安装；"
+                    f"与 Chrome versionCode={chrome_vc or '?'} 对应)"
+                )
+                packages.append(real_pkg)
+                continue
+
             out = self.adb.shell(f"pm path '{lib}' 2>/dev/null")
             if out and "package:" in out:
                 eprint(f"[依赖] {lib} (共享库，自动添加)")
                 packages.append(lib)
                 continue
-            # pm path 失败，用文件系统搜索共享库目录
             lib_basename = lib.split(".")[-1]
             find_out = self.adb.shell(
                 f"find /data/app -maxdepth 3 -name '*{lib_basename}*' -type d 2>/dev/null"
@@ -665,10 +1074,7 @@ class ApkExtractor:
                     line = line.strip()
                     if not line:
                         continue
-                    # 确认该目录包含 .apk 文件
-                    apk_check = self.adb.shell(
-                        f"ls '{line}'/*.apk 2>/dev/null"
-                    )
+                    apk_check = self.adb.shell(f"ls '{line}'/*.apk 2>/dev/null")
                     if apk_check and ".apk" in apk_check:
                         eprint(f"[依赖] {lib} (共享库，文件系统发现: {line})")
                         packages.append(lib)
@@ -793,6 +1199,13 @@ class ApkExtractor:
             "remote_dir": apk_dir,
             "apk_files": [os.path.basename(f) for f in apk_files],
         }
+        if pkg.startswith("com.google.android.trichromelibrary"):
+            meta["install_priority"] = 0
+            meta["install_before"] = [
+                "com.android.chrome",
+                "com.google.android.webview",
+            ]
+            meta["note"] = "Trichrome 共享库，必须最先安装；部分机型无 Dependency Installer 会安装失败"
         with open(local_dir / "metadata.json", "w", encoding="utf-8") as f:
             json.dump(meta, f, indent=2, ensure_ascii=False)
 
@@ -972,6 +1385,77 @@ def cmd_extract(args):
             print(f"  {r.name}")
 
 
+def cmd_pull_recent(args):
+    """提取最近 N 小时内更新/安装的应用 APK（Play DB + APK mtime + dumpsys）"""
+    adb = AdbHelper(args.device)
+    recent = list_recently_updated_packages(
+        adb,
+        hours=float(args.hours),
+        sources=args.source,
+        third_party_only=args.third_party_only,
+        exclude_system=not args.include_system,
+    )
+
+    if not recent:
+        print("\n未找到符合条件的应用。")
+        print("提示：需 root；可尝试 --source play,apk、--include-system，或增大 --hours。")
+        print("若 Play 已更新但列表仍少，请用 snapshot → 更新 → snapshot → diff（最准确）。")
+        return
+
+    print(f"\n最近 {args.hours} 小时内更新/安装的应用（共 {len(recent)} 个）:")
+    print(f"{'包名':<42} {'更新时间':<20} {'距今(h)':>8}  {'来源'}")
+    print("-" * 95)
+    for item in recent:
+        src = item.get("source", "")
+        if item.get("note"):
+            src = f"{src} ({item['note']})"
+        title = item.get("title") or ""
+        name_col = item["package"] if not title else f"{item['package']} ({title})"
+        print(
+            f"{name_col:<42} "
+            f"{item['last_update_time']:<20} "
+            f"{item['hours_ago']:>8.2f}  {src}"
+        )
+
+    packages = [item["package"] for item in recent]
+    if args.save:
+        save_path = Path(args.save)
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        save_path.write_text("\n".join(packages) + "\n", encoding="utf-8")
+        print(f"\n包名列表已保存: {save_path}")
+
+    if args.list_only:
+        print("\n仅列出包名（--list-only），未提取 APK。")
+        return
+
+    out_dir, dev_info = _make_device_output_dir(adb, args.output)
+    extractor = ApkExtractor(adb, out_dir)
+    results = extractor.pull_packages(packages, dry_run=args.dry_run)
+
+    manifest = {
+        "source": "pull_recent",
+        "detection_sources": args.source,
+        "hours": float(args.hours),
+        "third_party_only": args.third_party_only,
+        "include_system": args.include_system,
+        "device": dev_info,
+        "package_count": len(packages),
+        "extracted_count": len(results),
+        "packages": recent,
+    }
+    manifest_path = out_dir / "recent_updates_manifest.json"
+    with open(manifest_path, "w", encoding="utf-8") as f:
+        json.dump(manifest, f, indent=2, ensure_ascii=False)
+
+    print(f"\n提取完成，共 {len(results)}/{len(packages)} 个应用 → {out_dir.absolute()}")
+    print(f"  设备: {dev_info['brand']} {dev_info['model']} (Android {dev_info['android_version']})")
+    print(f"  清单: {manifest_path}")
+    if results:
+        print("\n提取的应用:")
+        for r in results:
+            print(f"  {r.name}")
+
+
 def cmd_pull(args):
     """直接按包名提取 APK，不依赖快照/diff"""
     packages = []
@@ -1110,6 +1594,7 @@ def main():
   %(prog)s check --save pkgs.txt    检查并保存包名列表
   %(prog)s pull pkg1 pkg2          直接按包名提取 APK
   %(prog)s pull --from-file pkgs.txt  从文件读取包名提取 APK
+  %(prog)s pull-recent --hours 24     提取最近24小时内更新/安装的应用
   %(prog)s snapshot                 创建版本快照
   %(prog)s diff before.json after.json  对比两次快照
   %(prog)s extract diff.json        根据 diff 提取更新的 APK
@@ -1133,6 +1618,39 @@ def main():
     p_pull.add_argument("--output", "-o", default="", help="APK 输出目录（默认按设备型号自动命名）")
     p_pull.add_argument("--dry-run", action="store_true", help="只显示要提取的，不实际执行")
     p_pull.set_defaults(func=cmd_pull)
+
+    # pull-recent — Play DB + APK mtime 提取最近更新/安装的 APK
+    p_recent = sub.add_parser(
+        "pull-recent",
+        help="提取最近 N 小时内更新/安装的应用 APK（Play DB + APK mtime）",
+    )
+    p_recent.add_argument(
+        "--hours", type=float, default=24.0,
+        help="时间窗口（小时），默认 24",
+    )
+    p_recent.add_argument(
+        "--source", default="all",
+        help="检测数据源：all | play,apk | play | apk | dumpsys（逗号分隔）",
+    )
+    p_recent.add_argument(
+        "--third-party-only", action="store_true",
+        help="仅包含第三方应用（pm list packages -3）",
+    )
+    p_recent.add_argument(
+        "--include-system", action="store_true",
+        help="包含系统/框架包（默认会排除部分 com.android.* 等）",
+    )
+    p_recent.add_argument(
+        "--list-only", action="store_true",
+        help="只列出包名，不提取 APK",
+    )
+    p_recent.add_argument(
+        "--save", "-S",
+        help="将包名列表保存到文件（供 pull --from-file 或批量安装使用）",
+    )
+    p_recent.add_argument("--output", "-o", default="", help="APK 输出目录")
+    p_recent.add_argument("--dry-run", action="store_true", help="只显示要提取的，不实际执行")
+    p_recent.set_defaults(func=cmd_pull_recent)
 
     # snapshot
     p_snap = sub.add_parser("snapshot", help="创建当前所有包版本快照")
