@@ -97,5 +97,6 @@ windows-scheduler/logs/
 windows-scheduler/runtime/
 linux-tools/system_Task-Scheduler/tasks/
 
-# Generated examples
-universal_Automation-Create-Task/examples/
+# Generated manpower exports under examples/ (keep *.example.json)
+**/examples/manpower*
+!**/examples/manpower*.example.json

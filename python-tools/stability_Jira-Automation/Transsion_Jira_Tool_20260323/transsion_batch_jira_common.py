@@ -381,13 +381,25 @@ def resolve_user_name(
     return fallback
 
 
+def _resolve_option_value(value_text: str, field_allowed: Optional[Dict[str, Any]]) -> str:
+    if not value_text or not field_allowed:
+        return value_text
+    if value_text in field_allowed:
+        return value_text
+    for key in field_allowed:
+        if key.lower() == value_text.lower():
+            return key
+    return value_text
+
+
 def option_payload(field_id: str, value: Any, allowed_values: Dict[str, Dict[str, Any]], multi: bool = False) -> Any:
     values = normalize_comma_values(value)
     if not values:
         return [] if multi else None
+    resolved = [_resolve_option_value(item, allowed_values.get(field_id)) for item in values]
     if multi:
-        return [{"value": item} for item in values]
-    return {"value": values[0]}
+        return [{"value": item} for item in resolved]
+    return {"value": resolved[0]}
 
 
 def validate_single_value(field_name: str, field_id: str, value: Any, allowed_values: Dict[str, Dict[str, Any]]) -> None:
@@ -397,8 +409,12 @@ def validate_single_value(field_name: str, field_id: str, value: Any, allowed_va
     if not value_text:
         return
     field_allowed = allowed_values.get(field_id)
-    if field_allowed and value_text not in field_allowed:
-        raise ValueError(f"{field_name}={value_text} 不在当前项目可选值中")
+    if field_allowed:
+        matched = _resolve_option_value(value_text, field_allowed)
+        if matched != value_text:
+            return
+        if value_text not in field_allowed:
+            raise ValueError(f"{field_name}={value_text} 不在当前项目可选值中")
 
 
 def validate_multi_values(field_name: str, field_id: str, values: List[str], allowed_values: Dict[str, Dict[str, Any]]) -> None:
@@ -407,7 +423,13 @@ def validate_multi_values(field_name: str, field_id: str, values: List[str], all
     field_allowed = allowed_values.get(field_id)
     if not field_allowed:
         return
-    invalid = [item for item in values if item not in field_allowed]
+    invalid = []
+    for item in values:
+        matched = _resolve_option_value(item, field_allowed)
+        if matched != item:
+            continue
+        if item not in field_allowed:
+            invalid.append(item)
     if invalid:
         raise ValueError(f"{field_name} 存在无效值: {invalid}")
 
@@ -418,9 +440,10 @@ def resolve_components_for_create(values: List[str], allowed_values: Dict[str, D
     field_allowed = allowed_values.get("components")
     if not field_allowed:
         return values
-    invalid = [item for item in values if item not in field_allowed]
+    resolved = [_resolve_option_value(item, field_allowed) for item in values]
+    invalid = [item for item in resolved if item not in field_allowed]
     if not invalid:
-        return values
+        return resolved
     fallback_component = "ODM处理"
     if fallback_component not in field_allowed:
         raise ValueError(

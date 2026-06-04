@@ -10,7 +10,7 @@ OPEN_LIKE_STATUSES = {"Open", "开放", "Reopened", "重新打开", "处理中",
 WONT_FIX_RESOLUTIONS = {"问题不修改", "非问题", "Won't Fix", "Won't Do", "不解决"}
 DUPLICATE_RESOLUTIONS = {"重复问题", "Duplicate"}
 RESOLVED_STATUSES = {"Resolved", "已解决", "Verified"}
-RESOLVED_FIXED_RESOLUTION = "完成"
+RESOLVED_FIXED_RESOLUTIONS = {"完成", "Done"}
 CLOSED_STATUSES = {"Closed", "已关闭", "已关单"}
 
 
@@ -75,6 +75,42 @@ def _compare_versions(current_version: Any, fix_version: Any) -> int:
     return 0
 
 
+def _compare_mld_versions(current_version: str, fix_version: str) -> int:
+    """Compare MLD-style versions by build date.
+
+    MLD format: MLD-LX{N}-{date}V{ver}  (e.g. MLD-LX3-16-260521V5)
+    Fix versions with embedded MLD styles should already be normalized
+    by _normalize_compare_version before calling this.
+
+    Primary sort is by BUILD DATE (earlier date = older).  Board
+    variants (LX3 vs LX2) are not comparable, so only the date
+    determines ordering.  Regression PASS proceeds when the fix
+    version date <= current test version date.
+    """
+    cur_match = re.search(r'(\d+)(V\d+)', current_version)
+    fix_match = re.search(r'(\d+)(V\d+)', fix_version)
+
+    if not cur_match or not fix_match:
+        return _compare_versions(current_version, fix_version)
+
+    cur_date = int(cur_match.group(1))
+    fix_date = int(fix_match.group(1))
+
+    if cur_date < fix_date:
+        return -1
+    if cur_date > fix_date:
+        return 1
+
+    # Same date → compare V-number as tiebreaker
+    cur_ver = int(cur_match.group(2)[1:])
+    fix_ver = int(fix_match.group(2)[1:])
+    if cur_ver < fix_ver:
+        return -1
+    if cur_ver > fix_ver:
+        return 1
+    return 0
+
+
 def _is_open_like(status: str) -> bool:
     return status in OPEN_LIKE_STATUSES
 
@@ -132,6 +168,24 @@ def _select_fix_version_for_comparison(fix_version: Any) -> str:
     if not versions:
         return ""
     return max(versions, key=_version_key)
+
+
+def _normalize_compare_version(version: str) -> str:
+    """Normalize build/fix versions to MLD-style for VFFCA version comparison.
+
+    Fix versions like V552AA-HONOR-LX2-16-260521V5_Release_user_...
+    embed an MLD-style version (LX2-16-260521V5).  Extract that so it
+    can be compared with Monkey report versions (MLD-LX3-16-260521V5).
+    """
+    text = _normalize_text(version)
+    if not text:
+        return text
+    if re.match(r'^MLD-LX\d+', text, re.IGNORECASE):
+        return text
+    match = re.search(r'(LX\d+-\d+-\d+V\d+)', text, re.IGNORECASE)
+    if match:
+        return f"MLD-{match.group(1)}"
+    return text
 
 
 def _normalize_verified_versions(value: Any) -> list[str]:
@@ -216,7 +270,7 @@ def decide_action(
             recreate_issue=True,
         )
 
-    if _is_resolved(status) and resolution == RESOLVED_FIXED_RESOLUTION:
+    if _is_resolved(status) and resolution in RESOLVED_FIXED_RESOLUTIONS:
         if not fix_version:
             return ActionDecision(
                 action="MANUAL_REVIEW",
@@ -234,6 +288,9 @@ def decide_action(
                 comment_required=False,
             )
         if _is_strict_version_project(project_key, strict_version_project_keys):
+            comparison_fix_version = _normalize_compare_version(comparison_fix_version)
+            current_version_text = _normalize_compare_version(current_version_text)
+            build_version = _normalize_compare_version(build_version)
             if not build_version:
                 return ActionDecision(
                     action="MANUAL_REVIEW",
@@ -241,21 +298,21 @@ def decide_action(
                     manual_review=True,
                     comment_required=False,
                 )
-            if _compare_versions(comparison_fix_version, build_version) <= 0:
+            if _compare_mld_versions(comparison_fix_version, build_version) <= 0:
                 return ActionDecision(
                     action="MANUAL_REVIEW",
                     update_jira=False,
                     manual_review=True,
                     comment_required=False,
                 )
-            if _compare_versions(current_version_text, build_version) < 0:
+            if _compare_mld_versions(current_version_text, build_version) < 0:
                 return ActionDecision(
                     action="MANUAL_REVIEW",
                     update_jira=False,
                     manual_review=True,
                     comment_required=False,
                 )
-        if _compare_versions(current_version_text, comparison_fix_version) >= 0:
+        if _compare_mld_versions(current_version_text, comparison_fix_version) >= 0:
             return ActionDecision(
                 action="MANUAL_REVIEW",
                 update_jira=False,
@@ -318,6 +375,9 @@ def evaluate_regression_pass(
         )
 
     if _is_strict_version_project(normalized_project_key, strict_version_project_keys):
+        comparison_fix_version = _normalize_compare_version(comparison_fix_version)
+        current_version_text = _normalize_compare_version(current_version_text)
+        normalized_build_version = _normalize_compare_version(normalized_build_version)
         if not normalized_build_version:
             return RegressionPassDecision(
                 action="REGRESSION_PASS_SKIP",
@@ -327,7 +387,7 @@ def evaluate_regression_pass(
                 comment_required=False,
                 reason="BUILD_VERSION_EMPTY",
             )
-        if _compare_versions(comparison_fix_version, normalized_build_version) <= 0:
+        if _compare_mld_versions(comparison_fix_version, normalized_build_version) <= 0:
             return RegressionPassDecision(
                 action="REGRESSION_PASS_SKIP",
                 record_pass=False,
@@ -336,7 +396,7 @@ def evaluate_regression_pass(
                 comment_required=False,
                 reason="FIX_VERSION_NOT_AFTER_BUILD_VERSION",
             )
-        if _compare_versions(current_version_text, normalized_build_version) < 0:
+        if _compare_mld_versions(current_version_text, normalized_build_version) < 0:
             return RegressionPassDecision(
                 action="REGRESSION_PASS_SKIP",
                 record_pass=False,
@@ -346,7 +406,7 @@ def evaluate_regression_pass(
                 reason="CURRENT_VERSION_BEFORE_BUILD_VERSION",
             )
 
-    if _compare_versions(current_version_text, comparison_fix_version) < 0:
+    if _compare_mld_versions(current_version_text, comparison_fix_version) < 0:
         return RegressionPassDecision(
             action="REGRESSION_PASS_SKIP",
             record_pass=False,
