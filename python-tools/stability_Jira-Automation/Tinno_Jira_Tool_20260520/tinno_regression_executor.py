@@ -308,20 +308,21 @@ def decide_action(
                     manual_review=True,
                     comment_required=False,
                 )
-            if _compare_mld_versions(comparison_fix_version, build_version) <= 0:
-                return ActionDecision(
-                    action="MANUAL_REVIEW",
-                    update_jira=False,
-                    manual_review=True,
-                    comment_required=False,
-                )
-            if _compare_mld_versions(current_version_text, build_version) < 0:
-                return ActionDecision(
-                    action="MANUAL_REVIEW",
-                    update_jira=False,
-                    manual_review=True,
-                    comment_required=False,
-                )
+            if _is_comparable_version(build_version):
+                if _compare_mld_versions(comparison_fix_version, build_version) <= 0:
+                    return ActionDecision(
+                        action="MANUAL_REVIEW",
+                        update_jira=False,
+                        manual_review=True,
+                        comment_required=False,
+                    )
+                if _compare_mld_versions(current_version_text, build_version) < 0:
+                    return ActionDecision(
+                        action="MANUAL_REVIEW",
+                        update_jira=False,
+                        manual_review=True,
+                        comment_required=False,
+                    )
         if _compare_mld_versions(current_version_text, comparison_fix_version) >= 0:
             return ActionDecision(
                 action="MANUAL_REVIEW",
@@ -397,24 +398,25 @@ def evaluate_regression_pass(
                 comment_required=False,
                 reason="BUILD_VERSION_EMPTY",
             )
-        if _compare_mld_versions(comparison_fix_version, normalized_build_version) <= 0:
-            return RegressionPassDecision(
-                action="REGRESSION_PASS_SKIP",
-                record_pass=False,
-                close_issue=False,
-                new_pass_count=normalized_pass_count,
-                comment_required=False,
-                reason="FIX_VERSION_NOT_AFTER_BUILD_VERSION",
-            )
-        if _compare_mld_versions(current_version_text, normalized_build_version) < 0:
-            return RegressionPassDecision(
-                action="REGRESSION_PASS_SKIP",
-                record_pass=False,
-                close_issue=False,
-                new_pass_count=normalized_pass_count,
-                comment_required=False,
-                reason="CURRENT_VERSION_BEFORE_BUILD_VERSION",
-            )
+        if _is_comparable_version(normalized_build_version):
+            if _compare_mld_versions(comparison_fix_version, normalized_build_version) <= 0:
+                return RegressionPassDecision(
+                    action="REGRESSION_PASS_SKIP",
+                    record_pass=False,
+                    close_issue=False,
+                    new_pass_count=normalized_pass_count,
+                    comment_required=False,
+                    reason="FIX_VERSION_NOT_AFTER_BUILD_VERSION",
+                )
+            if _compare_mld_versions(current_version_text, normalized_build_version) < 0:
+                return RegressionPassDecision(
+                    action="REGRESSION_PASS_SKIP",
+                    record_pass=False,
+                    close_issue=False,
+                    new_pass_count=normalized_pass_count,
+                    comment_required=False,
+                    reason="CURRENT_VERSION_BEFORE_BUILD_VERSION",
+                )
 
     if _compare_mld_versions(current_version_text, comparison_fix_version) < 0:
         return RegressionPassDecision(
