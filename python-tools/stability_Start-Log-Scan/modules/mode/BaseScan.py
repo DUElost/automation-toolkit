@@ -48,7 +48,7 @@ class FallbackAeeResult(object):
 class ScanBase(ABC):
     __doc__ = "\n    配置文件读取优先级： 平台传入tag值 value > hostname对应 value > default value\n    扫描目录优先级：传入扫描目录参数 > 配置参数配置 > 扫描工具本地目录\n    "
 
-    def __init__(self, scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir, skip_extract, skip_unzip, task_tag=None, delete_logs=False):
+    def __init__(self, scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir, skip_extract, skip_unzip, task_tag=None, delete_logs=False, limit_dbg_count=0):
         super(ScanBase, self).__init__()
         self._scan_mode = scan_mode
         self._scan_place = scan_place
@@ -59,6 +59,7 @@ class ScanBase(ABC):
         self._skip_unzip = skip_unzip
         self._task_tag = task_tag
         self._delete_logs = delete_logs
+        self._limit_dbg_count = limit_dbg_count
         self._build_version = None
         self._scan_site = "UnknownSite"
         TEST_LOGGER.info("初始化 ScanBase，传入的参数列表：")
@@ -71,6 +72,7 @@ class ScanBase(ABC):
         TEST_LOGGER.info("skip_unzip：{}".format(self._skip_unzip))
         TEST_LOGGER.info("task_tag：{}".format(self._task_tag))
         TEST_LOGGER.info("delete_logs：{}".format(self._delete_logs))
+        TEST_LOGGER.info("limit_dbg_count：{}".format(self._limit_dbg_count))
         self._android = None
         self._hostname = None
         self._platform_system = None
@@ -1373,6 +1375,10 @@ class ScanBase(ABC):
                 scan_status_str = "日志扫描终止"
                 send_mail = False
             else:
+                if self._limit_dbg_count > 0 and to_be_analysed_number > self._limit_dbg_count:
+                    TEST_LOGGER.info("预分析后待处理问题共 {} 个，超过限制 {} 个，截断至 {}".format(to_be_analysed_number, self._limit_dbg_count, self._limit_dbg_count))
+                    zz_list_to_be_analysed = zz_list_to_be_analysed[:self._limit_dbg_count]
+                    to_be_analysed_number = self._limit_dbg_count
                 TEST_LOGGER.info("本次预计处理问题共：{}个".format(to_be_analysed_number))
                 unhandled_number = len(unhandled_zz_list)
                 if unhandled_number > 0:

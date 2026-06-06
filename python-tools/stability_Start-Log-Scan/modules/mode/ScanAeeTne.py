@@ -18,7 +18,7 @@ class ScanAeeTne(ScanBase):
 
     def __init__(self, scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir,
                  skip_extract, skip_unzip, nas_address=None, task_tag=None,
-                 special_build_prefix=None, delete_logs=False):
+                 special_build_prefix=None, delete_logs=False, limit_dbg_count=0):
         TEST_LOGGER.info("初始化 ScanAeeTne，传入的参数列表：")
         TEST_LOGGER.info("scan_mode：{}".format(scan_mode))
         TEST_LOGGER.info("scan_place：{}".format(scan_place))
@@ -31,9 +31,11 @@ class ScanAeeTne(ScanBase):
         TEST_LOGGER.info("task_tag：{}".format(task_tag))
         TEST_LOGGER.info("special_build_prefix：{}".format(special_build_prefix))
         TEST_LOGGER.info("delete_logs：{}".format(delete_logs))
+        TEST_LOGGER.info("limit_dbg_count：{}".format(limit_dbg_count))
         super(ScanAeeTne, self).__init__(scan_mode, scan_place, days_before,
                                           scan_root_dir, cur_tool_dir, skip_extract,
-                                          skip_unzip, task_tag, delete_logs)
+                                          skip_unzip, task_tag, delete_logs,
+                                          limit_dbg_count=limit_dbg_count)
         self._nas_address = nas_address
         self._special_build_prefix = special_build_prefix
         self._extract_failed_dbg_set = set()
