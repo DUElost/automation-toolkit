@@ -76,6 +76,7 @@ if __name__ == "__main__":
     parser.add_argument("-merge", dest="merge_excel_dir", metavar="合并Excel文件存放目录", type=str, default=None, nargs="+", help="合并Excel文件，待合并文件夹目录")
     parser.add_argument("-merge_key", dest="merge_key", metavar="过滤待合并文件名关键字", type=str, default=None, nargs="?", help="过滤待合并文件名关键字")
     parser.add_argument("-side", dest="merge_side", metavar="合并Excel文件归属地", type=str, default="shanghai", nargs="?", help="合并Excel文件归属地：shanghai / factory")
+    parser.add_argument("-limit", dest="limit_dbg_count", metavar="最大解析dbg数", type=int, default=0, nargs="?", help="最大解析dbg文件数，0为不限制")
     parser.add_argument("-dedup_org", dest="dedup_org", metavar="离线去重_org.xls路径", type=str, default=None, nargs="?", const="", help="离线去重指定的_org.xls文件")
     parser.add_argument("-merge_priority", "--merge_priority", dest="merge_priority", action="store_const", const=True, default=False, metavar="是否判断优先级",
       help="是否判断优先级")
@@ -170,6 +171,7 @@ if __name__ == "__main__":
             reporter = args.reporter
             utp_tcid = args.utp_tcid
             utp_taskid = args.utp_taskid
+            limit_dbg_count = args.limit_dbg_count
             TEST_LOGGER.info("获取输入参数：")
             TEST_LOGGER.info("-del [删除不提交日志目录]：{}".format(delete_logs))
             TEST_LOGGER.info("-s [跳过所有解压步骤]：{}".format(skip_extract))
@@ -194,6 +196,7 @@ if __name__ == "__main__":
             TEST_LOGGER.info(f"-reporter [问题提交人员 reporter]：{reporter}")
             TEST_LOGGER.info(f"-tcid [UTP平台测试例ID tcid]：{utp_tcid}")
             TEST_LOGGER.info(f"-taskid [UTP平台任务ID taskid]：{utp_taskid}")
+            TEST_LOGGER.info("-limit [最大解析dbg数]：{}".format(limit_dbg_count))
     except SystemExit as e:
         if dedup_requested:
             raise
@@ -232,7 +235,7 @@ if __name__ == "__main__":
     TEST_LOGGER.info("工具当前目录：{}\n".format(cur_tool_dir))
     if scan_mode in [SCAN_MODE_AEE_TNE, SCAN_MODE_AEE, SCAN_MODE_TNE, SCAN_MODE_JENKINS, SCAN_MODE_HWASAN, 
      SCAN_MODE_FUZZ]:
-        scanner = ScanAeeTne(scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir, skip_extract, skip_unzip, nas_address, task_tag, special_build_prefix, delete_logs)
+        scanner = ScanAeeTne(scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir, skip_extract, skip_unzip, nas_address, task_tag, special_build_prefix, delete_logs, limit_dbg_count=limit_dbg_count)
         loggerName = datetime.datetime.now().strftime("LogScanAeeTne_%Y_%m_%d_%H_%M_%S.log")
         loggerPath = os.path.join(PathManager.log_folder, loggerName)
         TEST_LOGGER.resetLogFile(loggerPath)
