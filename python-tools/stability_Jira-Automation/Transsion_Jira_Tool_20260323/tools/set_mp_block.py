@@ -12,7 +12,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 JIRA_SERVER = "http://jira.transsion.com"
 TARGET_FIELD_NAME = "必解标签"
-TARGET_FIELD_VALUE = "Not MP Block"
+TARGET_FIELD_VALUE = "MP Block"
 
 
 def normalize_field_name(name):
@@ -263,7 +263,7 @@ def build_field_value(field_info, target_value):
     return selected
 
 
-def set_not_mp_block_for_one_issue(
+def set_mp_block_for_one_issue(
     client,
     project_key,
     reporter,
@@ -344,7 +344,7 @@ def set_not_mp_block_for_one_issue(
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="设置当前用户提单的必解标签为 Not MP Block"
+        description="设置当前用户提单的必解标签为 MP Block"
     )
     parser.add_argument(
         "--project-key",
@@ -396,7 +396,7 @@ def main():
     if not jira:
         sys.exit(1)
 
-    set_not_mp_block_for_one_issue(
+    set_mp_block_for_one_issue(
         jira,
         args.project_key,
         args.report_username,
