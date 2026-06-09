@@ -570,7 +570,7 @@ def test_extract_specialty_from_summary_recognizes_monkey_aee_tag(batch_entry_mo
         "[Total Number 4] [MonkeyAEE] ANR com.trassion.infinix.xclub"
     )
 
-    assert specialty == "MonkeyAEE"
+    assert specialty == "Monkey专项"
 
 
 def test_get_regression_pass_candidates_keeps_monkey_aee_rows_when_specialty_allowed(batch_entry_module):
@@ -591,7 +591,7 @@ def test_get_regression_pass_candidates_keeps_monkey_aee_rows_when_specialty_all
         ],
         regression_rules=regression_rules,
         matched_jira_keys=set(),
-        allowed_specialties={"MonkeyAEE"},
+        allowed_specialties={"Monkey专项"},
     )
 
     assert len(candidates) == 1

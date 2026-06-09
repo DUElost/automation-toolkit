@@ -252,7 +252,7 @@ def extract_specialty_from_summary(summary: Any, category_tag: str = DEFAULT_CAT
     if not summary_text:
         return ""
     if MONKEY_SUMMARY_KEYWORD in summary_text:
-        return "MonkeyAEE"
+        return "Monkey专项"
     tags = re.findall(r"【([^】]+)】", summary_text)
     if not tags:
         return ""
@@ -356,6 +356,13 @@ def resolve_regression_verify_summary_keyword(specialty: Any) -> str:
     if normalized_specialty == "Monkey专项":
         return "Monkey专项"
     return STABILITY_SUMMARY_KEYWORD
+
+
+def collect_summary_keywords_for_specialty(specialty: str) -> list[str]:
+    if specialty in ("Monkey专项", "MonkeyAEE"):
+        return ["[MonkeyAEE]", "Monkey专项"]
+    kw = resolve_regression_verify_summary_keyword(specialty)
+    return [kw] if kw else []
 
 
 def build_regression_verify_jql(project_key: str, reporter: str, specialty: str) -> str:
@@ -1386,6 +1393,10 @@ def run_excel_mode(args: argparse.Namespace) -> int:
         return 1
     summary_keywords = collect_regression_summary_keywords(df)
     batch_specialties = collect_batch_specialties(df)
+    for _sp in batch_specialties:
+        _kw = resolve_regression_verify_summary_keyword(_sp)
+        if _kw and _kw not in summary_keywords:
+            summary_keywords.append(_kw)
 
     jira = connect_to_jira(jira_server, args.jira_username, args.jira_password)
     current_user = str(jira.current_user() or "").strip()
@@ -1781,20 +1792,21 @@ def run_regression_verify_mode(args: argparse.Namespace) -> int:
         )
     )
     snapshot_field_mapping = build_snapshot_field_mapping(defaults)
+    normalized_specialties = {"Monkey专项" if sp == "MonkeyAEE" else sp for sp in specialties}
     all_snapshot_rows: List[Dict[str, Any]] = []
     built_jqls: List[str] = []
     base_jql = build_regression_base_jql(project_key, f"reporter in ({history_reporter})")
     for specialty in specialties:
-        built_jql = build_regression_verify_jql(project_key, history_reporter, specialty)
+        keywords = collect_summary_keywords_for_specialty(specialty)
+        built_jql = build_regression_export_jql(base_jql, keywords)
         built_jqls.append(built_jql)
         logger.info("专项 %s 使用 JQL: %s", specialty, built_jql)
-        summary_keyword = resolve_regression_verify_summary_keyword(specialty)
         all_snapshot_rows.extend(
             export_jira_snapshot(
                 jira,
                 regression_rules,
                 base_jql=base_jql,
-                summary_keywords=[summary_keyword],
+                summary_keywords=keywords,
                 field_mapping=snapshot_field_mapping,
             )
         )
@@ -1820,7 +1832,7 @@ def run_regression_verify_mode(args: argparse.Namespace) -> int:
         regression_rules=regression_rules,
         snapshot_rows=snapshot_rows,
         matched_jira_keys=set(),
-        allowed_specialties=set(specialties),
+        allowed_specialties=normalized_specialties,
         args=args,
         results=results,
         summary_rows=summary_rows,
@@ -1831,7 +1843,7 @@ def run_regression_verify_mode(args: argparse.Namespace) -> int:
         run_id=run_id,
         regression_rules=regression_rules,
         snapshot_rows=snapshot_rows,
-        allowed_specialties=set(specialties),
+        allowed_specialties=normalized_specialties,
         args=args,
         results=results,
         summary_rows=summary_rows,
