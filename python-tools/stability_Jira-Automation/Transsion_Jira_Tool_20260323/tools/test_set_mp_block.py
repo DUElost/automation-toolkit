@@ -29,6 +29,7 @@ class SetMpBlockScriptTest(unittest.TestCase):
 
         self.assertIn('project = "KO5OS16AEE"', jql)
         self.assertIn('reporter = "target.reporter"', jql)
+        self.assertIn('"必解标签" is EMPTY', jql)
         self.assertNotIn("project in", jql)
 
     def test_build_jql_for_multiple_projects(self):
@@ -81,6 +82,36 @@ class SetMpBlockScriptTest(unittest.TestCase):
             args = module.parse_args()
 
         self.assertEqual(args.report_username, ["dailv.tinno", "qimingwang.tinno"])
+
+    def test_build_jql_supports_exclude_priority_names(self):
+        module = load_module("set_mp_block.py", "set_mp_block")
+
+        jql = module.build_jql(
+            ["KO5OS16AEE"],
+            "target.reporter",
+            exclude_priority_names=["Major"],
+        )
+
+        self.assertIn('(priority != "Major" OR priority is EMPTY)', jql)
+
+    def test_parse_args_supports_exclude_priority_name(self):
+        module = load_module("set_mp_block.py", "set_mp_block")
+
+        with patch.object(
+            sys,
+            "argv",
+            [
+                "set_mp_block.py",
+                "--project-key",
+                "KO5OS16AEE",
+                "--exclude-priority-name",
+                "Major",
+                "Minor",
+            ],
+        ):
+            args = module.parse_args()
+
+        self.assertEqual(args.exclude_priority_name, ["Major", "Minor"])
 
 
 if __name__ == "__main__":

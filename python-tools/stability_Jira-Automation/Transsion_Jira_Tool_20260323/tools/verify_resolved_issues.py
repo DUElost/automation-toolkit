@@ -101,14 +101,18 @@ def get_verify_transition_for_issue(client, issue_key):
     return find_verify_transition(transitions)
 
 
-def transition_issue_to_verified(client, issue):
+def transition_issue_to_verified(client, issue, dry_run=False):
     issue_key = issue.key if hasattr(issue, "key") else issue
 
     try:
         transition = get_verify_transition_for_issue(client, issue_key)
         if not transition:
             print(f"[跳过] 问题 {issue_key} 未找到 {VERIFY_TRANSITION_NAME} 转换")
-            return False
+            return "skipped"
+
+        if dry_run:
+            print(f"[预演] 问题 {issue_key} 将流转到 Verified")
+            return "dry_run"
 
         client.transition_issue(
             issue_key,
@@ -116,16 +120,16 @@ def transition_issue_to_verified(client, issue):
             comment=VERIFY_COMMENT,
         )
         print(f"[成功] 问题 {issue_key} 已流转到 Verified")
-        return True
+        return "success"
     except JIRAError as e:
         print(f"[失败] 问题 {issue_key} 流转失败: {e.text} (状态码: {e.status_code})")
-        return False
+        return "failed"
     except Exception as e:
         print(f"[失败] 问题 {issue_key} 流转失败: {e}")
-        return False
+        return "failed"
 
 
-def verify_resolved_issues(client, project_keys, reporters):
+def verify_resolved_issues(client, project_keys, reporters, dry_run=False):
     issues = find_all_resolved_issues(client, project_keys, reporters)
     if not issues:
         print("未找到状态为 Resolved 的问题单。")
@@ -136,25 +140,12 @@ def verify_resolved_issues(client, project_keys, reporters):
     failed_keys = []
 
     for issue in issues:
-        try:
-            transition = get_verify_transition_for_issue(client, issue.key)
-            if not transition:
-                print(f"[跳过] 问题 {issue.key} 未找到 {VERIFY_TRANSITION_NAME} 转换")
-                skipped_keys.append(issue.key)
-                continue
-
-            client.transition_issue(
-                issue.key,
-                transition=transition["id"],
-                comment=VERIFY_COMMENT,
-            )
-            print(f"[成功] 问题 {issue.key} 已流转到 Verified")
+        status = transition_issue_to_verified(client, issue, dry_run=dry_run)
+        if status in ("success", "dry_run"):
             success_keys.append(issue.key)
-        except JIRAError as e:
-            print(f"[失败] 问题 {issue.key} 流转失败: {e.text} (状态码: {e.status_code})")
-            failed_keys.append(issue.key)
-        except Exception as e:
-            print(f"[失败] 问题 {issue.key} 流转失败: {e}")
+        elif status == "skipped":
+            skipped_keys.append(issue.key)
+        else:
             failed_keys.append(issue.key)
 
     return success_keys, skipped_keys, failed_keys
@@ -190,6 +181,11 @@ def parse_args(argv=None):
         required=True,
         help="问题单提单人用户名（必填，支持多个值）",
     )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="只预览将要流转的问题单，不执行 Jira 状态更新",
+    )
     return parser.parse_args(argv)
 
 
@@ -207,14 +203,19 @@ def main():
         jira,
         args.project_keys,
         args.reporter,
+        dry_run=args.dry_run,
     )
 
     print("\n" + "=" * 60)
     print("执行结果汇总")
     print("=" * 60)
-    print(f"成功: {len(success_keys)}")
+    if args.dry_run:
+        print(f"预计流转: {len(success_keys)}")
+    else:
+        print(f"成功: {len(success_keys)}")
     if success_keys:
-        print(f"成功列表: {', '.join(success_keys)}")
+        label = "预计列表" if args.dry_run else "成功列表"
+        print(f"{label}: {', '.join(success_keys)}")
     print(f"跳过: {len(skipped_keys)}")
     if skipped_keys:
         print(f"跳过列表: {', '.join(skipped_keys)}")

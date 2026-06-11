@@ -122,10 +122,12 @@ class SetMandatoryLabelByRuleScriptTest(unittest.TestCase):
         self.assertIn('reporter in ("dailv.tinno", "qimingwang.tinno")', jql)
         self.assertIn('priority in ("Blocker", "Critical")', jql)
         self.assertIn('component = "3RD_Stability"', jql)
-        self.assertIn(
-            '(resolution is EMPTY OR resolution not in ("Won\'t Fix", "Cannot Reproduce", "Platform Limit"))',
-            jql,
-        )
+        self.assertIn('resolution is EMPTY OR resolution not in (', jql)
+        self.assertIn('"Won\'t Fix"', jql)
+        self.assertIn('"Cannot Reproduce"', jql)
+        self.assertIn('"Platform Limit"', jql)
+        self.assertIn('"不能修复"', jql)
+        self.assertIn('"无法再次复现"', jql)
 
     def test_determine_target_label_skips_specific_resolution_results(self):
         module = load_module("set_mandatory_label_by_rule.py", "set_mandatory_label_by_rule")
@@ -295,6 +297,29 @@ class SetMandatoryLabelByRuleScriptTest(unittest.TestCase):
 
         self.assertIn("必解标签存在多个值", str(ctx.exception))
         self.assertNotIn("必解标签为空", str(ctx.exception))
+
+    def test_validate_scope_labels_excludes_known_failure_keys(self):
+        module = load_module("set_mandatory_label_by_rule.py", "set_mandatory_label_by_rule")
+
+        class FakeIssue:
+            def __init__(self, key, label_value):
+                self.key = key
+                self.raw = {"fields": {"customfield_1": label_value}}
+
+        issues = [
+            FakeIssue("X6852OS16-1", None),
+            FakeIssue("X6852OS16-2", [{"value": "MP Block"}]),
+        ]
+
+        with patch.object(module, "find_all_scope_issues", return_value=issues):
+            module.validate_scope_labels(
+                client=None,
+                project_key=["X6852OS16"],
+                reporter=["dailv.tinno"],
+                target_field_id="customfield_1",
+                require_non_empty=True,
+                exclude_keys={"X6852OS16-1"},
+            )
 
 
 if __name__ == "__main__":

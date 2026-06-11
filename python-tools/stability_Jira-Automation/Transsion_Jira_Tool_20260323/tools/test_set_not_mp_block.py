@@ -29,6 +29,7 @@ class SetNotMpBlockScriptTest(unittest.TestCase):
 
         self.assertIn('project = "KO5OS16AEE"', jql)
         self.assertIn('reporter = "target.reporter"', jql)
+        self.assertIn('"必解标签" is EMPTY', jql)
         self.assertNotIn("project in", jql)
 
     def test_build_jql_for_multiple_projects(self):

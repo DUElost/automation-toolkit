@@ -108,7 +108,7 @@ class VerifyResolvedIssuesScriptTest(unittest.TestCase):
 
         result = module.transition_issue_to_verified(client, FakeIssue("KO5OS16AEE-100"))
 
-        self.assertTrue(result)
+        self.assertEqual(result, "success")
         self.assertEqual(
             client.transition_calls,
             [
@@ -118,6 +118,40 @@ class VerifyResolvedIssuesScriptTest(unittest.TestCase):
                 )
             ],
         )
+
+    def test_transition_issue_to_verified_dry_run_does_not_transition(self):
+        module = load_module()
+        client = FakeJira(
+            transitions_by_issue={
+                "KO5OS16AEE-100": [
+                    {"id": "21", "name": "VerifyIssue", "to": {"name": "Verified"}}
+                ]
+            }
+        )
+
+        result = module.transition_issue_to_verified(
+            client,
+            FakeIssue("KO5OS16AEE-100"),
+            dry_run=True,
+        )
+
+        self.assertEqual(result, "dry_run")
+        self.assertEqual(client.transition_calls, [])
+
+    def test_parse_args_supports_dry_run(self):
+        module = load_module()
+
+        args = module.parse_args(
+            [
+                "--project-keys",
+                "KO5OS16AEE",
+                "--reporter",
+                "target.reporter",
+                "--dry-run",
+            ]
+        )
+
+        self.assertTrue(args.dry_run)
 
 
 if __name__ == "__main__":

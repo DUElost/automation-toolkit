@@ -23,4 +23,6 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "Task created or updated: $taskName"
+Write-Host "Config file: $(Join-Path $scriptRoot 'verify_resolved_config.json')"
+Write-Host "Dry-run trigger: powershell -ExecutionPolicy Bypass -File `"$runnerPath`" -DryRun"
 Write-Host "Manual trigger command: schtasks /Run /TN `"$taskName`""

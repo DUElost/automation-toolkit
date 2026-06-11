@@ -13,16 +13,22 @@
 进入仓库根目录执行：
 
 ```bash
-python Transsion_Jira_Tool_20260124/set_not_mp_block.py \
+python set_not_mp_block.py \
   --project-key KO5OS16AEE KO5OS16BEE \
   --jira-username your_login \
   --jira-password "your_password" \
   --report-username target.reporter
-``
-python Transsion_Jira_Tool_20260124/set_not_mp_block.py --project-key X6852OS16 --jira-username dailv.tinno --jira-password "59e-LJB-KbB-Hbb" --report-username dailv.tinno --priority-name Critical --update-all`
+```
 
-python set_not_mp_block.py --project-key X6852OS16 X6851OS16 X6851BOS16 X6851S6AEE X6851B6AEE X6852AEE X1103AEE X1103BAEE --report-username dailv.tinno qimingwang.tinno  --priority-name Critical --update-all
-X6852OS16 X6851OS16 X6851BOS16 X6851S6AEE X6851B6AEE X6852AEE X1103AEE X1103BAEE
+多项目批量更新示例：
+
+```bash
+python set_not_mp_block.py \
+  --project-key X6852OS16 X6851OS16 X6851BOS16 \
+  --report-username dailv.tinno qimingwang.tinno \
+  --priority-name Critical \
+  --update-all
+```
 
 ## 参数说明
 
@@ -31,6 +37,7 @@ X6852OS16 X6851OS16 X6851BOS16 X6851S6AEE X6851B6AEE X6852AEE X1103AEE X1103BAEE
 - `--jira-password` / `-w`：登录用密码（可选，缺省读取 `.env`）
 - `--report-username` / `-r`：提单人用户名（可选，支持多个值，缺省使用 currentUser）
 - `--priority-name`：优先级名称（可选，支持多个值）
+- `--exclude-priority-name`：排除的优先级名称（可选，支持多个值）
 - `--component-name`：模块名称（可选，不填写则不限制模块）
 - `--update-all`：更新所有“必解标签为空”的问题单（默认只更新最新一条）
 
@@ -43,7 +50,7 @@ X6852OS16 X6851OS16 X6851BOS16 X6851S6AEE X6851B6AEE X6852AEE X1103AEE X1103BAEE
 示例：
 
 ```bash
-python Transsion_Jira_Tool_20260124/set_mp_block.py \
+python Transsion_Jira_Tool_20260323/tools/set_mp_block.py \
   --project-key KO5OS16AEE \
   --jira-username your_login \
   --jira-password "your_password" \
@@ -53,7 +60,7 @@ python Transsion_Jira_Tool_20260124/set_mp_block.py \
 多项目示例：
 
 ```bash
-python Transsion_Jira_Tool_20260124/set_mp_block.py \
+python Transsion_Jira_Tool_20260323/tools/set_mp_block.py \
   --project-key KO5OS16AEE KO5OS16BEE \
   --jira-username your_login \
   --jira-password "your_password" \
@@ -64,7 +71,7 @@ python Transsion_Jira_Tool_20260124/set_mp_block.py \
 多报告人示例：
 
 ```bash
-python Transsion_Jira_Tool_20260124/set_mp_block.py \
+python Transsion_Jira_Tool_20260323/tools/set_mp_block.py \
   --project-key KO5OS16AEE KO5OS16BEE \
   --jira-username your_login \
   --jira-password "your_password" \
@@ -80,6 +87,7 @@ python Transsion_Jira_Tool_20260124/set_mp_block.py \
 - `--jira-password` / `-w`：登录用密码（可选，缺省读取 `.env`）
 - `--report-username` / `-r`：提单人用户名（可选，支持多个值，缺省使用 currentUser）
 - `--priority-name`：优先级名称（可选，支持多个值）
+- `--exclude-priority-name`：排除的优先级名称（可选，支持多个值）
 - `--component-name`：模块名称（可选，不填写则不限制模块）
 - `--update-all`：更新所有“必解标签为空”的问题单（默认只更新最新一条）
 
@@ -103,7 +111,7 @@ python Transsion_Jira_Tool_20260124/set_mp_block.py \
 示例：
 
 ```bash
-python Transsion_Jira_Tool_20260124/set_mandatory_label_by_rule.py \
+python Transsion_Jira_Tool_20260323/tools/set_mandatory_label_by_rule.py \
   --project-key X6852OS16 X6851OS16 X6851BOS16 X1103AEE \
   --jira-username your_login \
   --jira-password "your_password" \
@@ -113,7 +121,7 @@ python Transsion_Jira_Tool_20260124/set_mandatory_label_by_rule.py \
 Dry-run 预演：
 
 ```bash
-python Transsion_Jira_Tool_20260124/set_mandatory_label_by_rule.py \
+python Transsion_Jira_Tool_20260323/tools/set_mandatory_label_by_rule.py \
   --project-key X6852OS16 X6851OS16 X6851BOS16 X1103AEE \
   --report-username dailv.tinno qimingwang.tinno \
   --dry-run
@@ -135,10 +143,10 @@ python Transsion_Jira_Tool_20260124/set_mandatory_label_by_rule.py \
 示例：
 
 ```bash
-python Transsion_Jira_Tool_20260124/set_not_mp_block_is_empty.py \
+python Transsion_Jira_Tool_20260323/tools/set_not_mp_block_is_empty.py \
   --project-key KO5OS16AEE \
   --jira-username dailv.tinno \
-  --jira-password "59e-LJB-KbB-Hbb" \
+  --jira-password "your_password" \
   --report-username xiaohongli.tinno \
   --priority-name "Major" \
   --component-name "3RD_Stability"
@@ -157,7 +165,7 @@ python Transsion_Jira_Tool_20260124/set_not_mp_block_is_empty.py \
 示例：
 
 ```bash
-python Transsion_Jira_Tool_20260124/set_not_mp_block_not_major.py \
+python Transsion_Jira_Tool_20260323/tools/set_not_mp_block_not_major.py \
   --project-key KO5OS16AEE \
   --jira-username dailv.tinno \
   --jira-password "your_password" \
@@ -179,7 +187,7 @@ python Transsion_Jira_Tool_20260124/set_not_mp_block_not_major.py \
 示例：
 
 ```bash
-python Transsion_Jira_Tool_20260124/verify_resolved_issues.py \
+python Transsion_Jira_Tool_20260323/tools/verify_resolved_issues.py \
   --project-keys KO5OS16AEE KO5OS16BEE \
   --jira-username your_login \
   --jira-password "your_password" \
@@ -189,7 +197,7 @@ python Transsion_Jira_Tool_20260124/verify_resolved_issues.py \
 多个报告人：
 
 ```bash
-python Transsion_Jira_Tool_20260124/verify_resolved_issues.py \
+python Transsion_Jira_Tool_20260323/tools/verify_resolved_issues.py \
   --project-keys KO5OS16AEE KO5OS16BEE \
   --jira-username your_login \
   --jira-password "your_password" \
@@ -199,7 +207,7 @@ python Transsion_Jira_Tool_20260124/verify_resolved_issues.py \
 兼容旧参数名：
 
 ```bash
-python Transsion_Jira_Tool_20260124/verify_resolved_issues.py \
+python Transsion_Jira_Tool_20260323/tools/verify_resolved_issues.py \
   --project-keys KO5OS16AEE KO5OS16BEE \
   --jira-username your_login \
   --jira-password "your_password" \
@@ -212,6 +220,16 @@ python Transsion_Jira_Tool_20260124/verify_resolved_issues.py \
 - `--jira-username` / `-u`：登录用账号（可选，缺省读取 `.env`）
 - `--jira-password` / `-w`：登录用密码（可选，缺省读取 `.env`）
 - `--reporter` / `--report-username` / `-r`：提单人用户名（必填，支持多个值）
+- `--dry-run`：只预览将要流转的问题单，不执行 Jira 状态更新
+
+Dry-run 示例：
+
+```bash
+python verify_resolved_issues.py \
+  --project-keys KO5OS16AEE KO5OS16BEE \
+  --reporter target.reporter \
+  --dry-run
+```
 
 ### remove_verify_comment.py
 
@@ -220,7 +238,7 @@ python Transsion_Jira_Tool_20260124/verify_resolved_issues.py \
 单条模式：
 
 ```bash
-python Transsion_Jira_Tool_20260124/remove_verify_comment.py \
+python Transsion_Jira_Tool_20260323/tools/remove_verify_comment.py \
   --issue-key KO5OS16AEE-100 \
   --jira-username your_login \
   --jira-password "your_password"
@@ -229,7 +247,7 @@ python Transsion_Jira_Tool_20260124/remove_verify_comment.py \
 批量模式：
 
 ```bash
-python Transsion_Jira_Tool_20260124/remove_verify_comment.py \
+python Transsion_Jira_Tool_20260323/tools/remove_verify_comment.py \
   --project-keys KO5OS16AEE KO5OS16BEE \
   --update-all \
   --jira-username your_login \
@@ -256,20 +274,20 @@ python Transsion_Jira_Tool_20260124/remove_verify_comment.py \
 只更新最新一条（默认）：
 
 ```bash
-python Transsion_Jira_Tool_20260124/set_not_mp_block.py \
+python Transsion_Jira_Tool_20260323/tools/set_not_mp_block.py \
   --project-key KO5OS16AEE \
   --jira-username dailv.tinno \
-  --jira-password "59e-LJB-KbB-Hbb" \
+  --jira-password "your_password" \
   --report-username dailv.tinno
 ```
 
 更新所有“必解标签为空”的问题单：
 
 ```bash
-python Transsion_Jira_Tool_20260124/set_not_mp_block.py \
+python Transsion_Jira_Tool_20260323/tools/set_not_mp_block.py \
   --project-key KO5OS16AEE KO5OS16BEE \
   --jira-username dailv.tinno \
-  --jira-password "59e-LJB-KbB-Hbb" \
+  --jira-password "your_password" \
   --report-username dailv.tinno \
   --update-all
 ```
@@ -277,10 +295,10 @@ python Transsion_Jira_Tool_20260124/set_not_mp_block.py \
 按优先级与模块筛选后批量更新：
 
 ```bash
-python Transsion_Jira_Tool_20260124/set_not_mp_block.py \
+python Transsion_Jira_Tool_20260323/tools/set_not_mp_block.py \
   --project-key KO5OS16AEE \
   --jira-username dailv.tinno \
-  --jira-password "59e-LJB-KbB-Hbb" \
+  --jira-password "your_password" \
   --report-username xiaohongli.tinno \
   --priority-name "Major" \
   --component-name "3RD_Stability" \
@@ -290,7 +308,7 @@ python Transsion_Jira_Tool_20260124/set_not_mp_block.py \
 按多个优先级筛选（JQL: `priority in (...)`）：
 
 ```bash
-python Transsion_Jira_Tool_20260124/set_not_mp_block.py \
+python Transsion_Jira_Tool_20260323/tools/set_not_mp_block.py \
   --project-key KO5OS16AEE \
   --jira-username dailv.tinno \
   --jira-password "your_password" \
@@ -312,16 +330,27 @@ JIRA_PASSWORD=your_password
 
 已提供以下脚本用于通过 Windows 任务计划程序每天 `09:00` 自动执行 `verify_resolved_issues.py`：
 
+- `verify_resolved_config.json`：项目 Key、reporter 与 dry-run 配置
 - `run_verify_resolved_issues.ps1`
 - `register_verify_resolved_task.ps1`
 
 ### 前置条件
 
-先在仓库根目录创建 `.env`：
+先在 `tools/` 目录或仓库根目录创建 `.env`：
 
 ```env
-JIRA_USERNAME=dailv.tinno
+JIRA_USERNAME=your_login
 JIRA_PASSWORD=your_password
+```
+
+按需编辑 `verify_resolved_config.json`：
+
+```json
+{
+  "project_keys": ["X6852OS16", "X6851OS16"],
+  "reporters": ["your_login"],
+  "dry_run": false
+}
 ```
 
 ### 手工执行启动器
@@ -330,10 +359,10 @@ JIRA_PASSWORD=your_password
 powershell -ExecutionPolicy Bypass -File .\run_verify_resolved_issues.ps1
 ```
 
-执行内容固定为：
+预演模式（不写入 Jira）：
 
-```bash
-python verify_resolved_issues.py --project-keys X6852OS16 X6851OS16 X6851BOS16 T1103OS163 --reporter dailv.tinno qimingwang.tinno
+```powershell
+powershell -ExecutionPolicy Bypass -File .\run_verify_resolved_issues.ps1 -DryRun
 ```
 
 日志会写到：
@@ -366,7 +395,7 @@ schtasks /Query /TN "TranssionJiraVerifyResolvedIssuesDaily"
 
 ## 行为说明
 
-- 工具只会更新“必解标签为空”的问题单。
-- 可通过 `--priority-name` / `--component-name` 进行额外筛选（同时提供时会一起生效）。
-- `--priority-name` 支持多个值，会自动生成 `priority in (...)`。
-- 默认只处理最新的一条；加上 `--update-all` 会批量更新。
+- 工具通过 JQL `"必解标签" is EMPTY` 直接筛选空标签问题单。
+- 可通过 `--priority-name` / `--exclude-priority-name` / `--component-name` 进行额外筛选（同时提供时会一起生效）。
+- `--priority-name` 与 `--exclude-priority-name` 均支持多个值。
+- 默认只处理最新的一条空标签单；加上 `--update-all` 会批量更新。

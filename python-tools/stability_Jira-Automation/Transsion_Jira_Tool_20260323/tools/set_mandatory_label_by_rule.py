@@ -13,17 +13,22 @@ TARGET_FIELD_NAME = mp_tool.TARGET_FIELD_NAME
 MP_BLOCK_VALUE = mp_tool.TARGET_FIELD_VALUE
 NOT_MP_BLOCK_VALUE = not_mp_tool.TARGET_FIELD_VALUE
 EXPCLASS_FIELD_NAME = "ExpClass"
-RESOLUTION_SKIP_VALUES = {
+RESOLUTION_SKIP_VALUES = (
     "不能修复",
     "无法再次复现",
     "Platform Limit",
     "Won't Fix",
     "Cannot Reproduce",
-}
-RESOLUTION_SKIP_JQL_VALUES = ('"Won\'t Fix"', '"Cannot Reproduce"', '"Platform Limit"')
+)
+def _quote_jql_string(value):
+    return '"' + value.replace('"', '\\"') + '"'
+
+
+RESOLUTION_SKIP_JQL_VALUES = tuple(
+    _quote_jql_string(value) for value in RESOLUTION_SKIP_VALUES
+)
 A_PRIORITY_NAME = "Blocker"
 B_PRIORITY_NAME = "Critical"
-SUPPORTED_PRIORITY_NAMES = (A_PRIORITY_NAME, B_PRIORITY_NAME)
 PRIORITY_ALIASES = {
     A_PRIORITY_NAME: {A_PRIORITY_NAME, "紧急"},
     B_PRIORITY_NAME: {B_PRIORITY_NAME, "严重"},
@@ -95,7 +100,7 @@ def normalize_exp_class(exp_class):
 
 
 def determine_target_label(priority_name, exp_class, total_number, resolution_name=None):
-    if resolution_name in RESOLUTION_SKIP_VALUES:
+    if resolution_name in set(RESOLUTION_SKIP_VALUES):
         return None, "skipped_resolution"
 
     normalized_priority_name = normalize_priority_name(priority_name)
@@ -242,6 +247,7 @@ def validate_scope_labels(
     target_field_id,
     component_name=None,
     require_non_empty=True,
+    exclude_keys=None,
 ):
     issues = find_all_scope_issues(
         client,
@@ -252,8 +258,11 @@ def validate_scope_labels(
     )
     empty_keys = []
     multiple_label_keys = []
+    excluded = set(exclude_keys or [])
 
     for issue in issues:
+        if issue.key in excluded:
+            continue
         label_values = extract_label_values(get_issue_field_value(client, issue, target_field_id))
         if require_non_empty and not label_values:
             empty_keys.append(issue.key)
@@ -292,6 +301,7 @@ def apply_rule_based_labels(client, project_key, reporter, component_name=None, 
             "updated_not_mp": [],
             "already_expected": [],
             "skipped_existing_value": [],
+            "skipped_resolution": [],
             "failed": [],
         }
 
@@ -300,6 +310,7 @@ def apply_rule_based_labels(client, project_key, reporter, component_name=None, 
         "updated_not_mp": [],
         "already_expected": [],
         "skipped_existing_value": [],
+        "skipped_resolution": [],
         "failed": [],
     }
 
@@ -310,6 +321,7 @@ def apply_rule_based_labels(client, project_key, reporter, component_name=None, 
                 print(
                     f"[跳过] 问题 {issue.key} 的解决结果为 {rule_info['resolution_name']}，不设置必解标签。"
                 )
+                result["skipped_resolution"].append(issue.key)
                 continue
             print(build_failure_message(issue.key, rule_info))
             result["failed"].append(issue.key)
@@ -418,10 +430,12 @@ def main():
         print(f"设置为 Not MP Block: {len(result['updated_not_mp'])}")
     print(f"已符合预期: {len(result['already_expected'])}")
     print(f"已有值跳过: {len(result['skipped_existing_value'])}")
+    print(f"解决结果跳过: {len(result['skipped_resolution'])}")
     print(f"失败: {len(result['failed'])}")
     if result["failed"]:
         print(f"失败列表: {', '.join(result['failed'])}")
 
+    assertion_exclude_keys = set(result["failed"]) | set(result["skipped_resolution"])
     try:
         target_field_id = mp_tool.resolve_field_id(jira, TARGET_FIELD_NAME)
         validate_scope_labels(
@@ -431,6 +445,7 @@ def main():
             target_field_id,
             component_name=args.component_name,
             require_non_empty=not args.dry_run,
+            exclude_keys=assertion_exclude_keys,
         )
     except AssertionError as exc:
         print(f"[断言失败] {exc}")
@@ -440,6 +455,9 @@ def main():
         print("[断言通过] Dry-run 预检通过，未发现必解标签存在多个值。")
     else:
         print("[断言通过] 本次处理范围内所有 A/B 类问题必解标签均非空且只有一个值。")
+
+    if result["failed"]:
+        sys.exit(1)
 
 
 if __name__ == "__main__":

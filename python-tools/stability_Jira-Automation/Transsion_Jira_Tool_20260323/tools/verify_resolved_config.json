@@ -1,0 +1,13 @@
+{
+  "project_keys": [
+    "X6852OS16",
+    "X6851OS16",
+    "X6851BOS16",
+    "T1103OS163"
+  ],
+  "reporters": [
+    "dailv.tinno",
+    "qimingwang.tinno"
+  ],
+  "dry_run": false
+}
