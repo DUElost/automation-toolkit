@@ -461,6 +461,8 @@ class ScanAeeFans(ScanBase):
                             if ratio >= self._ratio_std_aee:
                                 target_aee_rlt_list[j][10] = target_aee_rlt_list[j][10] + 1
                                 self._merge_aee_final_device_id(target_aee_rlt_list[j], attrs_device_id)
+                                attrs_rom_ram = aee_result_attrs[14] if len(aee_result_attrs) > 14 else ""
+                                self._merge_aee_final_rom_ram(target_aee_rlt_list[j], attrs_rom_ram)
                                 break
                         except:
                             pass

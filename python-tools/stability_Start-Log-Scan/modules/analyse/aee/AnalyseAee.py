@@ -13,6 +13,7 @@ from modules.analyse.aee.files.sys_android_log import SysAndroidLog
 from modules.analyse.aee.files.sys_memory_info import SysMemoryInfo
 from modules.analyse.aee.files.sys_processes_and_threads import SysProcessesAndThreads
 from modules.analyse.aee.files.sys_kernel_log import SysKernelLog
+from modules.analyse.aee.files.rom_ram import parse_rom_ram_from_dec_dir
 from modules.analyse.aee.files.sys_properties import SysProperties
 from modules.analyse.aee.recognize_exception import recognize_except
 from modules.analyse.tne.files.pstore import Pstore
@@ -57,6 +58,7 @@ class Aee(object):
         self._Aee__ignore_ke_ne_hwasan = False
         self._Aee__count = 1
         self._Aee__fans_version = False
+        self._Aee__rom_ram = ""
         self._Aee__foreground_no = False
         self._Aee__pid = None
         self._Aee__tid = None
@@ -211,12 +213,13 @@ class Aee(object):
         # 设置默认 detail
         if self._Aee__detail is None or self._Aee__detail == "" or self._Aee__detail == "None":
             self._Aee__detail = f"class:[{self._Aee__exp_class}] process:[{self._Aee__cur_process}] 当前类型没有获取详细信息方式，请自己查看日志文件，本内容只为了Jira不能去重：\n{random_str(slen=200)}"
+        self._Aee__rom_ram = parse_rom_ram_from_dec_dir(self._Aee__aee_dir)
 
     def get_aee_attrs(self):
         # 返回顺序：
         # [0] Path, [1] Version, [2] ExpTime, [3] ExpClass, [4] ExpType,
         # [5] CurProcess, [6] Package, [7] Detail列内容, [8] CausedBy列内容, [9] extraTag,
-        # [10] Count, [11] Activity, [12] DeviceId, [13] FansVersion
+        # [10] Count, [11] Activity, [12] DeviceId, [13] FansVersion, [14] Rom_Ram
         # 
         # Excel 列映射：
         # - [7] → Detail 列：recognize_except 结果（Device_id、解析库版本、手机版本、异常包名等）
@@ -227,7 +230,7 @@ class Aee(object):
         # - __detail 存储 Activity + Subject + 堆栈信息 → 对应 CausedBy 列
         return [
          self._Aee__exp_main_path, self._Aee__version, self._Aee__exp_time, self._Aee__exp_class, self._Aee__exp_type,
-         self._Aee__cur_process, self._Aee__package, self._Aee__caused_by, self._Aee__detail, self._Aee__extra_tag, self._Aee__count, self._Aee__activity, self._Aee__device_id, self._Aee__fans_version]
+         self._Aee__cur_process, self._Aee__package, self._Aee__caused_by, self._Aee__detail, self._Aee__extra_tag, self._Aee__count, self._Aee__activity, self._Aee__device_id, self._Aee__fans_version, self._Aee__rom_ram]
 
     @property
     def recognize_exception_rlt(self):

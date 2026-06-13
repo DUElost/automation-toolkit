@@ -26,10 +26,24 @@ class Excel(object):
         return device_id
 
     def _get_aee_device_count(self, aee_result):
+        if len(aee_result) >= 2 and isinstance(aee_result[-1], set) and isinstance(aee_result[-2], set):
+            return max(1, len(aee_result[-2]))
         for extra_attr in reversed(aee_result):
             if isinstance(extra_attr, set):
                 return max(1, len(extra_attr))
         return 1
+
+    @staticmethod
+    def _get_aee_rom_ram(aee_result):
+        if aee_result and isinstance(aee_result[-1], set):
+            rom_ram_set = aee_result[-1]
+            if rom_ram_set:
+                return ";".join(sorted(str(item) for item in rom_ram_set if item))
+            return ""
+        if len(aee_result) > 15 and not isinstance(aee_result[15], set):
+            value = aee_result[15]
+            return "" if value is None else str(value)
+        return ""
 
     def insertResultAee(self, aee_result_list, more_info=False, pipeline_id=None, utp_tcid=None, utp_taskid=None, priority=False, deduplicated=False):
         insert_exception = False
@@ -103,6 +117,10 @@ class Excel(object):
         work_sheet.write(0, column_index, "DeviceCount" if deduplicated else "DeviceId", style0)
         work_sheet.col(column_index).width = 10000
         column_index += 1
+        rom_ram_column_index = column_index
+        work_sheet.write(0, column_index, "Rom_Ram", style0)
+        work_sheet.col(column_index).width = 8000
+        column_index += 1
         if priority:
             work_sheet.write(0, column_index, "Priority", style0)
             work_sheet.col(column_index).width = 10000
@@ -127,6 +145,8 @@ class Excel(object):
                             try:
                                 if deduplicated and col_index == device_column_index:
                                     content = self._get_aee_device_count(aee_result)
+                                elif col_index == rom_ram_column_index:
+                                    content = self._get_aee_rom_ram(aee_result)
                                 else:
                                     content = aee_result[col_index] if (col_index == 0 or col_index == 11) else (str(aee_result[col_index]))
                             except:
@@ -505,10 +525,15 @@ def read_aee_rlt_excel(excel_path):
         count_index = header_to_index.get("Count", 11)
         activity_index = header_to_index.get("Activity", 12)
         device_id_index = None
+        rom_ram_index = None
         for device_column_name in ("DeviceId", "DeviceID"):
             if device_column_name in header_to_index:
                 device_id_index = header_to_index[device_column_name]
                 break
+        if "DeviceCount" in header_to_index:
+            device_id_index = header_to_index["DeviceCount"]
+        if "Rom_Ram" in header_to_index:
+            rom_ram_index = header_to_index["Rom_Ram"]
         for row_index in range(1, work_sheet_0.nrows):
             row_values = work_sheet_0.row_values(row_index)
             exp_main_path = row_values[1]
@@ -524,7 +549,8 @@ def read_aee_rlt_excel(excel_path):
             count = row_values[count_index] if count_index < len(row_values) and row_values[count_index] != "" else 1
             activity = row_values[activity_index] if activity_index < len(row_values) else None
             device_id = row_values[device_id_index] if device_id_index is not None and device_id_index < len(row_values) else None
-            aee_data = AeeExcelData(exp_main_path, version, exp_time, exp_class, exp_type, cur_process, package, detail, caused_by, extra_tag, activity, count=count, device_id=device_id)
+            rom_ram = row_values[rom_ram_index] if rom_ram_index is not None and rom_ram_index < len(row_values) else ""
+            aee_data = AeeExcelData(exp_main_path, version, exp_time, exp_class, exp_type, cur_process, package, detail, caused_by, extra_tag, activity, count=count, device_id=device_id, rom_ram=rom_ram)
             aee_rlt_list.append(aee_data)
 
     return aee_rlt_list
@@ -532,7 +558,7 @@ def read_aee_rlt_excel(excel_path):
 
 class AeeExcelData(object):
 
-    def __init__(self, exp_main_path, version, exp_time, exp_class, exp_type, cur_process, package, detail, caused_by, extra_tag, activity, count=1, device_id=None):
+    def __init__(self, exp_main_path, version, exp_time, exp_class, exp_type, cur_process, package, detail, caused_by, extra_tag, activity, count=1, device_id=None, rom_ram=""):
         self._AeeExcelData__exp_main_path = exp_main_path
         self._AeeExcelData__version = version
         self._AeeExcelData__exp_time = exp_time
@@ -549,6 +575,7 @@ class AeeExcelData(object):
             self._AeeExcelData__count = 1
         self._AeeExcelData__activity = activity
         self._AeeExcelData__device_id = device_id
+        self._AeeExcelData__rom_ram = rom_ram
         self._AeeExcelData__recognize_exception_rlt = True
         self._AeeExcelData__handle_recognize_rlt = True
         self._AeeExcelData__ignore_ke_ne_hwasan = False
@@ -557,7 +584,7 @@ class AeeExcelData(object):
     def get_aee_attrs(self):
         return [
          self._AeeExcelData__exp_main_path, self._AeeExcelData__version, self._AeeExcelData__exp_time, self._AeeExcelData__exp_class, self._AeeExcelData__exp_type,
-         self._AeeExcelData__cur_process, self._AeeExcelData__package, self._AeeExcelData__detail, self._AeeExcelData__caused_by, self._AeeExcelData__extra_tag, self._AeeExcelData__count, self._AeeExcelData__activity, self._AeeExcelData__device_id]
+         self._AeeExcelData__cur_process, self._AeeExcelData__package, self._AeeExcelData__detail, self._AeeExcelData__caused_by, self._AeeExcelData__extra_tag, self._AeeExcelData__count, self._AeeExcelData__activity, self._AeeExcelData__device_id, False, self._AeeExcelData__rom_ram]
 
     @property
     def recognize_exception_rlt(self):

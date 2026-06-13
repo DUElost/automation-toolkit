@@ -7,6 +7,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from modules.analyse.aee.AnalyseAee import analyse_aee
 from modules.analyse.aee.files.db_file_map import DbFileMap
 from modules.analyse.aee.files.exp_main import ExpMain
+from modules.analyse.aee.files.rom_ram import parse_rom_ram_from_dec_dir
 from modules.analyse.aee.files.sys_properties import SysProperties
 from modules.analyse.aee.files.zz_internal import ZZ_internal
 from modules.analyse.tne.AnalyseTne import analyse_tne
@@ -21,11 +22,11 @@ PATTERN_ANDROID_VERION = re.compile("-([L|M|N|O|P|Q|R|S|T|U|V])-")
 
 class FallbackAeeResult(object):
 
-    def __init__(self, path, version, exp_time, exp_class, exp_type, cur_process, package, detail_col_text, caused_by_col_text, extra_tag="", activity="None", device_id=None, fans_version=False):
+    def __init__(self, path, version, exp_time, exp_class, exp_type, cur_process, package, detail_col_text, caused_by_col_text, extra_tag="", activity="None", device_id=None, fans_version=False, rom_ram=""):
         super(FallbackAeeResult, self).__init__()
         self._attrs = [
          path, version, exp_time, exp_class, exp_type, cur_process, package, detail_col_text,
-         caused_by_col_text, extra_tag, 1, activity, device_id, fans_version]
+         caused_by_col_text, extra_tag, 1, activity, device_id, fans_version, rom_ram]
 
     def get_aee_attrs(self):
         return list(self._attrs)
@@ -206,21 +207,46 @@ class ScanBase(ABC):
     def _build_aee_final_attrs(self, aee_result_attrs):
         final_attrs = list(aee_result_attrs)
         device_id_set = set()
+        rom_ram_set = set()
         device_id = self._normalize_aee_device_id(final_attrs[12] if len(final_attrs) > 12 else None)
+        rom_ram = str(final_attrs[14] if len(final_attrs) > 14 else "").strip()
         if device_id:
             device_id_set.add(device_id)
+        if rom_ram:
+            rom_ram_set.add(rom_ram)
         final_attrs.append(device_id_set)
+        final_attrs.append(rom_ram_set)
         return final_attrs
 
     def _merge_aee_final_device_id(self, final_attrs, device_id):
-        if final_attrs and isinstance(final_attrs[-1], set):
-            device_id_set = final_attrs[-1]
-        else:
-            device_id_set = set()
-            final_attrs.append(device_id_set)
+        device_id_set = self._get_aee_final_device_id_set(final_attrs)
         normalized_device_id = self._normalize_aee_device_id(device_id)
         if normalized_device_id:
             device_id_set.add(normalized_device_id)
+
+    def _merge_aee_final_rom_ram(self, final_attrs, rom_ram):
+        rom_ram_set = self._get_aee_final_rom_ram_set(final_attrs)
+        rom_ram = str(rom_ram or "").strip()
+        if rom_ram:
+            rom_ram_set.add(rom_ram)
+
+    @staticmethod
+    def _get_aee_final_device_id_set(final_attrs):
+        if final_attrs and len(final_attrs) >= 2 and isinstance(final_attrs[-2], set):
+            return final_attrs[-2]
+        device_id_set = set()
+        final_attrs.append(device_id_set)
+        if not isinstance(final_attrs[-1], set):
+            final_attrs.append(set())
+        return device_id_set
+
+    @staticmethod
+    def _get_aee_final_rom_ram_set(final_attrs):
+        if final_attrs and isinstance(final_attrs[-1], set):
+            return final_attrs[-1]
+        rom_ram_set = set()
+        final_attrs.append(rom_ram_set)
+        return rom_ram_set
 
     @abstractmethod
     def _get_scan_dir_failed(self, error_msg):
@@ -833,6 +859,8 @@ class ScanBase(ABC):
                         if ratio >= self._ratio_std_aee:
                             aee_rlt_list_final[j][10] = aee_rlt_list_final[j][10] + 1
                             self._merge_aee_final_device_id(aee_rlt_list_final[j], attrs_device_id)
+                            attrs_rom_ram = aee_result_attrs[14] if len(aee_result_attrs) > 14 else ""
+                            self._merge_aee_final_rom_ram(aee_rlt_list_final[j], attrs_rom_ram)
                             is_duplicate = True
                             break
                     except:
@@ -1737,9 +1765,10 @@ class ScanBase(ABC):
             exp_time = "TIME_UNKNOWN"
         detail_col_text = "Device_id: {}\n{}\n手机版本：['{}']".format(device_id, RECOGNIZE_LIB_VERSION, build_version)
         caused_by_col_text = "当前类型没有获取详细信息方式，请自己查看日志文件，本内容只为了Jira不能去重：\n{}".format(random_str(slen=200))
+        rom_ram = parse_rom_ram_from_dec_dir(self._get_dbg_dec_dir(dbg_file))
         TEST_LOGGER.warn("dbg 文件解压失败，已生成兜底结果写入报告：{}".format(dbg_file))
         self._set_extract_failed_dbg_report_status(dbg_file, True, extra_tag=extra_tag)
-        return FallbackAeeResult(dbg_file, build_version, exp_time, exp_class, exp_type, cur_process, package, detail_col_text, caused_by_col_text, extra_tag=extra_tag, device_id=device_id)
+        return FallbackAeeResult(dbg_file, build_version, exp_time, exp_class, exp_type, cur_process, package, detail_col_text, caused_by_col_text, extra_tag=extra_tag, device_id=device_id, rom_ram=rom_ram)
 
     def _build_extract_failed_aee_result_list(self, extract_failed_dbg_list):
         fallback_aee_result_list = []
