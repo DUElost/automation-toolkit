@@ -31,14 +31,8 @@ from urllib.parse import urlparse
 import pandas as pd
 
 CURRENT_DIR = Path(__file__).resolve().parent
-PROJECT_ROOT = CURRENT_DIR.parent
-SRC_DIR = PROJECT_ROOT / "src"
 if str(CURRENT_DIR) not in sys.path:
     sys.path.insert(0, str(CURRENT_DIR))
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
-if str(SRC_DIR) not in sys.path:
-    sys.path.insert(0, str(SRC_DIR))
 
 from tinno_batch_jira_common import (
     add_issue_comment,
@@ -67,7 +61,7 @@ from tinno_regression_matcher import is_strong_match
 from tinno_regression_models import load_regression_rules
 from tinno_regression_report import write_excel_summary
 from tinno_regression_store import RegressionStore
-from src.modules.database_manager import DatabaseManager
+from tinno_database_manager import DatabaseManager
 
 logger = logging.getLogger(__name__)
 
@@ -350,7 +344,7 @@ def build_legacy_project_history_db_path(jira_server: str, project_key: str) -> 
     if not project_text:
         raise ValueError("project_key 不能为空")
     jira_host = parse_jira_host(jira_server)
-    return PROJECT_ROOT / "db" / f"{jira_host}_{project_text}.db"
+    return CURRENT_DIR / "db" / f"{jira_host}_{project_text}.db"
 
 
 def migrate_legacy_project_history_db(project_db: DatabaseManager | None, legacy_db_path: str | Path) -> int:

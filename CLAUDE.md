@@ -9,6 +9,7 @@
 
 | 日期 | 变更内容 |
 |------|----------|
+| 2026-06-13 | stability_Jira-Automation 迁移为 Transsion/Tinno/Moto 三套独立工具 |
 | 2026-05-26 | 新增 linux-tools/system_Task-Scheduler（systemd taskmgr，对齐 macOS） |
 | 2026-03-25 | 新增 stability_Start-Log-Scan、stability_FTPserver-Check、universal_Automation-Create-Task 模块 |
 | 2026-02-06 | 新增 Top300 Result Filler、MemoryFusion、Factory-Reset 工具模块 |
@@ -60,12 +61,18 @@ graph TD
     B --> L["stability_Start-Log-Scan"];
     B --> M["stability_FTPserver-Check"];
     B --> N["universal_Automation-Create-Task"];
+    B --> O["stability_Jira-Automation"];
 
     C --> K["python-utils"];
+
+    O --> O1["Transsion_Jira_Tool_20260323"];
+    O --> O2["Tinno_Jira_Tool_20260520"];
+    O --> O3["Moto_Jira_Tool_20251201"];
 
     click G "./python-tools/performance_SMT_ResultFiller/CLAUDE.md" "查看 SMT Result Filler"
     click H "./python-tools/performance_Top300_ResultFiller/CLAUDE.md" "查看 Top300 Result Filler"
     click K "./shared/python-utils/CLAUDE.md" "查看 python-utils"
+    click O "./python-tools/stability_Jira-Automation/CLAUDE.md" "查看 Jira 自动化"
 ```
 
 ---
@@ -81,6 +88,7 @@ graph TD
 | [python-tools/stability_Start-Log-Scan](./python-tools/stability_Start-Log-Scan/) | Python | 稳定性测试日志扫描分析工具（AEE/TNE/KE） | 活跃 |
 | [python-tools/stability_FTPserver-Check](./python-tools/stability_FTPserver-Check/) | Python | FTP 服务器日志检查与未解析 dbg 报告工具 | 活跃 |
 | [python-tools/universal_Automation-Create-Task](./python-tools/universal_Automation-Create-Task/) | Python | ITMS 自动化批量创建测试任务工具 | 活跃 |
+| [python-tools/stability_Jira-Automation](./python-tools/stability_Jira-Automation/CLAUDE.md) | Python | 稳定性测试 Jira 批量提单（Transsion / Tinno / Moto 三套工具） | 活跃 |
 | [shared/python-utils](./shared/python-utils/CLAUDE.md) | Python | 共享 Python 工具库 | 初始 |
 | [macos-tools/system_Task-Scheduler](./macos-tools/system_Task-Scheduler/) | Bash | launchd 定时任务管理器 | 活跃 |
 | [linux-tools/system_Task-Scheduler](./linux-tools/system_Task-Scheduler/) | Bash | systemd 用户定时任务管理器 | 活跃 |
@@ -134,6 +142,7 @@ python main.py
 |------|----------|----------|------|
 | performance_SMT_ResultFiller | pytest | 未配置 | CI 中预留测试命令 |
 | performance_Top300_ResultFiller | pytest | 未配置 | CI 中预留测试命令 |
+| stability_Jira-Automation | pytest | 局部覆盖 | Transsion / Tinno 各自 `test/` 目录 |
 | python-utils | - | 无测试 | 空模块，待开发 |
 
 **CI 配置**: `.github/workflows/python-tools.yml`
@@ -199,6 +208,11 @@ python main.py
    - 读取空载/负载测试报告
    - 保留所有原始数据，只为 AM 且非零行计算非首轮平均值
    - 平均值计算方式：所有值之和 ÷ 10000
+
+4. **stability_Jira-Automation 提单工具**：
+   - 三套独立子目录：Transsion、Tinno、Moto，互不共享父级代码
+   - 统一两阶段：原始 Excel → 上传模板 → 建单/回归
+   - 详见 [stability_Jira-Automation/CLAUDE.md](./python-tools/stability_Jira-Automation/CLAUDE.md)
 
 ### AI 辅助开发建议
 

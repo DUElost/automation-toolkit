@@ -53,13 +53,6 @@ log_dir = os.path.join(base_dir, 'log')
 os.makedirs(log_dir, exist_ok=True)
 os.makedirs(config_dir, exist_ok=True)
 
-# Add repo root (parent of base_dir) to sys.path
-project_root = os.path.dirname(base_dir)
-sys.path.insert(0, project_root)
-
-from config_loader import ConfigLoader
-from database_manager import DatabaseManager
-
 # 配置日志
 logging.basicConfig(
     level=logging.INFO,
@@ -76,17 +69,6 @@ class ExcelToJiraUploadListMoto:
 
     def __init__(self, main_file_path: str = None, test_case: str = "Monkey"):
         """初始化生成器"""
-        self.config = ConfigLoader()
-
-        # 数据库文件放在脚本目录的 log 子目录
-        db_path = os.path.join(log_dir, "jira_automation.db")
-        if hasattr(self.config, "config"):
-            self.config.config['path'] = db_path
-            self.config.config.setdefault('database', {})
-            self.config.config['database']['path'] = db_path
-
-        self.db_manager = DatabaseManager(self.config)
-
         # 文件路径
         if main_file_path:
             if os.path.isabs(main_file_path) or re.match(r"^[a-zA-Z]:", main_file_path):

@@ -9,7 +9,7 @@ from unittest import mock
 
 import pandas as pd
 
-from src.modules.database_manager import DatabaseManager
+from tinno_database_manager import DatabaseManager
 
 
 TOOL_DIR = Path(__file__).resolve().parent.parent

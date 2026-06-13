@@ -13,8 +13,7 @@ Motorola edart JIRA 问题更新工具
 6. 使用Personal Access Token认证
 
 使用方法: python jira_motorola_edart_batch_update.py <excel文件路径> --issues "EKLAMUC-2028,EKLAMUC-2029"
-python src/modules/jira_motorola_edart_batch_update.py JIRA_Upload_List_Moto_20251014_093941.xlsx --issues "EKLAMUC-2021,EKLAMUC-2022,EKLAMUC-2023,EKLAMUC-2024,EKLAMUC-2025,EKLAMUC-2026,EKLAMUC-2027" --add-comments
-python src/modules/jira_motorola_edart_batch_update.py JIRA_Upload_List_Moto_20251014_093941.xlsx --issues "EKLAMUC-2041,EKLAMUC-2042" --add-comments
+python jira_motorola_edart_batch_update.py JIRA_Upload_List_Moto_20251014_093941.xlsx --issues "EKLAMUC-2021,EKLAMUC-2022" --add-comments
 
 作者：AI Assistant
 创建时间：2025-01-13

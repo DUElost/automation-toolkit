@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-DatabaseManager - SQLite 数据库管理器
--------------------------------------
+Tinno 项目历史 SQLite 缓存（DatabaseManager）
+------------------------------------------------
 
-仅支持 SQLite 数据库，用于本地单用户场景。
+供 Tinno 第二阶段建单与回归验证使用，管理本地 jira_issues_main 等表。
 """
 
 import sqlite3

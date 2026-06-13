@@ -7,27 +7,31 @@
 ## 工具组件
 
 ### 1. 元数据分析工具
-- **文件**: `src/modules/test_jira_motorola_simple.py`
-- **功能**: 连接到JIRA并获取项目元数据
+- **文件**: `test_jira_motorola_edart.py`
+- **功能**: 连接到 JIRA 并获取项目元数据
 - **用途**: 获取项目字段信息，生成模板所需数据
 
 ### 2. Excel模板生成工具
-- **文件**: `src/modules/generate_motorola_excel_template.py`
-- **功能**: 基于项目元数据生成Excel模板
-- **输出**: 包含多个工作表的Excel文件
+- **文件**: `generate_motorola_excel_template.py`
+- **功能**: 基于项目元数据生成 Excel 模板
+- **输出**: 包含多个工作表的 Excel 文件
 
 ### 3. 批量创建工具
-- **文件**: `src/modules/test_excel_to_jira_motorola_edart_batch_create.py`
-- **功能**: 读取Excel文件并批量创建JIRA问题
+- **文件**: `test_excel_to_jira_motorola_edart_batch_create.py`
+- **功能**: 读取 Excel 文件并批量创建 JIRA 问题
 - **支持**: 自定义字段、组件、版本等
+
+### 4. 上传清单生成工具
+- **文件**: `test_excel_to_jira_upload_list_moto.py`
+- **功能**: 从原始 Monkey 结果 Excel 生成 Motorola 上传清单
 
 ## 使用步骤
 
 ### 第一步：获取项目元数据（如需要重新获取）
 
 ```bash
-cd "f:\Jira_test_0813_rin"
-python src/modules/test_jira_motorola_simple.py
+cd Moto_Jira_Tool_20251201
+python test_jira_motorola_edart.py
 ```
 
 这将生成以下文件：
@@ -37,7 +41,7 @@ python src/modules/test_jira_motorola_simple.py
 ### 第二步：生成Excel模板
 
 ```bash
-python src/modules/generate_motorola_excel_template.py
+python generate_motorola_excel_template.py
 ```
 
 生成的Excel文件包含：
@@ -67,10 +71,10 @@ python src/modules/generate_motorola_excel_template.py
 
 ```bash
 # 测试运行（不实际创建问题）
-python src/modules/test_excel_to_jira_motorola_edart_batch_create.py --dry-run "模板文件.xlsx"
+python test_excel_to_jira_motorola_edart_batch_create.py --dry-run --add-excel-file "模板文件.xlsx" --set-jira-token "<TOKEN>"
 
 # 正式创建问题
-python src/modules/test_excel_to_jira_motorola_edart_batch_create.py "填写好的文件.xlsx"
+python test_excel_to_jira_motorola_edart_batch_create.py --add-excel-file "填写好的文件.xlsx" --set-jira-token "<TOKEN>"
 ```
 
 ## 项目信息

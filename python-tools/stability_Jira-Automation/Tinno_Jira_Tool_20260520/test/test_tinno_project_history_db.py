@@ -11,14 +11,11 @@ from pathlib import Path
 import pandas as pd
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-TOOL_DIR = PROJECT_ROOT / "Tinno_Jira_Tool_20260520"
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
+TOOL_DIR = Path(__file__).resolve().parents[1]
 if str(TOOL_DIR) not in sys.path:
     sys.path.insert(0, str(TOOL_DIR))
 
-from src.modules.database_manager import DatabaseManager
+from tinno_database_manager import DatabaseManager
 from tinno_regression_store import RegressionStore
 
 
