@@ -603,6 +603,10 @@ def build_summary_text(issue_data: Dict[str, Any], test_case: str, summary_tags:
     return summary[:255] if len(summary) > 255 else summary
 
 
+def resolve_rom_ram_text(issue_data: Dict[str, Any]) -> str:
+    return str(clean_cell_value(issue_data.get("rom_ram")) or "").strip()
+
+
 def build_description_text(issue_data: Dict[str, Any], test_case: str, defaults: Dict[str, Any], environment_override: Optional[str]) -> str:
     count = int(issue_data.get("count") or 0)
     total_runs = int(issue_data.get("total_runs") or 0) or 20
@@ -624,21 +628,25 @@ def build_description_text(issue_data: Dict[str, Any], test_case: str, defaults:
     if expect_phrase == base_failure_phrase:
         expect_phrase = f"{issue_target}不会发生{issue_data.get('exp_class') or '异常'}报错"
 
-    parts = [
-        f"A)Preconditions：{issue_data.get('preconditions') or defaults.get('default_preconditions', '/')}",
-        f"B)Operation step：执行{test_case}",
-        f"C)Expect result：执行{test_case}过程中，{expect_phrase}",
-        f"D)Test result：执行{test_case}过程中，{failure_phrase}",
-        f"E)Ref Phone Results if needed：{defaults.get('default_ref_result', '无需对比')}",
-        f"F)Peripheral accessories: {defaults.get('default_accessories', '无')}",
-        f"G)Time:{issue_data.get('exp_time') or '/'}",
-        f"H)Problem Risk：{count}/{total_runs}，评级 {issue_data.get('probability_level') or ''}",
-        "I)Log and Screenshot address：",
-        str(issue_data.get("path") or ""),
-        f"J)Recovery technique：{defaults.get('default_recovery', '不涉及恢复')}",
-    ]
+    rom_ram = resolve_rom_ram_text(issue_data) or "/"
+    creator = str(defaults.get("default_creator") or "NA").strip() or "NA"
     detail = clean_cell_value(issue_data.get("detail"))
-    parts.append("K)other：")
+
+    parts = [
+        f"*Precondition*: {issue_data.get('preconditions') or defaults.get('default_preconditions', '/')}",
+        f"*Environment*: {rom_ram}",
+        f"*Operation Steps*: 执行{test_case}",
+        f"*Expect Result*: 执行{test_case}过程中，{expect_phrase}",
+        f"*Test Result*: 执行{test_case}过程中，{failure_phrase}",
+        f"*Ref Phone Results If Needed*: {defaults.get('default_ref_result', '无需对比')}",
+        f"*Risk*: {count}/{total_runs}，评级 {issue_data.get('probability_level') or ''}",
+        "*Log And Screenshot Address*:",
+        str(issue_data.get("path") or ""),
+        f"*Recovery Technique*: {defaults.get('default_recovery', '不涉及恢复')}",
+        f"*Problem Time*: {issue_data.get('exp_time') or '/'}",
+        f"*Creator*: {creator}",
+        "*Others*:",
+    ]
     if detail:
         parts.append(str(detail))
     return "\n".join(parts)
@@ -740,6 +748,7 @@ def prepare_issue_record(
         "package": clean_cell_value(raw_row.get("Package")) or "",
         "detail": clean_cell_value(raw_row.get("Detail")) or "",
         "caused_by": clean_cell_value(raw_row.get("CausedBy")) or "",
+        "rom_ram": clean_cell_value(raw_row.get("Rom_Ram")) or clean_cell_value(raw_row.get("rom_ram")) or "",
         "count": int(float(count_raw)),
         "device_count": device_count,
         "device_id": device_id or "",
