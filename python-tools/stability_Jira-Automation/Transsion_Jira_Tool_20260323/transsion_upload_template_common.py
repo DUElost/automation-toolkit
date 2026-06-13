@@ -703,6 +703,9 @@ def build_environment_text(issue_data: Dict[str, Any], environment_override: Opt
         fallback_lines.append(f"CurProcess：{cur_process}")
     if fallback_lines:
         return "\n".join(fallback_lines)
+    rom_ram = resolve_rom_ram_text(issue_data)
+    if rom_ram:
+        return rom_ram
     return environment_override or ""
 
 
