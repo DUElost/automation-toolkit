@@ -65,7 +65,7 @@ class TinnoToolScaffoldTest(unittest.TestCase):
         self.assertIn("完成", status_rules["resolved_fixed_resolutions"])
         self.assertIn("问题不修改", status_rules["wont_fix_resolutions"])
         self.assertIn("已关闭", status_rules["closed_statuses"])
-        self.assertFalse(rules["regression"]["enable_duplicate_followups"])
+        self.assertTrue(rules["regression"]["enable_duplicate_followups"])
         self.assertTrue(rules["regression"]["write_audit_report"])
         self.assertIn("VFFCA", rules["regression"]["strict_version_project_keys"])
 
