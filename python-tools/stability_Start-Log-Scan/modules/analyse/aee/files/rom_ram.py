@@ -14,6 +14,13 @@ PROPERTY_LINE_PATTERN = re.compile(r"^\[(?P<key>[^\]]+)\]:\s*\[(?P<value>.*)\]\s
 ANDROID_BOOT_LINE_PATTERN = re.compile(
     r'^androidboot\.(?P<key>[a-zA-Z0-9_.]+)\s*=\s*"(?P<value>[^"]*)"',
 )
+LK_SD0_SIZE_PATTERN = re.compile(r"\[SD0\]\s+Size:\s+(\d+)\s+MB", re.IGNORECASE)
+LK_DRAM_HEX_PATTERNS = (
+    re.compile(r"total_dram_size:\s+(0x[0-9a-fA-F]+)", re.IGNORECASE),
+    re.compile(r"orig_dram size:\s+(0x[0-9a-fA-F]+)", re.IGNORECASE),
+    re.compile(r"EMI rank0 size:\s+(0x[0-9a-fA-F]+)", re.IGNORECASE),
+)
+LK_DUMP_FILE_NAMES = ("SYS_EXP_PL_LK", "SYS_LOG_DUR_LKDUMP")
 
 ROM_MARKET_SKU_GB = (32, 64, 128, 256, 512, 1024)
 RAM_MARKET_SKU_GB = (2, 3, 4, 6, 8, 12, 16, 24, 32)
@@ -213,6 +220,51 @@ def _parse_from_boot_mem(properties: Dict[str, str]) -> str:
     return ""
 
 
+def _parse_hex_bytes_to_gb(hex_value: str) -> Optional[float]:
+    try:
+        return int(hex_value, 16) / (1024 ** 3)
+    except (TypeError, ValueError):
+        return None
+
+
+def _parse_lk_dump_text(text: str) -> str:
+    if not text:
+        return ""
+
+    rom_gb = None
+    sd0_match = LK_SD0_SIZE_PATTERN.search(text)
+    if sd0_match:
+        physical_gb = int(sd0_match.group(1)) / 1024.0
+        rom_gb = normalize_market_sku_gb(physical_gb, "rom")
+
+    ram_gb = None
+    for pattern in LK_DRAM_HEX_PATTERNS:
+        match = pattern.search(text)
+        if not match:
+            continue
+        physical_gb = _parse_hex_bytes_to_gb(match.group(1))
+        if physical_gb is not None:
+            ram_gb = normalize_market_sku_gb(physical_gb, "ram")
+            break
+
+    if rom_gb and ram_gb:
+        return format_rom_ram(rom_gb, ram_gb)
+    return ""
+
+
+def _parse_from_lk_dump(dec_dir: str) -> str:
+    """KE 等早期崩溃转储常缺少 SYS_MEMORY_INFO，改从 preloader/LK 日志解析。"""
+    for file_name in LK_DUMP_FILE_NAMES:
+        file_path = os.path.join(dec_dir, file_name)
+        if not os.path.isfile(file_path):
+            continue
+        with open(file_path, "r", encoding="utf-8", errors="ignore") as handle:
+            result = _parse_lk_dump_text(handle.read())
+        if result:
+            return result
+    return ""
+
+
 def parse_rom_ram_from_dec_dir(dec_dir: str) -> str:
     """从 dbg.DEC 目录解析 Rom+Ram 市场 SKU 字符串。"""
     if not dec_dir or not os.path.isdir(dec_dir):
@@ -236,7 +288,11 @@ def parse_rom_ram_from_dec_dir(dec_dir: str) -> str:
     if boot_combo:
         return boot_combo
 
-    return _parse_from_boot_mem(properties)
+    boot_mem_combo = _parse_from_boot_mem(properties)
+    if boot_mem_combo:
+        return boot_mem_combo
+
+    return _parse_from_lk_dump(dec_dir)
 
 
 def parse_rom_ram_from_exp_main_path(exp_main_path: str) -> str:

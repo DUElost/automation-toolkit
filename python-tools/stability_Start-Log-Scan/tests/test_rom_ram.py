@@ -79,6 +79,15 @@ class RomRamParserTest(unittest.TestCase):
         self.assertEqual(normalize_market_sku_gb(7.35, "ram"), 8)
         self.assertEqual(format_rom_ram(256, 8), "256GB+8GB")
 
+    def test_lk_dump_ke_fallback(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with open(os.path.join(temp_dir, "SYS_EXP_PL_LK"), "w", encoding="utf-8") as handle:
+                handle.write(
+                    "[SD0] Size: 59648 MB, Max.Speed: 52000 kHz, blklen(512), nblks(122159104)\n"
+                    "total_dram_size: 0x00000000C0000000, max_dram_size: 0x0000000800000000\n"
+                )
+            self.assertEqual(parse_rom_ram_from_dec_dir(temp_dir), "64GB+3GB")
+
 
 class RomRamSampleIntegrationTest(unittest.TestCase):
     SAMPLE_CASES = {
