@@ -22,13 +22,10 @@ Tinno 独立 Jira 工具，不与 Transsion 工具混用。
   - 支持历史单导出、匹配、决策、PASS/FAIL 备注、关单预演
   - 支持 full dry-run 审计输出，预演所有涉及到的决策
   - 支持严格版本项目按配置执行 `build_version / fix_version / current_version` 比较
-
-当前明确暂不启用的能力：
-
-- duplicate 跟随链路默认禁用
-  - 代码保留
-  - 配置默认关闭
-  - 后续若 Tinno Jira 支持再恢复
+    （详见下文「VFFCA 严格版本比较规则」）
+- duplicate 跟随关闭已启用（与 Transsion 对齐）
+  - 已关闭主单（resolution 非 Duplicate）可带动重复子单一同关单
+  - 配置项 `enable_duplicate_followups=true`
 
 当前仍待真实验证的点：
 
@@ -62,7 +59,7 @@ Tinno 独立 Jira 工具，不与 Transsion 工具混用。
 - `config/regression_rules.json`
   回归导出字段、状态规则、严格版本项目、审计输出、缓存目录
   当前关键项：
-  - `enable_duplicate_followups=false`
+  - `enable_duplicate_followups=true`
   - `write_audit_report=true`
   - `strict_version_project_keys=["VFFCA"]`
 - `config/regression_comment_config.json`
@@ -192,12 +189,32 @@ python ".\create_tinno_jira_batch_from_excel.py" --test-mode --regression-projec
   - OPEN / WONT_FIX / RESOLVED_FIXED_WAIT_NEW_VERSION / REGRESSION_PASS 等主决策预演
   - PASS / FAIL 结构化备注生成
   - 新建问题单后按 `--add-comments` 追加 `PS` 评论
-  - 严格版本项目按配置比较版本
-- 暂不启用
-  - duplicate 跟随关闭
+  - 严格版本项目按配置比较版本（见下）
+  - duplicate 跟随关闭：主单关单后关闭其重复子单（resolution=Duplicate 的主单不触发）
 - 尚待真实项目补证
   - `VFFCA` 已解决单真实回归验证
   - Tinno 各项目 fixVersions / 关单流转的项目化差异
+
+6.1、VFFCA 严格版本比较规则
+
+实现位置：`tinno_regression_executor.py`
+
+三个版本字段含义：
+- `fix_version`：Jira 已解决时开发人员填写的修复版本，LX2/LX3 可能混填或漏填
+- `build_version`：建单时从 Monkey 报告写入的历史版本，板型可信
+- `current_version`：本轮 Monkey 测试版本，板型可信
+
+比较策略（仅 `strict_version_project_keys` 中的项目，如 VFFCA）：
+- `fix_version` ↔ `build_version`：只比构建日期与 V-number，**不区分 LX 板型**
+  （因 fix 来自 Jira，板型不可信）
+- `current_version` ↔ `fix_version`：只比构建日期与 V-number，**不区分 LX 板型**
+- `current_version` ↔ `build_version`：区分 LX2/LX3 板型后再比日期
+  （两者均来自测试报告，LX2 与 LX3 视为不同产品分支）
+
+duplicate 跟随关闭补充规则：
+- 主单 resolution 为 Duplicate / 重复问题 时不触发
+- 重复子单已是关闭状态或 resolution 为 Done/完成 时跳过
+- 重复链接关键字含：duplicate、重复、重于 等
 
 
 7、当前建议
@@ -205,4 +222,5 @@ python ".\create_tinno_jira_batch_from_excel.py" --test-mode --regression-projec
 1. 第一阶段继续以真实 `VFFCA` Monkey 数据生成上传模板，作为统一入口。
 2. 第二阶段建单完成后，优先使用真实 `VFFCA` 已解决单跑一轮 full dry-run 审计。
 3. 审计结果确认无误后，再做真实 PASS / FAIL 备注与关单验证。
-4. duplicate 链路保持关闭，等 Tinno Jira 明确支持后再单独恢复。
+4. duplicate 跟随关闭已默认开启；若某项目 Jira 工作流不支持，可在
+   `regression_rules.json` 将 `enable_duplicate_followups` 设为 `false`。

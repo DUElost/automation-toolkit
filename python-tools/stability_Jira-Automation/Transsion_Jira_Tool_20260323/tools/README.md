@@ -6,7 +6,7 @@
 ## 依赖
 
 - Python 3.10+
-- 已安装依赖：`jira`, `python-dotenv`
+- 与工具根目录 `requirements.txt` 一致（含 `jira`、`python-dotenv`）
 
 ## 使用方式
 
