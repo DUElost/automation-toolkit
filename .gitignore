@@ -100,3 +100,7 @@ linux-tools/system_Task-Scheduler/tasks/
 # Generated manpower exports under examples/ (keep *.example.json)
 **/examples/manpower*
 !**/examples/manpower*.example.json
+
+# stability_Jira-Automation: bundled OpenSSL 1.1.1g (commit .tar.gz, ignore extracted dir)
+python-tools/stability_Jira-Automation/openssl-1.1.1g/
+python-tools/stability_Jira-Automation/**/log/
