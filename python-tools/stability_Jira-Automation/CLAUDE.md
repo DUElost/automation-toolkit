@@ -1,7 +1,7 @@
 # stability_Jira-Automation
 
 > 稳定性测试 Jira 批量提单工具集 — 三套独立工具，无共享父级代码
-> 更新时间：2026-06-13
+> 更新时间：2026-06-15
 
 ---
 
@@ -26,10 +26,13 @@
 
 ```
 stability_Jira-Automation/
+├── openssl-1.1.1g.tar.gz         # 可选：旧 P12 链离线编译用 OpenSSL 1.1.1g 源码包
 ├── Transsion_Jira_Tool_20260323/   # Transsion 全套脚本、配置、测试
 ├── Tinno_Jira_Tool_20260520/       # Tinno 全套脚本、配置、测试
 └── Moto_Jira_Tool_20251201/        # Moto 全套脚本、配置、文档
 ```
+
+`openssl-1.1.1g.tar.gz` 供 Windows 等环境在系统 OpenSSL 3.x 无法加载 Tinno 旧 P12 证书链时离线编译 1.1.1g；解压目录 `openssl-1.1.1g/` 已 gitignore，仓库仅保留 tar 包。日常 P12 建单由 `Tinno_Jira_Tool_20260520/jira_p12_client.py` 通过 Python `cryptography` 降 SECLEVEL 完成，不强制依赖该 tar 包。
 
 各工具目录内通用子目录：`config/`、`log/`、`result/`、`test/`（如有）。
 
@@ -51,6 +54,8 @@ python generate_transsion_jira_upload_list.py --add-main-excel ".\resource\Resul
 python -m pytest test\ -q
 ```
 
+`requirements.txt` 覆盖第一阶段、第二阶段及 `tools/`（含 `jira`、`python-dotenv`）。
+
 ---
 
 ## Tinno_Jira_Tool_20260520
@@ -63,6 +68,8 @@ python -m pytest test\ -q
 | `create_tinno_jira_batch_from_excel.py` | 二 |
 
 本地项目历史缓存由目录内 `tinno_database_manager.py` 提供（SQLite），不依赖父目录。
+
+VFFCA 严格版本比较（fix 忽略 LX 板型、current↔build 区分板型）见 [readme.txt §6.1](./Tinno_Jira_Tool_20260520/readme.txt)。
 
 ```powershell
 cd Tinno_Jira_Tool_20260520

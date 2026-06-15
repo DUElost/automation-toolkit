@@ -75,6 +75,36 @@ def _compare_versions(current_version: Any, fix_version: Any) -> int:
     return 0
 
 
+def _compare_versions_by_date(version_a: str, version_b: str) -> int:
+    """Compare MLD-style versions by build date and V-number only (ignore LX board).
+
+    Use when either side may come from Jira fix_version, where developers sometimes
+    omit or mislabel LX2 vs LX3. Monkey-sourced build_version / current_version
+    pairs should use _compare_mld_versions instead so board variants stay isolated.
+    """
+    a_match = re.search(r'(\d+)(V\d+)', version_a)
+    b_match = re.search(r'(\d+)(V\d+)', version_b)
+
+    if not a_match or not b_match:
+        return _compare_versions(version_a, version_b)
+
+    a_date = int(a_match.group(1))
+    b_date = int(b_match.group(1))
+
+    if a_date < b_date:
+        return -1
+    if a_date > b_date:
+        return 1
+
+    a_ver = int(a_match.group(2)[1:])
+    b_ver = int(b_match.group(2)[1:])
+    if a_ver < b_ver:
+        return -1
+    if a_ver > b_ver:
+        return 1
+    return 0
+
+
 def _compare_mld_versions(current_version: str, fix_version: str) -> int:
     """Compare MLD-style versions by board, then build date.
 
@@ -309,13 +339,15 @@ def decide_action(
                     comment_required=False,
                 )
             if _is_comparable_version(build_version):
-                if _compare_mld_versions(comparison_fix_version, build_version) <= 0:
+                # fix_version (Jira) vs build_version (Monkey): ignore LX board on fix.
+                if _compare_versions_by_date(comparison_fix_version, build_version) <= 0:
                     return ActionDecision(
                         action="MANUAL_REVIEW",
                         update_jira=False,
                         manual_review=True,
                         comment_required=False,
                     )
+                # current_version vs build_version (both Monkey): require matching LX board.
                 if _compare_mld_versions(current_version_text, build_version) < 0:
                     return ActionDecision(
                         action="MANUAL_REVIEW",
@@ -323,7 +355,8 @@ def decide_action(
                         manual_review=True,
                         comment_required=False,
                     )
-        if _compare_mld_versions(current_version_text, comparison_fix_version) >= 0:
+        # current_version vs fix_version (Jira): ignore LX board on fix.
+        if _compare_versions_by_date(current_version_text, comparison_fix_version) >= 0:
             return ActionDecision(
                 action="MANUAL_REVIEW",
                 update_jira=False,
@@ -399,7 +432,8 @@ def evaluate_regression_pass(
                 reason="BUILD_VERSION_EMPTY",
             )
         if _is_comparable_version(normalized_build_version):
-            if _compare_mld_versions(comparison_fix_version, normalized_build_version) <= 0:
+            # fix_version (Jira) vs build_version (Monkey): ignore LX board on fix.
+            if _compare_versions_by_date(comparison_fix_version, normalized_build_version) <= 0:
                 return RegressionPassDecision(
                     action="REGRESSION_PASS_SKIP",
                     record_pass=False,
@@ -408,6 +442,7 @@ def evaluate_regression_pass(
                     comment_required=False,
                     reason="FIX_VERSION_NOT_AFTER_BUILD_VERSION",
                 )
+            # current_version vs build_version (both Monkey): require matching LX board.
             if _compare_mld_versions(current_version_text, normalized_build_version) < 0:
                 return RegressionPassDecision(
                     action="REGRESSION_PASS_SKIP",
@@ -418,7 +453,8 @@ def evaluate_regression_pass(
                     reason="CURRENT_VERSION_BEFORE_BUILD_VERSION",
                 )
 
-    if _compare_mld_versions(current_version_text, comparison_fix_version) < 0:
+    # current_version vs fix_version (Jira): ignore LX board on fix.
+    if _compare_versions_by_date(current_version_text, comparison_fix_version) < 0:
         return RegressionPassDecision(
             action="REGRESSION_PASS_SKIP",
             record_pass=False,

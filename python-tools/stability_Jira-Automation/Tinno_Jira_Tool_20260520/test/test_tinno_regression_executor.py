@@ -70,6 +70,33 @@ class TinnoRegressionExecutorTest(unittest.TestCase):
         self.assertEqual("RESOLVED_FIXED_WAIT_NEW_VERSION", decision.action)
         self.assertFalse(decision.manual_review)
 
+    def test_vffca_fix_version_lx_mismatch_does_not_block_wait_new_version(self) -> None:
+        """fix_version from Jira may mislabel LX2/LX3; compare vs current ignores board."""
+        decision = executor.decide_action(
+            current_row={"project": "VFFCA"},
+            history={
+                "status": "Resolved",
+                "resolution": "完成",
+                "fix_version": "MLD-LX2-16-260521V5",
+                "build_version": "MLD-LX3-16-260512V2",
+                "affect_project": "VFFCA",
+            },
+            current_version="MLD-LX3-16-260518V3",
+            strict_version_project_keys=["VFFCA"],
+        )
+
+        self.assertEqual("RESOLVED_FIXED_WAIT_NEW_VERSION", decision.action)
+
+    def test_compare_versions_by_date_ignores_lx_board(self) -> None:
+        self.assertEqual(
+            executor._compare_versions_by_date("MLD-LX2-16-260521V5", "MLD-LX3-16-260518V3"),
+            1,
+        )
+        self.assertEqual(
+            executor._compare_mld_versions("MLD-LX3-16-260518V3", "MLD-LX2-16-260512V2"),
+            -1,
+        )
+
     def test_vffca_resolved_fixed_requires_build_version(self) -> None:
         decision = executor.decide_action(
             current_row={"project": "VFFCA"},

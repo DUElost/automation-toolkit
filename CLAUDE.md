@@ -212,6 +212,7 @@ python main.py
 4. **stability_Jira-Automation 提单工具**：
    - 三套独立子目录：Transsion、Tinno、Moto，互不共享父级代码
    - 统一两阶段：原始 Excel → 上传模板 → 建单/回归
+   - Tinno VFFCA 严格版本比较：涉及 Jira `fix_version` 时忽略 LX 板型，仅 `current_version`↔`build_version` 区分 LX2/LX3
    - 详见 [stability_Jira-Automation/CLAUDE.md](./python-tools/stability_Jira-Automation/CLAUDE.md)
 
 ### AI 辅助开发建议

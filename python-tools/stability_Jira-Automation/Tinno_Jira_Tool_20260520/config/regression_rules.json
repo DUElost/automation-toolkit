@@ -62,7 +62,7 @@
   "regression": {
     "enabled": true,
     "required_regression_pass_versions": 2,
-    "enable_duplicate_followups": false,
+    "enable_duplicate_followups": true,
     "write_audit_report": true,
     "strict_version_project_keys": [
       "VFFCA"

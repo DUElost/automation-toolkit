@@ -84,9 +84,8 @@ DEFAULT_TEST_MODE_OUTPUT_PREFIX = "JIRA_Upload_List_Tinno_Test"
 TINNO_TEST_COOKIE_JSESSIONID_ENV = "TINNO_TEST_JIRA_COOKIE_JSESSIONID"
 TINNO_TEST_COOKIE_XSRF_TOKEN_ENV = "TINNO_TEST_JIRA_COOKIE_XSRF_TOKEN"
 DUPLICATE_FOLLOW_CLOSE_COMMENT = "跟随主单一同关闭。"
-DUPLICATE_LINK_KEYWORDS = ("duplicate", "duplicates", "duplicated", "重复")
+DUPLICATE_LINK_KEYWORDS = ("duplicate", "duplicates", "duplicated", "重复", "重于")
 DUPLICATE_CUSTOM_FIELD_KEYS = ("customfield_14207",)
-DUPLICATE_BACKFILL_STATUS_NAMES = {"verified"}
 _REGRESSION_COMMENT_CONFIG_CACHE: Dict[str, Any] | None = None
 
 
@@ -1585,12 +1584,9 @@ def close_duplicate_issues_following_main(
     closed_statuses: List[str],
     results: List[Dict[str, Any]],
     summary_rows: List[Dict[str, Any]],
-    only_duplicate_statuses: set[str] | None = None,
 ) -> None:
     main_key = str(main_row.get("jira_key") or "").strip()
-    normalized_allowed_statuses = {
-        str(item).strip().lower() for item in (only_duplicate_statuses or set()) if str(item).strip()
-    }
+    normalized_closed_statuses = {str(s).strip().lower() for s in closed_statuses if str(s).strip()}
     for duplicate_key in collect_duplicate_issue_keys(main_row):
         duplicate_row = {
             "jira_key": duplicate_key,
@@ -1601,11 +1597,16 @@ def close_duplicate_issues_following_main(
         success = True
         reason = "跟随主单关闭"
         try:
-            if normalized_allowed_statuses:
-                current_status = get_issue_status_name(jira_client, duplicate_key)
-                if current_status.lower() not in normalized_allowed_statuses:
-                    logger.info("重复单 %s 状态为 %s，跳过跟随关闭", duplicate_key, current_status or "UNKNOWN")
-                    continue
+            issue = jira_client.issue(duplicate_key)
+            fields = getattr(issue, "fields", None)
+            current_status = str(getattr(getattr(fields, "status", None), "name", None) or "").strip()
+            resolution_raw = getattr(fields, "resolution", None)
+            current_resolution = str(getattr(resolution_raw, "name", None) or resolution_raw or "").strip()
+            if current_status.lower() in normalized_closed_statuses:
+                logger.info("重复单 %s 已是 %s 状态，无需重复关单", duplicate_key, current_status)
+                continue
+            if current_resolution.lower() in {"完成", "done"}:
+                continue
             add_issue_comment(jira_client, duplicate_key, DUPLICATE_FOLLOW_CLOSE_COMMENT)
             transitioned, transition_message = transition_issue_to_closed(
                 jira_client,
@@ -1617,6 +1618,7 @@ def close_duplicate_issues_following_main(
             if not transitioned:
                 raise RuntimeError(transition_message)
             result_message = f"duplicate of {main_key}; {transition_message}"
+            logger.info("重复单 %s 跟随主单 %s 关闭成功: %s", duplicate_key, main_key, transition_message)
             sync_regression_pass_to_project_history_db(
                 project_db=project_db,
                 jira_key=duplicate_key,
@@ -1706,12 +1708,16 @@ def process_closed_main_duplicate_followups(
     if not normalized_closed_statuses:
         return
 
+    # 1) Parent → Child: closed main issue (resolution≠Duplicate) → close its duplicate children
     for history_row in snapshot_rows:
         jira_key = str((history_row or {}).get("jira_key") or "").strip()
         if not jira_key:
             continue
         status_text = str((history_row or {}).get("status") or "").strip()
         if status_text.lower() not in normalized_closed_statuses:
+            continue
+        resolution_text = str((history_row or {}).get("resolution") or "").strip()
+        if resolution_text.lower() in {"重复问题", "duplicate"}:
             continue
         if allowed_specialties:
             specialty = extract_specialty_from_summary((history_row or {}).get("summary", ""))
@@ -1726,8 +1732,9 @@ def process_closed_main_duplicate_followups(
             closed_statuses=closed_statuses,
             results=results,
             summary_rows=summary_rows,
-            only_duplicate_statuses=DUPLICATE_BACKFILL_STATUS_NAMES,
         )
+
+
 
 
 def process_regression_pass_candidates(
