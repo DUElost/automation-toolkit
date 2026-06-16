@@ -629,6 +629,25 @@ def select_current_version(versions: List[str]) -> str:
     return max(cleaned_versions, key=_version_sort_key)
 
 
+def _match_current_version_by_board(
+    build_version: Any,
+    version_candidates: list[str],
+    fallback: str | None = None,
+) -> str | None:
+    cleaned = [v for v in version_candidates if v.strip()]
+    if not cleaned:
+        return fallback
+    build_text = str(build_version or "").strip()
+    build_lx = re.search(r'LX(\d+)', build_text)
+    if not build_lx:
+        return fallback
+    board = build_lx.group(1)
+    board_matched = [v for v in cleaned if re.search(rf'\bLX{board}\b', v)]
+    if not board_matched:
+        return fallback
+    return max(board_matched, key=_version_sort_key)
+
+
 def _parse_summary_tokens(summary: Any) -> List[str]:
     return [item.strip() for item in re.findall(r"\[([^\]]+)\]", str(summary or "")) if item.strip()]
 
@@ -1744,6 +1763,7 @@ def process_regression_pass_candidates(
     project_db: DatabaseManager | None,
     run_id: str,
     current_version: str,
+    current_version_candidates: list[str] | None = None,
     regression_rules: Any,
     matched_jira_keys: set[str],
     allowed_specialties: set[str] | None,
@@ -1784,10 +1804,23 @@ def process_regression_pass_candidates(
         current_pass_count = int(issue_state.get("regression_pass_count") or 0)
         verified_versions = _load_verified_versions(issue_state.get("verified_versions"))
         project_key = infer_history_project_key(history_row)
+        effective_current_version = current_version
+        if current_version_candidates:
+            matched = _match_current_version_by_board(
+                history_row.get("build_version"),
+                current_version_candidates,
+                fallback=current_version,
+            )
+            if matched and matched != current_version:
+                logger.info(
+                    "候选 %s: 按板型配版本 %s (原 %s)",
+                    jira_key, matched, current_version,
+                )
+            effective_current_version = matched or current_version
         pass_decision = evaluate_regression_pass(
             pass_count=current_pass_count,
             required_versions=required_versions,
-            current_version=current_version,
+            current_version=effective_current_version,
             fix_version=history_row.get("fix_version"),
             already_verified=verified_versions,
             build_version=history_row.get("build_version"),
@@ -2265,6 +2298,12 @@ def run_excel_mode(args: argparse.Namespace) -> int:
         batch_current_version = select_current_version(
             [str(item.get("current_version") or "").strip() for item in regression_rows]
         )
+        batch_current_version_candidates = list(dict.fromkeys(
+            str(v).strip()
+            for regression_row in regression_rows
+            for v in regression_row.get("versions", [])
+            if str(v).strip()
+        ))
         batch_specialties = collect_batch_specialties(df, defaults)
 
         run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -2542,6 +2581,7 @@ def run_excel_mode(args: argparse.Namespace) -> int:
                 project_db=project_db,
                 run_id=run_id,
                 current_version=batch_current_version,
+                current_version_candidates=batch_current_version_candidates,
                 regression_rules=regression_rules,
                 matched_jira_keys=matched_history_keys,
                 allowed_specialties=batch_specialties,
