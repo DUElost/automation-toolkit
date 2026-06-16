@@ -11,7 +11,7 @@ FTP 读取工具
 示例：
     python ftp_reader.py list /
     python ftp_reader.py read /remote/path/demo.txt --file-encoding utf-8
-    python ftp_reader.py download /remote/path/demo.zip .\demo.zip
+    python ftp_reader.py download /remote/path/demo.zip ./demo.zip
 """
 
 import argparse
@@ -25,7 +25,7 @@ from ftplib import FTP, all_errors
 from io import BytesIO
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Callable, Dict, Generator, Iterable, List, Optional, Tuple, TypeVar
+from typing import Callable, Generator, Iterable, List, Optional, Tuple, TypeVar
 from urllib.parse import urlsplit
 
 
@@ -94,10 +94,9 @@ class DownloadProgress:
         self._lock = threading.Lock()
         self._rendered = False
 
-    def add_file(self, size: int = 0) -> None:
+    def add_file(self) -> None:
         with self._lock:
             self.completed_files += 1
-            self.completed_bytes += size
 
     def add_bytes(self, delta: int) -> None:
         with self._lock:
@@ -184,10 +183,6 @@ KNOWN_FTP_PATH_PREFIX_ALIASES = {
     ),
     ("172.20.11.240", 21): (),
     ("113.140.11.141", 21): (),
-}
-
-KNOWN_PATH_PREFIX_TO_SERVER: "Dict[str, Tuple[str, int]]" = {
-    "MLD-LX3": ("220.175.120.251", 21),
 }
 
 
@@ -744,6 +739,38 @@ def download_chunked_file(
         raise
 
 
+def should_use_chunked_file_download(
+    file_size: int,
+    chunk_threshold: int = CHUNKED_DOWNLOAD_THRESHOLD,
+    chunk_count: int = DEFAULT_CHUNK_COUNT,
+) -> bool:
+    """Whether a single file should use REST chunked download (independent of --workers)."""
+    return file_size >= chunk_threshold and chunk_count > 1
+
+
+def download_file_with_progress(
+    config: FTPConfig,
+    remote_file: str,
+    local_file: Path,
+    file_size: int,
+    chunk_threshold: int,
+    chunk_count: int,
+    progress: "Optional[DownloadProgress]" = None,
+) -> None:
+    """Download one remote file; use chunked REST when eligible, else single connection."""
+    if should_use_chunked_file_download(file_size, chunk_threshold, chunk_count):
+        try:
+            download_chunked_file(
+                config, remote_file, local_file, file_size, chunk_count, progress
+            )
+            return
+        except (RuntimeError,) + all_errors as exc:
+            _safe_print(
+                f"[warn] 分块下载失败，回退单连接：{remote_file} ({exc})\n"
+            )
+    download_single_file_parallel(config, remote_file, local_file, progress)
+
+
 def _render_loop(progress: DownloadProgress, stop_event: threading.Event) -> None:
     while not stop_event.wait(0.25):
         _safe_print(progress.render())
@@ -801,11 +828,10 @@ def parallel_download_directory(
 
     def _download_one(rp: str, rel: str, sz: int) -> None:
         local = local_dir / rel
-        if sz >= chunk_threshold and chunk_count > 1:
-            download_chunked_file(config, rp, local, sz, chunk_count, progress)
-        else:
-            download_single_file_parallel(config, rp, local, progress)
-        progress.add_file(sz)
+        download_file_with_progress(
+            config, rp, local, sz, chunk_threshold, chunk_count, progress
+        )
+        progress.add_file()
 
     stop_event = threading.Event()
     render_thread = threading.Thread(
@@ -902,15 +928,6 @@ def resolve_ftp_target(config: FTPConfig, raw_target: str) -> Tuple[FTPConfig, s
                 remote_path = apply_known_ftp_path_aliases(resolved_config, remainder)
                 note = f"已从输入中识别 FTP 主机：{resolved_config.host}:{resolved_config.port}"
                 return resolved_config, remote_path, note
-        for prefix, (host, port) in KNOWN_PATH_PREFIX_TO_SERVER.items():
-            for component in components:
-                if component.startswith(prefix):
-                    resolved_config = apply_known_ftp_credentials(
-                        replace(config, host=host, port=port)
-                    )
-                    remote_path = apply_known_ftp_path_aliases(resolved_config, normalized)
-                    note = f"已从输入中识别 FTP 主机：{host}:{port}"
-                    return resolved_config, remote_path, note
         return config, apply_known_ftp_path_aliases(config, normalized), None
 
     candidate_host, candidate_port = split_host_and_port(normalized.split("/", 1)[0], config.port)
@@ -1040,7 +1057,10 @@ def build_parser() -> argparse.ArgumentParser:
         "-w", "--workers",
         type=int,
         default=DEFAULT_MAX_WORKERS,
-        help=f"并行下载线程数，默认 {DEFAULT_MAX_WORKERS}，设为 1 则串行下载",
+        help=(
+            f"目录并行下载线程数，默认 {DEFAULT_MAX_WORKERS}，设为 1 则目录串行；"
+            "单文件 ≥ 阈值时分块并行由 --chunks 控制，不受此参数影响"
+        ),
     )
     download_parser.add_argument(
         "--large-threshold",
@@ -1127,9 +1147,9 @@ def safe_main() -> int:
                 )
             elif (
                 remote_info.path_type == "file"
-                and (remote_info.size or 0) >= chunk_threshold
-                and workers > 1
-                and chunks > 1
+                and should_use_chunked_file_download(
+                    remote_info.size or 0, chunk_threshold, chunks
+                )
             ):
                 file_size = remote_info.size or 0
                 target_path = resolve_local_download_path(remote_info, local_path)
@@ -1140,11 +1160,16 @@ def safe_main() -> int:
                 )
                 render_thread.start()
                 try:
-                    download_chunked_file(
-                        config, remote_info.path, target_path, file_size,
-                        chunk_count=chunks, progress=progress,
+                    download_file_with_progress(
+                        config,
+                        remote_info.path,
+                        target_path,
+                        file_size,
+                        chunk_threshold,
+                        chunks,
+                        progress,
                     )
-                    progress.add_file(file_size)
+                    progress.add_file()
                 finally:
                     stop_event.set()
                     render_thread.join(timeout=2)
@@ -1172,6 +1197,8 @@ def safe_main() -> int:
                             ftp, resolved_target, local_path, progress,
                         ),
                     )
+                    if progress is not None:
+                        progress.add_file()
                 finally:
                     if stop_event is not None:
                         stop_event.set()
