@@ -1878,14 +1878,15 @@ def process_regression_pass_candidates(
             )
             continue
 
+        record_version = effective_current_version
         new_verified_versions = list(verified_versions)
-        if current_version and current_version not in new_verified_versions:
-            new_verified_versions.append(current_version)
+        if record_version and record_version not in new_verified_versions:
+            new_verified_versions.append(record_version)
         result_message = build_regression_pass_comment(
             pass_decision.new_pass_count,
             new_verified_versions,
             specialty=extract_specialty_from_summary((history_row or {}).get("summary", "")),
-            current_version=current_version,
+            current_version=record_version,
         )
         success = True
         comment_status = ""
@@ -1920,7 +1921,7 @@ def process_regression_pass_candidates(
                         )
                 store.record_regression_pass(
                     jira_key,
-                    current_version,
+                    record_version,
                     pass_decision.new_pass_count,
                     status="已关闭" if pass_decision.close_issue else history_row.get("status"),
                     resolution=history_row.get("resolution"),
@@ -1932,7 +1933,7 @@ def process_regression_pass_candidates(
                     project_db=project_db,
                     jira_key=jira_key,
                     history_row=history_row,
-                    current_version=current_version,
+                    current_version=record_version,
                     new_pass_count=pass_decision.new_pass_count,
                     verified_versions=new_verified_versions,
                     status="已关闭" if pass_decision.close_issue else str(history_row.get("status") or ""),

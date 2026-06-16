@@ -172,6 +172,14 @@ class TinnoJiraClientAdapter:
     def add_comment(self, issue_key: str, comment: str) -> Dict[str, Any]:
         return self._client.add_comment(issue_key, comment)
 
+    def get_issue_comments(
+        self,
+        issue_key: str,
+        start_at: int = 0,
+        max_results: int = 100,
+    ) -> Dict[str, Any]:
+        return self._client.get_issue_comments(issue_key, start_at=start_at, max_results=max_results)
+
     def get_issue(self, issue_key: str) -> Dict[str, Any]:
         return self._client.get_issue(issue_key)
 
@@ -776,6 +784,23 @@ def assign_issue_to_user(
 
 def update_issue_fields(jira_client: TinnoJiraClientAdapter, issue_key: str, fields: Dict[str, Any]) -> None:
     jira_client.update_issue(issue_key, fields)
+
+
+def normalize_comment_body(comment: str) -> str:
+    return re.sub(r"\s+", " ", str(comment or "").strip())
+
+
+def issue_has_comment(jira_client: TinnoJiraClientAdapter, issue_key: str, comment: str) -> bool:
+    expected = normalize_comment_body(comment)
+    if not expected:
+        return False
+    payload = jira_client.get_issue_comments(issue_key)
+    comments = payload.get("comments", []) if isinstance(payload, dict) else []
+    for item in comments:
+        body = item.get("body") if isinstance(item, dict) else ""
+        if normalize_comment_body(body) == expected:
+            return True
+    return False
 
 
 def add_issue_comment(jira_client: TinnoJiraClientAdapter, issue_key: str, comment: str) -> None:

@@ -135,6 +135,15 @@ class JiraP12Client:
     def add_comment(self, issue_key: str, comment_text: str) -> Dict[str, Any]:
         return self._make_request("POST", f"/rest/api/2/issue/{issue_key}/comment", json={"body": comment_text})
 
+    def get_issue_comments(
+        self,
+        issue_key: str,
+        start_at: int = 0,
+        max_results: int = 100,
+    ) -> Dict[str, Any]:
+        params = {"startAt": start_at, "maxResults": max_results}
+        return self._make_request("GET", f"/rest/api/2/issue/{issue_key}/comment", params=params)
+
     def get_issue(self, issue_key: str) -> Dict[str, Any]:
         return self._make_request("GET", f"/rest/api/2/issue/{issue_key}")
 

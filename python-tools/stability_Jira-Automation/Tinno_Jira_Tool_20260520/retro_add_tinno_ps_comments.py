@@ -9,19 +9,21 @@ retro_add_tinno_ps_comments.py
 
 用法：
     python "retro_add_tinno_ps_comments.py" ^
-        --add-excel-file ".\result\JIRA_Upload_List_Tinno_Monkey专项_20260615_211827.xlsx" ^
-        --result-json ".\result\tinno_jira_batch_create_result_20260615_212929.json" ^
+        --add-excel-file ".\\result\\JIRA_Upload_List_Tinno_Monkey专项_20260615_211827.xlsx" ^
+        --result-json ".\\result\\tinno_jira_batch_create_result_20260615_212929.json" ^
         --jira-cookie-jsessionid "<JSESSIONID>" ^
         --jira-cookie-xsrf-token "<XSRF_TOKEN>" ^
         --dry-run
 
     python "retro_add_tinno_ps_comments.py" ^
-        --add-excel-file ".\result\JIRA_Upload_List_Tinno_Monkey专项_20260615_211827.xlsx" ^
-        --result-json ".\result\tinno_jira_batch_create_result_20260615_212929.json" ^
+        --add-excel-file ".\\result\\JIRA_Upload_List_Tinno_Monkey专项_20260615_211827.xlsx" ^
+        --result-json ".\\result\\tinno_jira_batch_create_result_20260615_212929.json" ^
         --jira-cookie-jsessionid "<JSESSIONID>" ^
         --jira-cookie-xsrf-token "<XSRF_TOKEN>"
 
 不指定 --result-json 时，脚本会尝试按上传文件名自动匹配最近的 result JSON。
+存在多个时间接近的候选时会拒绝自动匹配，请显式传入 --result-json 或使用 --force-auto-match。
+默认跳过 issue 上已存在相同内容的 PS 评论；使用 --no-skip-existing 可强制重复追加。
 """
 
 from __future__ import annotations
@@ -42,7 +44,7 @@ CURRENT_DIR = Path(__file__).resolve().parent
 if str(CURRENT_DIR) not in sys.path:
     sys.path.insert(0, str(CURRENT_DIR))
 
-from tinno_batch_jira_common import add_issue_comment, connect_to_jira
+from tinno_batch_jira_common import add_issue_comment, connect_to_jira, issue_has_comment
 from create_tinno_jira_batch_from_excel import (
     DEFAULT_CONFIG_FILE,
     DEFAULT_LOCAL_ENV_FILE,
@@ -76,10 +78,20 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--jira-cookie-string", dest="jira_cookie_string", default=os.getenv("JIRA_COOKIE_STRING"), help="完整 Cookie 字符串")
     parser.add_argument("--config-file", dest="config_file", default=str(DEFAULT_CONFIG_FILE), help="默认配置路径")
     parser.add_argument("--dry-run", action="store_true", help="仅打印即将追加的评论，不做真实提交")
+    parser.add_argument(
+        "--no-skip-existing",
+        action="store_true",
+        help="即使 issue 上已有相同 PS 评论也再次追加（默认跳过重复）",
+    )
+    parser.add_argument(
+        "--force-auto-match",
+        action="store_true",
+        help="自动匹配 result JSON 存在歧义时仍使用最接近的一个",
+    )
     return parser.parse_args()
 
 
-def find_result_json_by_excel(excel_path: str) -> str | None:
+def find_result_json_by_excel(excel_path: str, *, force: bool = False) -> str | None:
     result_dir = RESULT_DIR
     if not result_dir.exists():
         return None
@@ -112,9 +124,25 @@ def find_result_json_by_excel(excel_path: str) -> str | None:
         return None
 
     candidates.sort(key=lambda x: x[0])
-    best = candidates[0]
-    logger.info("自动匹配 result JSON: %s（晚于上传模板 %d 秒）", best[1], int(best[0]))
-    return str(result_dir / best[1])
+    best_delta, best_name = candidates[0]
+    if len(candidates) > 1:
+        second_delta = candidates[1][0]
+        ambiguous = abs(second_delta - best_delta) < 1.0 or (second_delta - best_delta) <= 60.0
+        if ambiguous:
+            preview = ", ".join(name for _, name in candidates[:3])
+            logger.error(
+                "自动匹配 result JSON 存在歧义（最佳差 %ds，次佳差 %ds）：%s；"
+                "请显式传入 --result-json%s",
+                int(best_delta),
+                int(second_delta),
+                preview,
+                "，或使用 --force-auto-match" if not force else "",
+            )
+            if not force:
+                return None
+
+    logger.info("自动匹配 result JSON: %s（晚于上传模板 %d 秒）", best_name, int(best_delta))
+    return str(result_dir / best_name)
 
 
 def read_excel_smart(file_path: str | Path) -> pd.DataFrame:
@@ -168,7 +196,10 @@ def main() -> int:
     args = parse_args()
 
     if not args.result_json:
-        matched = find_result_json_by_excel(args.excel_file)
+        matched = find_result_json_by_excel(
+            args.excel_file,
+            force=bool(args.force_auto_match),
+        )
         if not matched:
             logger.error("自动匹配 result JSON 失败，请手动传入 --result-json")
             return 1
@@ -239,11 +270,18 @@ def main() -> int:
     )
     logger.info("当前认证来源: %s", getattr(jira, "auth_mode", "unknown"))
 
+    skip_existing = not bool(args.no_skip_existing)
+
     try:
         success_count = 0
         fail_count = 0
+        skip_count = 0
         for row_num, issue_key, ps_text in matched_pairs:
             try:
+                if skip_existing and issue_has_comment(jira, issue_key, ps_text):
+                    logger.info("第 %d 行 -> %s: 评论已存在，跳过", row_num, issue_key)
+                    skip_count += 1
+                    continue
                 add_issue_comment(jira, issue_key, ps_text)
                 logger.info("第 %d 行 -> %s: 评论已追加", row_num, issue_key)
                 success_count += 1
@@ -251,8 +289,8 @@ def main() -> int:
                 logger.error("第 %d 行 -> %s: 评论追加失败: %s", row_num, issue_key, exc)
                 fail_count += 1
         logger.info(
-            "处理完成: 成功=%d 失败=%d 总计=%d",
-            success_count, fail_count, len(matched_pairs),
+            "处理完成: 成功=%d 跳过=%d 失败=%d 总计=%d",
+            success_count, skip_count, fail_count, len(matched_pairs),
         )
         return 0 if fail_count == 0 else 1
     finally:

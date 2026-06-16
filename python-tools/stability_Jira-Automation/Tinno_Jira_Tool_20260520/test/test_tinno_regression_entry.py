@@ -542,6 +542,120 @@ class TinnoRegressionEntryTest(unittest.TestCase):
         self.assertEqual(1, updated["regression_pass_count"])
         self.assertIn("P2", json.loads(updated["verified_versions"]))
 
+    def test_match_current_version_by_board_selects_same_board_highest(self) -> None:
+        candidates = ["MLD-LX2-16-260518V3", "MLD-LX3-16-260520V5"]
+        matched = self.module._match_current_version_by_board(
+            "MLD-LX3-16-260508V1",
+            candidates,
+            fallback="MLD-LX2-16-260518V3",
+        )
+        self.assertEqual("MLD-LX3-16-260520V5", matched)
+
+    def test_match_current_version_by_board_falls_back_without_board(self) -> None:
+        matched = self.module._match_current_version_by_board(
+            "P0",
+            ["MLD-LX2-16-260518V3"],
+            fallback="P1",
+        )
+        self.assertEqual("P1", matched)
+
+    def test_process_regression_pass_records_board_matched_version(self) -> None:
+        fake_rules = SimpleNamespace(
+            regression=SimpleNamespace(
+                enabled=True,
+                required_regression_pass_versions=2,
+                enable_duplicate_followups=False,
+                write_audit_report=True,
+                strict_version_project_keys=["VCAME"],
+            ),
+            status_rules=SimpleNamespace(
+                resolved_statuses=["已解决"],
+                resolved_fixed_resolutions=["完成"],
+                closed_statuses=["Closed", "已关闭"],
+            ),
+        )
+        lx2_batch_version = "MLD-LX2-16-260518V5"
+        lx3_effective_version = "MLD-LX3-16-260520V5"
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            store = self.module.RegressionStore(temp_path / "cache" / "VCAME.db")
+            project_db = self.module.DatabaseManager({"type": "sqlite", "path": str(temp_path / "project.db")})
+            project_db.insert_issue(
+                {
+                    "jira_key": "VCAME-100",
+                    "status": "已解决",
+                    "summary": "[自动化][V552AA][Total Number 1][MLD-LX3-16-260508V1][MonkeyAEE][Java (JE)]a发生Java (JE)",
+                    "normalized_summary": "[自动化][V552AA][Total Number 1][MLD-LX3-16-260508V1][MonkeyAEE][Java (JE)]a发生Java (JE)",
+                    "test_environment": "*Package:* com.android.settings",
+                    "raw_caused_by": "java.lang.RuntimeException",
+                    "assignee": "dai.lv",
+                    "bug_severity": "B",
+                    "priority": "Medium",
+                    "description": "desc",
+                    "resolution": "完成",
+                    "package_name": "com.android.settings",
+                    "exp_class": "Java (JE)",
+                    "exp_type": "Crash",
+                    "cur_process": "com.android.settings",
+                    "version": "MLD-LX3-16-260510V1",
+                    "count": 1,
+                    "device_count": 1,
+                    "source_file": "",
+                    "raw_data": {},
+                    "fix_version": "MLD-LX3-16-260510V1",
+                    "build_version": "MLD-LX3-16-260508V1",
+                    "regression_pass_count": 0,
+                    "verified_versions": [],
+                }
+            )
+            store.save_snapshot(
+                "run1",
+                [
+                    {
+                        "jira_key": "VCAME-100",
+                        "summary": "[自动化][V552AA][Total Number 1][MLD-LX3-16-260508V1][MonkeyAEE][Java (JE)]a发生Java (JE)",
+                        "status": "已解决",
+                        "resolution": "完成",
+                        "fix_version": "MLD-LX3-16-260510V1",
+                        "build_version": "MLD-LX3-16-260508V1",
+                        "affect_project": "VCAME",
+                        "environment": "*Package:* com.android.settings",
+                        "exp_class": "Java (JE)",
+                        "caused_by": "java.lang.RuntimeException",
+                        "raw_payload": "{}",
+                    },
+                ],
+            )
+
+            with mock.patch.object(self.module, "add_issue_comment") as add_issue_comment:
+                self.module.process_regression_pass_candidates(
+                    jira_client=SimpleNamespace(),
+                    store=store,
+                    project_db=project_db,
+                    run_id="run1",
+                    current_version=lx2_batch_version,
+                    current_version_candidates=[
+                        "MLD-LX2-16-260518V3",
+                        lx3_effective_version,
+                    ],
+                    regression_rules=fake_rules,
+                    matched_jira_keys=set(),
+                    allowed_specialties={"MonkeyAEE"},
+                    args=Namespace(dry_run=False),
+                    results=[],
+                    summary_rows=[],
+                )
+
+            updated = project_db.get_issue_by_key("VCAME-100")
+            project_db.close()
+
+        verified_versions = json.loads(updated["verified_versions"])
+        self.assertEqual(1, add_issue_comment.call_count)
+        self.assertEqual(1, updated["regression_pass_count"])
+        self.assertIn(lx3_effective_version, verified_versions)
+        self.assertNotIn(lx2_batch_version, verified_versions)
+
     def test_ensure_test_mode_upload_excel_generates_vcame_autotest_rows(self) -> None:
         raw_df = pd.DataFrame(
             [
