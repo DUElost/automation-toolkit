@@ -777,6 +777,60 @@ class TinnoRegressionEntryTest(unittest.TestCase):
         self.assertEqual({"MonkeyAEE"}, process_regression_pass.call_args.kwargs["allowed_specialties"])
         duplicate_followups.assert_not_called()
 
+    def test_build_run_decision_stats_uses_summary_rows_for_action_and_reason(self) -> None:
+        results = [
+            {"status": "SUCCESS", "decision": {"action": "FROM_RESULTS_ONLY"}},
+            {"status": "FAILED", "decision": {"action": "IGNORED_ACTION"}},
+        ]
+        summary_rows = [
+            {"action": "OPEN_LIKE_UPDATE", "reason": "HISTORY_MATCH"},
+            {"action": "CREATE_NEW", "reason": "NO_HISTORY"},
+        ]
+
+        stats = self.module.build_run_decision_stats(results, summary_rows)
+
+        self.assertEqual({"SUCCESS": 1, "FAILED": 1}, stats["status_counts"])
+        self.assertEqual(
+            {"OPEN_LIKE_UPDATE": 1, "CREATE_NEW": 1},
+            stats["action_counts"],
+        )
+        self.assertEqual(
+            {"HISTORY_MATCH": 1, "NO_HISTORY": 1},
+            stats["reason_counts"],
+        )
+        self.assertNotIn("FROM_RESULTS_ONLY", stats["action_counts"])
+
+    def test_build_run_decision_stats_empty_values_map_to_unknown(self) -> None:
+        stats = self.module.build_run_decision_stats(
+            [{"status": ""}],
+            [{"action": "", "reason": ""}],
+        )
+        self.assertEqual({"UNKNOWN": 1}, stats["status_counts"])
+        self.assertEqual({"UNKNOWN": 1}, stats["action_counts"])
+        self.assertEqual({"UNKNOWN": 1}, stats["reason_counts"])
+
+    def test_format_counts_orders_by_count_then_name(self) -> None:
+        formatted = self.module._format_counts({"B": 2, "A": 1, "C": 2})
+        self.assertEqual("B=2、C=2、A=1", formatted)
+
+    def test_save_audit_report_uses_shared_decision_stats(self) -> None:
+        results = [{"status": "SUCCESS", "decision": {"action": "IGNORED"}}]
+        summary_rows = [{"action": "REGRESSION_PASS_PROGRESS", "reason": "回归PASS判定"}]
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            with mock.patch.object(self.module, "RESULT_DIR", temp_path):
+                audit_path = self.module.save_audit_report(
+                    results=results,
+                    summary_rows=summary_rows,
+                    run_id="run-test",
+                )
+                payload = json.loads(audit_path.read_text(encoding="utf-8"))
+
+        self.assertEqual({"SUCCESS": 1}, payload["status_counts"])
+        self.assertEqual({"REGRESSION_PASS_PROGRESS": 1}, payload["action_counts"])
+        self.assertEqual({"回归PASS判定": 1}, payload["reason_counts"])
+
 
 if __name__ == "__main__":
     unittest.main()

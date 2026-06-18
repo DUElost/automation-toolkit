@@ -2131,17 +2131,18 @@ def should_write_audit_report(regression_rules: Any) -> bool:
     return bool(getattr(regression_config, "write_audit_report", True))
 
 
-def save_audit_report(
-    *,
+def build_run_decision_stats(
     results: List[Dict[str, Any]],
     summary_rows: List[Dict[str, Any]],
-    run_id: str,
-) -> Path:
-    RESULT_DIR.mkdir(parents=True, exist_ok=True)
-    target = RESULT_DIR / f"tinno_jira_batch_create_audit_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+) -> Dict[str, Dict[str, int]]:
+    """Aggregate run counters shared by audit JSON and end-of-run logs.
+
+    - status_counts: from ``results`` (per output row / issue attempt)
+    - action_counts, reason_counts: from ``summary_rows`` (authoritative decision trail)
+    """
+    status_counts: Dict[str, int] = {}
     action_counts: Dict[str, int] = {}
     reason_counts: Dict[str, int] = {}
-    status_counts: Dict[str, int] = {}
 
     for item in results:
         status_text = str(item.get("status") or "").strip() or "UNKNOWN"
@@ -2153,14 +2154,29 @@ def save_audit_report(
         action_counts[action_text] = action_counts.get(action_text, 0) + 1
         reason_counts[reason_text] = reason_counts.get(reason_text, 0) + 1
 
+    return {
+        "status_counts": status_counts,
+        "action_counts": action_counts,
+        "reason_counts": reason_counts,
+    }
+
+
+def save_audit_report(
+    *,
+    results: List[Dict[str, Any]],
+    summary_rows: List[Dict[str, Any]],
+    run_id: str,
+) -> Path:
+    RESULT_DIR.mkdir(parents=True, exist_ok=True)
+    target = RESULT_DIR / f"tinno_jira_batch_create_audit_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+    stats = build_run_decision_stats(results, summary_rows)
+
     payload = {
         "run_id": run_id,
         "generated_at": datetime.now().isoformat(timespec="seconds"),
         "total_results": len(results),
         "total_summary_rows": len(summary_rows),
-        "status_counts": status_counts,
-        "action_counts": action_counts,
-        "reason_counts": reason_counts,
+        **stats,
         "rows": summary_rows,
     }
     with target.open("w", encoding="utf-8") as fp:
@@ -2174,20 +2190,10 @@ def _format_counts(counts: Dict[str, int]) -> str:
 
 
 def _log_decision_stats(results: List[Dict[str, Any]], summary_rows: List[Dict[str, Any]]) -> None:
-    status_counts: Dict[str, int] = {}
-    action_counts: Dict[str, int] = {}
-    reason_counts: Dict[str, int] = {}
-
-    for item in results:
-        status_text = str(item.get("status") or "").strip() or "UNKNOWN"
-        status_counts[status_text] = status_counts.get(status_text, 0) + 1
-        decision = item.get("decision") or {}
-        action_text = str(decision.get("action") or "").strip() or "UNKNOWN"
-        action_counts[action_text] = action_counts.get(action_text, 0) + 1
-
-    for row in summary_rows:
-        reason_text = str(row.get("reason") or "").strip() or "UNKNOWN"
-        reason_counts[reason_text] = reason_counts.get(reason_text, 0) + 1
+    stats = build_run_decision_stats(results, summary_rows)
+    status_counts = stats["status_counts"]
+    action_counts = stats["action_counts"]
+    reason_counts = stats["reason_counts"]
 
     if status_counts:
         logger.info("状态统计: %s", _format_counts(status_counts))
