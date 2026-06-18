@@ -2168,6 +2168,35 @@ def save_audit_report(
     return target
 
 
+def _format_counts(counts: Dict[str, int]) -> str:
+    ordered = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
+    return "、".join(f"{name}={count}" for name, count in ordered)
+
+
+def _log_decision_stats(results: List[Dict[str, Any]], summary_rows: List[Dict[str, Any]]) -> None:
+    status_counts: Dict[str, int] = {}
+    action_counts: Dict[str, int] = {}
+    reason_counts: Dict[str, int] = {}
+
+    for item in results:
+        status_text = str(item.get("status") or "").strip() or "UNKNOWN"
+        status_counts[status_text] = status_counts.get(status_text, 0) + 1
+        decision = item.get("decision") or {}
+        action_text = str(decision.get("action") or "").strip() or "UNKNOWN"
+        action_counts[action_text] = action_counts.get(action_text, 0) + 1
+
+    for row in summary_rows:
+        reason_text = str(row.get("reason") or "").strip() or "UNKNOWN"
+        reason_counts[reason_text] = reason_counts.get(reason_text, 0) + 1
+
+    if status_counts:
+        logger.info("状态统计: %s", _format_counts(status_counts))
+    if action_counts:
+        logger.info("决策动作统计: %s", _format_counts(action_counts))
+    if reason_counts:
+        logger.info("决策原因统计: %s", _format_counts(reason_counts))
+
+
 def write_run_outputs(
     *,
     results: List[Dict[str, Any]],
@@ -2200,6 +2229,7 @@ def write_run_outputs(
     success_count = sum(1 for item in results if item["status"] in {"SUCCESS", "DRY_RUN"})
     failed_count = sum(1 for item in results if item["status"] == "FAILED")
     logger.info("处理完成，总计=%d 成功/校验通过=%d 失败=%d", len(results), success_count, failed_count)
+    _log_decision_stats(results, summary_rows)
     return 0 if failed_count == 0 else 1
 
 
