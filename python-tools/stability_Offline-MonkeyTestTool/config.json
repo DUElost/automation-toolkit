@@ -1,0 +1,105 @@
+{
+    "_comment": "MonkeyAEEinfo 配置文件 - 敏感信息请通过环境变量设置",
+    
+    "general": {
+        "polling_interval_seconds": 180,
+        "filter_db_logs_enabled": false,
+        "enable_precise_mobilelog_scheme": true,
+        "main_log_root_dir": "/home/android/sonic_agent/logs/ftp_log/sonic_tinno/",
+        "main_log_root_dir_windows": "D:\\MoveData\\Users\\Rin\\Desktop\\MonkeyTest\\",
+        "_note": "Linux使用main_log_root_dir，Windows使用main_log_root_dir_windows（为空则用脚本目录）"
+    },
+    
+    "mount": {
+        "server_ip": "172.21.15.4",
+        "username": "jxtinno",
+        "password": "",
+        "sudo_passwords": [],
+        "timeout": 30,
+        "retry_count": 3
+    },
+    
+    "wifi": {
+        "ssid": "JX10F-Trans",
+        "password": "",
+        "security": "wpa2"
+    },
+    
+    "stability": {
+        "max_thread_pool_workers": 8,
+        "thread_timeout_seconds": 300,
+        "heartbeat_interval": 30,
+        "max_consecutive_failures": 5,
+        "adb_command_timeout": 30,
+        "memory_threshold_mb": 1024
+    },
+    
+    "aee_decrypt": {
+        "tool_path": "/home/android/sonic_agent/logs/ftp_log/sonic_tinno/start_log_scan/tools/aee_extract/aee_extract",
+        "tool_path_relative": "tools/aee_extract/aee_extract",
+        "_tool_note": "Linux使用tool_path绝对路径，Windows使用tool_path_relative相对于脚本目录",
+        "enable_local_decrypt_scan": true,
+        "limit_per_cycle": 30,
+        "single_log_timeout": 300,
+        "retry_limit": 2,
+        "min_free_disk_space_gb": 10,
+        "scan_recent_folders_limit": 20
+    },
+    
+    "scan_optimization": {
+        "enable_cache": true,
+        "enable_parallel_scan": true,
+        "cache_timeout": 600,
+        "parallel_workers": 5,
+        "batch_check_size": 100,
+        "task_timeout": 300,
+        "find_timeout": 60,
+        "enable_fast_path_filter": true,
+        "max_depth": 3,
+        "pre_scan_enabled": true
+    },
+    
+    "node_coordination": {
+        "enabled": true,
+        "lock_dir": "/home/android/sonic_agent/logs/ftp_log/sonic_tinno/.node_locks",
+        "lock_dir_relative": ".node_locks",
+        "_lock_note": "Linux使用lock_dir绝对路径，Windows使用lock_dir_relative相对于脚本目录",
+        "lock_timeout": 300
+    },
+    
+    "device_paths": {
+        "aee_paths": ["/data/aee_exp/", "/data/vendor/aee_exp/"],
+        "mobilelog_path": "/data/debuglogger/mobilelog/"
+    },
+    
+    "bugreport": {
+        "enabled": true,
+        "dirname": "correlated_bugreports",
+        "timeout_seconds": 600,
+        "cooldown_seconds": 300,
+        "cooldown_event_types": ["ANR", "CRASH"]
+    },
+    
+    "monkey": {
+        "process_name": "com.android.commands.monkey.transsion",
+        "restart_command": "nohup /data/local/tmp/aim --pkg-blacklist-file /sdcard/blacklist.txt --smartuiautomator true --hprof --ignore-crashes --ignore-security-exceptions --ignore-timeouts --throttle 500 --runtime-minutes 10080 --switchuimode -v >/dev/null 2>&1 &",
+        "dumpsys_command": "dumpsys activity appops on"
+    },
+    
+    "mobilelog_filter": {
+        "main_enabled": true,
+        "kernel_enabled": true,
+        "sys_enabled": false
+    },
+    
+    "storage": {
+        "fill_percentage": 60,
+        "enable_fill_storage": false,
+        "_fill_note": "enable_fill_storage: 是否在测试前填充存储空间"
+    },
+    
+    "device_setup": {
+        "enable_clear_logs_before_test": false,
+        "_clear_note": "enable_clear_logs_before_test: 是否在测试前清除设备日志"
+    }
+}
