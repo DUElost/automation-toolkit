@@ -748,6 +748,23 @@ def should_use_chunked_file_download(
     return file_size >= chunk_threshold and chunk_count > 1
 
 
+def _chunked_download_is_truncated(
+    config: FTPConfig,
+    remote_file: str,
+    local_file: Path,
+    scanned_size: int,
+) -> bool:
+    """Detect stale/partial SIZE from directory scan that would truncate REST chunks."""
+    if not local_file.is_file():
+        return True
+    local_size = local_file.stat().st_size
+    if scanned_size > 0 and local_size < scanned_size:
+        return True
+    with ftp_connection(config) as ftp:
+        remote_size = _try_get_size(ftp, remote_file)
+    return remote_size > 0 and local_size < remote_size
+
+
 def download_file_with_progress(
     config: FTPConfig,
     remote_file: str,
@@ -763,6 +780,13 @@ def download_file_with_progress(
             download_chunked_file(
                 config, remote_file, local_file, file_size, chunk_count, progress
             )
+            if _chunked_download_is_truncated(config, remote_file, local_file, file_size):
+                local_size = local_file.stat().st_size if local_file.is_file() else 0
+                if local_file.exists():
+                    local_file.unlink()
+                raise RuntimeError(
+                    f"chunked download truncated (local={local_size}, scanned={file_size})"
+                )
             return
         except (RuntimeError,) + all_errors as exc:
             _safe_print(

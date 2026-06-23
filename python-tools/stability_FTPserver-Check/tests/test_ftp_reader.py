@@ -14,6 +14,7 @@ from ftp_reader import (
     DEFAULT_CHUNK_COUNT,
     DEFAULT_CONFIG,
     DownloadProgress,
+    _chunked_download_is_truncated,
     apply_known_ftp_path_aliases,
     download_file_with_progress,
     resolve_ftp_target,
@@ -101,6 +102,55 @@ class DownloadFileWithProgressTest(unittest.TestCase):
             chunk_count=4,
         )
         mock_chunked.assert_called_once()
+        mock_single.assert_called_once()
+
+    @patch("ftp_reader._try_get_size", return_value=20 * 1024 * 1024)
+    @patch("ftp_reader.ftp_connection")
+    def test_chunked_download_is_truncated_when_remote_grew(
+        self,
+        mock_ftp_connection,
+        mock_get_size,
+    ) -> None:
+        local_file = Path(PROJECT_ROOT) / "truncated.dbg"
+        local_file.write_bytes(b"x" * (10 * 1024 * 1024))
+        try:
+            self.assertTrue(
+                _chunked_download_is_truncated(
+                    DEFAULT_CONFIG,
+                    "/remote/big.dbg",
+                    local_file,
+                    scanned_size=10 * 1024 * 1024,
+                )
+            )
+        finally:
+            if local_file.exists():
+                local_file.unlink()
+
+    @patch("ftp_reader.download_single_file_parallel")
+    @patch("ftp_reader._chunked_download_is_truncated", return_value=True)
+    @patch("ftp_reader.download_chunked_file")
+    def test_falls_back_when_chunked_download_truncated(
+        self,
+        mock_chunked,
+        mock_truncated,
+        mock_single,
+    ) -> None:
+        target = Path(PROJECT_ROOT) / "big.dbg"
+        target.write_bytes(b"partial")
+        try:
+            download_file_with_progress(
+                DEFAULT_CONFIG,
+                "/remote/big.dbg",
+                target,
+                file_size=20 * 1024 * 1024,
+                chunk_threshold=10 * 1024 * 1024,
+                chunk_count=4,
+            )
+        finally:
+            if target.exists():
+                target.unlink()
+        mock_chunked.assert_called_once()
+        mock_truncated.assert_called_once()
         mock_single.assert_called_once()
 
 
