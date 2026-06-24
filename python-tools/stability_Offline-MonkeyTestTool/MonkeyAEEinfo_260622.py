@@ -696,13 +696,22 @@ class CIFSHealthProbe:
                         return True
 
                     if write_failure == "timeout":
+                        # stat 已通过，仅写探针超时：I/O 缓慢但仍可写，不应跳过整轮扫描
                         self.last_failure_reason = "io_slow"
                         self._last_io_slow_at = time.time()
-                    else:
-                        self.last_failure_reason = "write_fail"
-                        self._last_write_probe_result = False
-                        APP_LOGGER.error(
-                            f"CIFS 挂载点可读但写入失败: {self.mount_path}")
+                        APP_LOGGER.warning(
+                            f"CIFS 写探针超时({self.probe_timeout}s): {self.mount_path} "
+                            "(I/O 缓慢，继续采集)")
+                        self._is_healthy = True
+                        self._last_healthy_time = now
+                        self._last_health_check_time = now
+                        self._consecutive_failures = 0
+                        return True
+
+                    self.last_failure_reason = "write_fail"
+                    self._last_write_probe_result = False
+                    APP_LOGGER.error(
+                        f"CIFS 挂载点可读但写入失败: {self.mount_path}")
                 else:
                     if not check_mount_status(self.mount_path):
                         self.last_failure_reason = "mount_missing"
@@ -1203,7 +1212,6 @@ def mount_with_pexpect(mount_command, sudo_passwords, timeout=30):
             APP_LOGGER.debug(f"执行命令: {mount_command}")
             
             child = pexpect.spawn(mount_command, timeout=timeout)
-            child.logfile_read = sys.stdout.buffer  # 添加调试输出
             
             # 更精确的密码提示匹配模式
             password_patterns = [
