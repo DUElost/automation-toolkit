@@ -264,6 +264,12 @@ class PlayStoreDownloader:
             "authSubToken": self.api.authSubToken,
         }))
 
+    def spawn_worker(self) -> "PlayStoreDownloader":
+        """Create an isolated downloader for parallel workers (API session is not thread-safe)."""
+        worker = PlayStoreDownloader(self.api.locale, self.api.timezone)
+        worker.api.login(gsfId=int(self.api.gsfId), authSubToken=self.api.authSubToken)
+        return worker
+
     def get_details(self, package: str) -> dict:
         """获取应用详情"""
         return self.api.details(package)
@@ -586,10 +592,11 @@ def main():
         else:
             work_items.append((i, pkg))
 
-    def _download_one(item: tuple[int, str]) -> tuple[int, str, bool, str]:
+    def _download_one(item: tuple[int, str], worker: PlayStoreDownloader | None = None) -> tuple[int, str, bool, str]:
         i, pkg = item
         try:
-            downloader.download_to_dir(pkg, output_dir)
+            active = worker or downloader
+            active.download_to_dir(pkg, output_dir)
             return i, pkg, True, ""
         except Exception as exc:
             return i, pkg, False, str(exc)
@@ -607,8 +614,13 @@ def main():
                 time.sleep(1.5)
     else:
         eprint(f"[并行] 启动 {jobs} 个下载任务（失败会在汇总中显示）")
+
+        def _parallel_download_one(item: tuple[int, str]) -> tuple[int, str, bool, str]:
+            worker = downloader.spawn_worker()
+            return _download_one(item, worker)
+
         with ThreadPoolExecutor(max_workers=jobs) as ex:
-            fut_map = {ex.submit(_download_one, it): it for it in work_items}
+            fut_map = {ex.submit(_parallel_download_one, it): it for it in work_items}
             for fut in as_completed(fut_map):
                 i, pkg = fut_map[fut]
                 try:
