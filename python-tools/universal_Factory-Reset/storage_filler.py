@@ -16,6 +16,14 @@ if not DEFAULT_LOGGER.handlers:
     DEFAULT_LOGGER.addHandler(handler)
     DEFAULT_LOGGER.setLevel(logging.INFO)
 
+# 与 _get_storage_info 中 df /data 一致：填充文件必须落在 /data 分区上
+FILL_TARGET_DIR = "/data/local/tmp"
+
+
+def _build_fill_file_path(unique_id):
+    return f"{FILL_TARGET_DIR}/fill_file_{unique_id}.tmp"
+
+
 def _log(message, level='info', logger=None):
     """一个统一的日志/打印函数"""
     effective_logger = logger if logger else DEFAULT_LOGGER
@@ -66,7 +74,7 @@ def _fill_in_chunks(device_id, fill_size_mb, logger=None, chunk_size_mb=2048):
     while remaining_mb > 0:
         current_chunk = min(remaining_mb, chunk_size_mb)
         unique_id = f"{int(time.time())}_{random.randint(1000, 9999)}"
-        file_name = f"/sdcard/fill_file_{unique_id}.tmp"
+        file_name = _build_fill_file_path(unique_id)
         
         command = f'adb -s {device_id} shell "dd if=/dev/zero of={file_name} bs=1M count={current_chunk}"'
         _log(f"正在向设备 {device_id} 写入 {current_chunk}MB...", logger=logger)
