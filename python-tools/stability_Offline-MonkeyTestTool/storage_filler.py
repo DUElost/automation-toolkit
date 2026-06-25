@@ -16,8 +16,8 @@ if not DEFAULT_LOGGER.handlers:
     DEFAULT_LOGGER.addHandler(handler)
     DEFAULT_LOGGER.setLevel(logging.INFO)
 
-# 与 _get_storage_info 中 df /data 一致：填充文件必须落在 /data 分区上
-FILL_TARGET_DIR = "/data/local/tmp"
+# 与 _get_storage_info 中 df /sdcard 一致：测量与填充均针对外置存储分区
+FILL_TARGET_DIR = "/sdcard"
 
 
 def _build_fill_file_path(unique_id):
@@ -40,7 +40,7 @@ def _log(message, level='info', logger=None):
 def _get_storage_info(device_id, logger=None):
     """获取存储信息，并使用指定的logger记录日志"""
     try:
-        command = ["adb", "-s", device_id, "shell", "df", "/data"]
+        command = ["adb", "-s", device_id, "shell", "df", "/sdcard"]
         output = subprocess.check_output(command, text=True, stderr=subprocess.STDOUT)
         lines = output.strip().split('\n')
         if len(lines) < 2:
