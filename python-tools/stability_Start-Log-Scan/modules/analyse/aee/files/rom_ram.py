@@ -74,7 +74,7 @@ def _parse_capacity_text_gb(value: str) -> Optional[float]:
     if unit == "MB":
         return amount / 1024.0
     if unit == "GIB":
-        return amount * (1024.0 ** 3) / (1000.0 ** 3) if amount < 64 else amount
+        return amount * (1024.0 ** 3) / (1000.0 ** 3)
     if unit == "MIB":
         return amount / 1024.0
     return amount
@@ -141,6 +141,9 @@ def _parse_ram_gb_from_properties(properties: Dict[str, str]) -> Optional[int]:
             continue
         if key == "ro.boot.ddr_size" and raw_value.isdigit():
             physical_gb = int(raw_value) / (1024 ** 3)
+            return normalize_market_sku_gb(physical_gb, "ram")
+        if key in ("ro.boot.ddrsize", "ro.odm.tran.ddrsize") and raw_value.isdigit():
+            physical_gb = int(raw_value) / 1024.0
             return normalize_market_sku_gb(physical_gb, "ram")
         physical_gb = _parse_capacity_text_gb(raw_value)
         if physical_gb is None:

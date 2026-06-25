@@ -50,6 +50,22 @@ class RomRamParserTest(unittest.TestCase):
             ])
             self.assertEqual(parse_rom_ram_from_dec_dir(temp_dir), "32GB+3GB")
 
+    def test_large_emmc_gib_maps_to_market_sku(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            self._write_properties(temp_dir, [
+                "[ro.boot.ddrsize]: [3GB]",
+                "[ro.boot.emmc_size]: [128GiB,30560256KiB]",
+            ])
+            self.assertEqual(parse_rom_ram_from_dec_dir(temp_dir), "256GB+3GB")
+
+    def test_ddrsize_bare_mb_integer_maps_to_market_sku(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            self._write_properties(temp_dir, [
+                "[ro.boot.ddrsize]: [4096]",
+                "[ro.boot.mmcsize]: [64GB]",
+            ])
+            self.assertEqual(parse_rom_ram_from_dec_dir(temp_dir), "64GB+4GB")
+
     def test_boot_mem_parses_market_sku(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             self._write_properties(temp_dir, [
