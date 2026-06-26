@@ -722,10 +722,17 @@ class CIFSHealthProbe:
                         APP_LOGGER.error(
                             f"CIFS stat 失败(rc={result.returncode}): {self.mount_path}")
             except subprocess.TimeoutExpired:
+                # stat 超时：I/O 缓慢，与写探针超时一致，不应跳过整轮 ADB 采集
                 self.last_failure_reason = "io_slow"
                 self._last_io_slow_at = time.time()
-                APP_LOGGER.error(
-                    f"CIFS 挂载探测超时({self.probe_timeout}s): {self.mount_path} (I/O 缓慢，非挂载断开)")
+                APP_LOGGER.warning(
+                    f"CIFS stat 探测超时({self.probe_timeout}s): {self.mount_path} "
+                    "(I/O 缓慢，继续采集)")
+                self._is_healthy = True
+                self._last_healthy_time = now
+                self._last_health_check_time = now
+                self._consecutive_failures = 0
+                return True
             except Exception as e:
                 self.last_failure_reason = "error"
                 APP_LOGGER.error(f"CIFS 探测异常: {e}")
