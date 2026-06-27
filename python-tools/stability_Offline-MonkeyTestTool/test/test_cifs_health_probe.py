@@ -31,6 +31,20 @@ def test_write_probe_timeout_stays_healthy_when_stat_ok():
   assert probe.last_failure_reason == "io_slow"
 
 
+def test_stat_timeout_stays_healthy_on_slow_io():
+  module = _load_monkey_module()
+  probe = module.CIFSHealthProbe("/mnt/cifs", probe_timeout=1)
+
+  with patch.object(
+      module.subprocess,
+      "run",
+      side_effect=module.subprocess.TimeoutExpired(cmd="stat", timeout=1),
+  ):
+    assert probe.is_mount_healthy() is True
+
+  assert probe.last_failure_reason == "io_slow"
+
+
 def test_write_probe_failure_marks_unhealthy():
   module = _load_monkey_module()
   probe = module.CIFSHealthProbe("/mnt/cifs", probe_timeout=1)
