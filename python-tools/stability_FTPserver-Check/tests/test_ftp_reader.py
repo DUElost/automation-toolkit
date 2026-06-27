@@ -9,7 +9,7 @@ PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-from ftp_reader import (
+from ftp_reader_20260626 import (
     CHUNKED_DOWNLOAD_THRESHOLD,
     DEFAULT_CHUNK_COUNT,
     DEFAULT_CONFIG,
@@ -59,8 +59,10 @@ class ResolveFtpTargetTest(unittest.TestCase):
             "/MLD-LX3-16-260521V5/MonkeyAEE",
         )
         self.assertEqual(config.host, DEFAULT_CONFIG.host)
+        self.assertEqual(config.port, DEFAULT_CONFIG.port)
         self.assertEqual(remote_path, "/MLD-LX3-16-260521V5/MonkeyAEE")
-        self.assertIsNone(note)
+        self.assertIsNotNone(note)
+        self.assertIn("220.175.120.251", note)
 
 
 class ApplyKnownFtpPathAliasesTest(unittest.TestCase):
@@ -85,8 +87,8 @@ class DownloadFileWithProgressTest(unittest.TestCase):
             should_use_chunked_file_download(large, CHUNKED_DOWNLOAD_THRESHOLD, chunk_count=1)
         )
 
-    @patch("ftp_reader.download_single_file_parallel")
-    @patch("ftp_reader.download_chunked_file")
+    @patch("ftp_reader_20260626.download_single_file_parallel")
+    @patch("ftp_reader_20260626.download_chunked_file")
     def test_falls_back_when_chunked_download_fails(
         self,
         mock_chunked,
@@ -104,8 +106,8 @@ class DownloadFileWithProgressTest(unittest.TestCase):
         mock_chunked.assert_called_once()
         mock_single.assert_called_once()
 
-    @patch("ftp_reader._try_get_size", return_value=20 * 1024 * 1024)
-    @patch("ftp_reader.ftp_connection")
+    @patch("ftp_reader_20260626._try_get_size", return_value=20 * 1024 * 1024)
+    @patch("ftp_reader_20260626.ftp_connection")
     def test_chunked_download_is_truncated_when_remote_grew(
         self,
         mock_ftp_connection,
@@ -126,9 +128,9 @@ class DownloadFileWithProgressTest(unittest.TestCase):
             if local_file.exists():
                 local_file.unlink()
 
-    @patch("ftp_reader.download_single_file_parallel")
-    @patch("ftp_reader._chunked_download_is_truncated", return_value=True)
-    @patch("ftp_reader.download_chunked_file")
+    @patch("ftp_reader_20260626.download_single_file_parallel")
+    @patch("ftp_reader_20260626._chunked_download_is_truncated", return_value=True)
+    @patch("ftp_reader_20260626.download_chunked_file")
     def test_falls_back_when_chunked_download_truncated(
         self,
         mock_chunked,

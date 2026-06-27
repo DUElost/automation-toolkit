@@ -27,7 +27,7 @@ from typing import Deque, Dict, Iterable, List, Optional, Sequence, Tuple
 from openpyxl import Workbook
 from openpyxl.styles import Font
 
-from ftp_reader import (
+from ftp_reader_20260626 import (
     DEFAULT_CONFIG,
     DEFAULT_FTP_ENCODING_CANDIDATES,
     FTPConfig,
