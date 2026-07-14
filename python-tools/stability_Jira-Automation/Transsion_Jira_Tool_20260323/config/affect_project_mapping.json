@@ -23,5 +23,15 @@
     "jira_project": "X1103OS163",
     "affect_project": "X1103",
     "monkey_project": "X1103AEE"
+  },
+  "X1103B": {
+    "jira_project": "X1103BOS16",
+    "affect_project": "X1103B",
+    "monkey_project": "X1103BAEE"
+  },
+    "X6728": {
+    "jira_project": "X6728S1510",
+    "affect_project": "X6728",
+    "monkey_project": "X6728O5AEE"
   }
 }
