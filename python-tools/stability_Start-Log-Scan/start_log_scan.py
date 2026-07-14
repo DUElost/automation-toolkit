@@ -81,6 +81,7 @@ if __name__ == "__main__":
     parser.add_argument("-merge_priority", "--merge_priority", dest="merge_priority", action="store_const", const=True, default=False, metavar="是否判断优先级",
       help="是否判断优先级")
     parser.add_argument("-merge_files", dest="merge_files", metavar="合并多个已生成的xls文件", type=str, default=None, nargs="+", help="合并多个已生成的xls结果文件（_org.xls或final.xls），去重汇总输出")
+    parser.add_argument("-merge_files_list", dest="merge_files_list", metavar="文件列表路径（一行一个xls）", type=str, default=None, nargs="?", help="从文件读取待合并的xls路径列表（一行一个），适用于大量文件命令行超长场景")
     try:
         args = parser.parse_args()
         show_version = args.show_version
@@ -110,6 +111,10 @@ if __name__ == "__main__":
                 pass
 
         merge_files = args.merge_files
+        if args.merge_files_list:
+            with open(args.merge_files_list, encoding="utf-8") as _f:
+                _list_entries = [line.strip() for line in _f if line.strip()]
+            merge_files = (merge_files or []) + _list_entries
         merge_factory = args.merge_factory
         merge_excel_dir_list = args.merge_excel_dir
         merge_side = args.merge_side
