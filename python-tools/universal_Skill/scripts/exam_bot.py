@@ -9,7 +9,7 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from matching import match_options_by_text, match_stem
+from matching import match_options_by_text, match_stem, normalize_text, similarity
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_STATE = ROOT / "data" / "storage_state.json"
@@ -21,30 +21,30 @@ EXTRACT_QUESTIONS_JS = r"""
   const norm = (s) => (s || '').replace(/\s+/g, ' ').trim();
   const optionRe = /^([A-Fa-f])[\.、．\s]+(.+)$/;
   const blocks = [];
-  const candidates = Array.from(document.querySelectorAll('div, li, section, article'));
   const seen = new Set();
-  for (const el of candidates) {
-    const text = norm(el.innerText || '');
-    if (text.length < 10 || text.length > 2500) continue;
-    const lines = text.split('\n').map(norm).filter(Boolean);
-    const optIdx = lines.findIndex(l => optionRe.test(l));
-    if (optIdx < 1) continue;
+  const items = Array.from(document.querySelectorAll('.exam-content-item'));
+  items.forEach((el, domIndex) => {
+    const stemEl = el.querySelector('.exam-pre');
+    if (!stemEl) return;
+    const stem = norm(stemEl.innerText || '');
+    if (!stem) return;
     const options = [];
-    for (let i = optIdx; i < lines.length; i++) {
-      const m = lines[i].match(optionRe);
-      if (!m) {
-        if (options.length) break;
-        continue;
-      }
-      options.push({ letter: m[1].toUpperCase(), text: m[2] });
-    }
-    if (options.length < 2) continue;
-    const stem = lines.slice(0, optIdx).join('');
-    const key = stem.slice(0, 40) + '|' + options.map(o => o.text).join('|');
-    if (seen.has(key)) continue;
+    Array.from(el.querySelectorAll('.exam-option')).forEach((opt, optIndex) => {
+      const raw = norm((opt.querySelector('.multiple-choice') || opt).innerText || '');
+      const m = raw.match(optionRe);
+      if (!m) return;
+      options.push({
+        letter: m[1].toUpperCase(),
+        text: norm(m[2]),
+        optIndex,
+      });
+    });
+    if (options.length < 2) return;
+    const key = stem.slice(0, 60) + '|' + options.map(o => o.text).join('|');
+    if (seen.has(key)) return;
     seen.add(key);
-    blocks.push({ stem, options, key });
-  }
+    blocks.push({ stem, options, key, domIndex });
+  });
   return blocks;
 }
 """
@@ -57,42 +57,99 @@ def load_answers(path: Path) -> List[Dict[str, Any]]:
     return data
 
 
-def cmd_login(url: str, state_path: Path) -> int:
+def _candidate_chrome_paths() -> List[Path]:
+    local = Path.home() / "AppData" / "Local"
+    return [
+        local / "ms-playwright" / "chromium-1200" / "chrome-win64" / "chrome.exe",
+        local / "ms-playwright" / "chromium-1140" / "chrome-win" / "chrome.exe",
+        Path(r"C:\Program Files\Google\Chrome\Application\chrome.exe"),
+        Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"),
+        Path(r"C:\Program Files\Microsoft\Edge\Application\msedge.exe"),
+    ]
+
+
+def launch_browser(playwright):
+    """Launch headed Chromium; fall back to local installs if download missing."""
+    try:
+        return playwright.chromium.launch(headless=False)
+    except Exception as first_err:
+        for channel in ("chrome", "msedge"):
+            try:
+                return playwright.chromium.launch(headless=False, channel=channel)
+            except Exception:
+                pass
+        for exe in _candidate_chrome_paths():
+            if exe.is_file():
+                print(f"Using local browser: {exe}")
+                return playwright.chromium.launch(headless=False, executable_path=str(exe))
+        raise first_err
+
+
+def cmd_login(url: str, state_path: Path, wait_seconds: int = 300) -> int:
     from playwright.sync_api import sync_playwright
 
     state_path.parent.mkdir(parents=True, exist_ok=True)
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False)
+        browser = launch_browser(p)
         context = browser.new_context()
         page = context.new_page()
         page.goto(url, wait_until="domcontentloaded")
-        print("请在打开的浏览器中完成登录，并进入可答题页面。")
-        print("完成后回到终端，按 Enter 保存登录态…")
-        try:
-            input()
-        except EOFError:
-            print("未检测到交互输入，等待 90s 后保存…")
-            time.sleep(90)
+        print("请在【弹出的 Playwright 窗口】完成登录并进入考试答题页（不要用日常 Chrome）。")
+        print(f"脚本会每 3 秒检测登录态，最长等待 {wait_seconds}s…")
+        deadline = time.time() + wait_seconds
+        logged_in = False
+        while time.time() < deadline:
+            try:
+                title = page.title() or ""
+                cur = page.url or ""
+                cookies = {c["name"]: c.get("value") for c in context.cookies()}
+                islogin = cookies.get("enterprise:domainName:islogin", "")
+                on_login = ("登录" in title) or ("/login" in cur.lower())
+                if islogin.upper() == "Y" or (not on_login and "exam" in cur.lower()):
+                    # wait a bit for SPA to settle on exam page
+                    page.wait_for_timeout(2000)
+                    title2 = page.title() or ""
+                    if "登录" not in title2:
+                        logged_in = True
+                        break
+            except Exception as e:
+                print(f"poll error: {e}")
+            time.sleep(3)
+        if not logged_in:
+            print("登录超时：未检测到有效登录态，不保存 storage_state。")
+            browser.close()
+            return 2
         context.storage_state(path=str(state_path))
         browser.close()
     print(f"Saved storage state -> {state_path}")
     return 0
 
 
-def _click_option_by_text(page, option_text: str) -> bool:
-    loc = page.get_by_text(option_text, exact=False)
+def _click_option_by_text(page, option_text: str, dom_index: Optional[int] = None, opt_index: Optional[int] = None) -> bool:
+    """Click an exam option by text, preferably within a question card."""
     try:
+        if dom_index is not None and opt_index is not None:
+            item = page.locator(".exam-content-item").nth(dom_index)
+            item.scroll_into_view_if_needed(timeout=3000)
+            opt = item.locator(".exam-option").nth(opt_index)
+            opt.click(timeout=3000)
+            return True
+        if dom_index is not None:
+            item = page.locator(".exam-content-item").nth(dom_index)
+            item.scroll_into_view_if_needed(timeout=3000)
+            opt = item.locator(".exam-option").filter(has_text=option_text)
+            if opt.count():
+                opt.first.click(timeout=3000)
+                return True
+        loc = page.locator(".exam-option").filter(has_text=option_text)
         count = loc.count()
-    except Exception:
-        return False
-    for i in range(count):
-        item = loc.nth(i)
-        try:
+        for i in range(count):
+            item = loc.nth(i)
             if item.is_visible():
                 item.click(timeout=3000)
                 return True
-        except Exception:
-            continue
+    except Exception:
+        return False
     return False
 
 
@@ -104,9 +161,9 @@ def cmd_fill(
     submit: bool,
     force_submit: bool,
     dump: bool,
+    keep_open: bool = True,
 ) -> int:
     from playwright.sync_api import sync_playwright
-    from matching import similarity
 
     if not state_path.exists():
         print(f"Missing login state: {state_path}. Run: python scripts/exam_bot.py login --url ...")
@@ -135,11 +192,31 @@ def cmd_fill(
     }
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False)
+        browser = launch_browser(p)
         context = browser.new_context(storage_state=str(state_path))
         page = context.new_page()
         page.goto(url, wait_until="networkidle")
         page.wait_for_timeout(2000)
+        try:
+            page.wait_for_selector(".exam-content-item .exam-pre", timeout=15000)
+        except Exception:
+            print("Warning: exam question cards not found yet")
+
+        # Expand sections via answer-card numbers (1..60) so all cards mount.
+        aside = page.locator(".exam-content-aside, .exam-content-right")
+        for n in (20, 40, 60, 1):
+            try:
+                target = aside.get_by_text(str(n), exact=True)
+                if target.count():
+                    target.first.click(timeout=2000)
+                    page.wait_for_timeout(800)
+            except Exception as e:
+                print(f"Sidebar num {n} click skipped: {e}")
+
+        page.evaluate("() => window.scrollTo(0, document.body.scrollHeight)")
+        page.wait_for_timeout(600)
+        page.evaluate("() => window.scrollTo(0, 0)")
+        page.wait_for_timeout(300)
 
         if dump:
             SCREENSHOT_DIR.mkdir(parents=True, exist_ok=True)
@@ -151,6 +228,8 @@ def cmd_fill(
         questions = page.evaluate(EXTRACT_QUESTIONS_JS)
         print(f"Detected {len(questions)} question blocks on page")
 
+        filled_keys = set()
+        any_questions = bool(questions)
         if not questions:
             print("No questions detected; use --dump to inspect DOM")
             report["unmatched"].append({"stem": "", "best": 0, "second": 0, "reason": "no_questions"})
@@ -158,7 +237,20 @@ def cmd_fill(
             for q in questions:
                 page_stem = q.get("stem") or ""
                 page_options = q.get("options") or []
-                hit = match_stem(page_stem, bank, threshold=threshold, min_gap=0.05)
+                dom_index = q.get("domIndex")
+                qkey = (
+                    normalize_text(page_stem),
+                    tuple(normalize_text(o.get("text", "")) for o in page_options),
+                )
+                if qkey in filled_keys:
+                    continue
+                hit = match_stem(
+                    page_stem,
+                    bank,
+                    threshold=threshold,
+                    min_gap=0.05,
+                    page_option_texts=[o.get("text", "") for o in page_options],
+                )
                 if hit is None:
                     scored = sorted(
                         ((similarity(page_stem, b.get("stem", "")), b) for b in bank),
@@ -167,7 +259,11 @@ def cmd_fill(
                     )
                     best = scored[0][0] if scored else 0
                     second = scored[1][0] if len(scored) > 1 else 0
-                    bucket = "ambiguous" if best >= threshold and best - second < 0.05 else "unmatched"
+                    bucket = (
+                        "ambiguous"
+                        if best >= threshold and best - second < 0.05
+                        else "unmatched"
+                    )
                     report[bucket].append({"stem": page_stem, "best": best, "second": second})
                     continue
 
@@ -184,13 +280,36 @@ def cmd_fill(
 
                 ok_all = True
                 for i in idxs:
-                    text = page_options[i]["text"]
-                    if not _click_option_by_text(page, text):
+                    opt = page_options[i]
+                    text = opt["text"]
+                    opt_index = opt.get("optIndex", i)
+                    if not _click_option_by_text(
+                        page,
+                        text,
+                        dom_index=dom_index,
+                        opt_index=opt_index,
+                    ):
                         ok_all = False
+                    page.wait_for_timeout(120)
                 if ok_all:
+                    filled_keys.add(qkey)
                     report["filled"].append({"stem": page_stem, "answers": hit["answer_texts"]})
                 else:
                     report["option_miss"].append({"stem": page_stem, "want": hit["answer_texts"]})
+
+            # Read progress text for sanity
+            try:
+                prog = page.evaluate(
+                    r"""() => {
+                      const t = document.body.innerText || '';
+                      const m = t.match(/当前答题\s*\d+\s*\/\s*\d+/) || t.match(/\d+\s*\/\s*60/);
+                      return m ? m[0] : '';
+                    }"""
+                )
+                if prog:
+                    print(f"Page progress: {prog}")
+            except Exception:
+                pass
 
         problems = report["unmatched"] + report["ambiguous"] + report["option_miss"]
         print(json.dumps({k: len(v) for k, v in report.items()}, ensure_ascii=False))
@@ -203,36 +322,47 @@ def cmd_fill(
             if problems and not force_submit:
                 reason = (
                     "no questions detected"
-                    if not questions
+                    if not any_questions
                     else "unmatched/ambiguous/option_miss exist"
                 )
                 print(f"Refuse --submit because {reason}. Use --force-submit to override.")
-                browser.close()
-                return 1
-            clicked = False
-            for label in ("交卷", "提交", "提交试卷", "确认交卷"):
-                btn = page.get_by_role("button", name=label)
-                if btn.count() == 0:
-                    btn = page.get_by_text(label, exact=False)
-                if btn.count():
-                    try:
-                        btn.first.click(timeout=3000)
-                        page.wait_for_timeout(500)
-                        for conf in ("确认", "确定", "是"):
-                            c = page.get_by_role("button", name=conf)
-                            if c.count():
-                                c.first.click(timeout=2000)
-                                break
-                        clicked = True
-                        break
-                    except Exception as e:
-                        print(f"Submit click failed for {label}: {e}")
-            if not clicked:
-                print("Submit button not found")
-                browser.close()
-                return 1
+                # keep browser open for manual review when keep_open
+            else:
+                clicked = False
+                for label in ("交卷", "提交", "提交试卷", "确认交卷"):
+                    btn = page.get_by_role("button", name=label)
+                    if btn.count() == 0:
+                        btn = page.get_by_text(label, exact=False)
+                    if btn.count():
+                        try:
+                            btn.first.click(timeout=3000)
+                            page.wait_for_timeout(500)
+                            for conf in ("确认", "确定", "是"):
+                                c = page.get_by_role("button", name=conf)
+                                if c.count():
+                                    c.first.click(timeout=2000)
+                                    break
+                            clicked = True
+                            break
+                        except Exception as e:
+                            print(f"Submit click failed for {label}: {e}")
+                if not clicked:
+                    print("Submit button not found")
+                else:
+                    page.wait_for_timeout(1000)
 
-        browser.close()
+        if keep_open:
+            print("填答完成，浏览器保持打开，请核对后手动交卷。")
+            print("关闭浏览器窗口结束脚本；或在此终端按 Enter 关闭浏览器。")
+            try:
+                input()
+                if browser.is_connected():
+                    browser.close()
+            except EOFError:
+                while browser.is_connected():
+                    time.sleep(1)
+        else:
+            browser.close()
 
     return 1 if problems else 0
 
@@ -244,6 +374,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     p_login = sub.add_parser("login", help="Manual login and save storage state")
     p_login.add_argument("--url", required=True)
     p_login.add_argument("--state", default=str(DEFAULT_STATE))
+    p_login.add_argument("--wait", type=int, default=180, help="Seconds to wait if stdin has no Enter")
 
     p_fill = sub.add_parser("fill", help="Fill answers from answers.json")
     p_fill.add_argument("--url", required=True)
@@ -253,10 +384,15 @@ def main(argv: Optional[List[str]] = None) -> int:
     p_fill.add_argument("--submit", action="store_true")
     p_fill.add_argument("--force-submit", action="store_true")
     p_fill.add_argument("--dump", action="store_true", help="Dump HTML/screenshot for selector tuning")
+    p_fill.add_argument(
+        "--close",
+        action="store_true",
+        help="Close browser after fill (default: keep open for review)",
+    )
 
     args = parser.parse_args(argv)
     if args.cmd == "login":
-        return cmd_login(args.url, Path(args.state))
+        return cmd_login(args.url, Path(args.state), wait_seconds=args.wait)
     if args.cmd == "fill":
         return cmd_fill(
             url=args.url,
@@ -266,6 +402,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             submit=args.submit,
             force_submit=args.force_submit,
             dump=args.dump,
+            keep_open=not args.close,
         )
     return 2
 

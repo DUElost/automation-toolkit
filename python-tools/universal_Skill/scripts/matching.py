@@ -37,8 +37,13 @@ def match_stem(
     bank: Sequence[Dict[str, Any]],
     threshold: float = 0.72,
     min_gap: float = 0.05,
+    page_option_texts: Optional[Sequence[str]] = None,
 ) -> Optional[Dict[str, Any]]:
-    """Return best bank item or None if below threshold / ambiguous."""
+    """Return best bank item or None if below threshold / ambiguous.
+
+    When stems collide, disambiguate by overlap between page option texts
+    and bank option texts (ignores letters).
+    """
     scored = []
     for item in bank:
         stem = item.get("stem") or item.get("stem_raw") or ""
@@ -50,9 +55,30 @@ def match_stem(
     second = scored[1][0] if len(scored) > 1 else 0.0
     if best_score < threshold:
         return None
-    if best_score - second < min_gap:
+    if best_score - second >= min_gap:
+        return best
+
+    # Ambiguous stems: try option-set overlap
+    if not page_option_texts:
         return None
-    return best
+    page_norms = {normalize_text(t) for t in page_option_texts if t}
+    if not page_norms:
+        return None
+    tied = [item for score, item in scored if abs(score - best_score) < min_gap]
+    best_item = None
+    best_overlap = -1.0
+    for item in tied:
+        opts = item.get("options") or []
+        bank_norms = {normalize_text(o.get("text", "")) for o in opts if o.get("text")}
+        if not bank_norms:
+            continue
+        overlap = len(page_norms & bank_norms) / max(len(page_norms | bank_norms), 1)
+        if overlap > best_overlap:
+            best_overlap = overlap
+            best_item = item
+    if best_item is not None and best_overlap >= 0.5:
+        return best_item
+    return None
 
 
 def match_options_by_text(

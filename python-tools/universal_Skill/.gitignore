@@ -1,6 +1,9 @@
 data/storage_state.json
 data/answers.json
 data/last_report.json
+data/verify_*.json
+data/verify_*.txt
+data/icon_classes.json
 data/screenshots/
 __pycache__/
 *.pyc

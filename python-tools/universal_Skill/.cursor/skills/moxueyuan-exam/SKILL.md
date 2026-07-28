@@ -29,7 +29,7 @@ description: Fill Tinno moxueyuan online exams using local answer bank (7月考�
 ## 规则
 
 1. **选项按文字匹配**，忽略页面 A/B/C/D 字母。
-2. **默认不交卷**。只有用户明确要求且使用 `--submit`；若报告有问题，不要加 `--force-submit`，除非用户再次明确同意。
+2. **默认不交卷**。填完后浏览器保持打开供核对；只有用户明确要求才用 `--submit`。若报告有问题，不要加 `--force-submit`，除非用户再次明确同意。自动化场景需要立即关浏览器时加 `--close`。
 3. 登录态失效时重跑 `login`，不要索要或保存账号密码。
 4. 页面抽题失败时：`fill --dump`，根据 `data/screenshots/page.html` 调整 `exam_bot.py` 中 `EXTRACT_QUESTIONS_JS`。
 
