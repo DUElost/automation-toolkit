@@ -4,17 +4,21 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from matching import match_options_by_text, match_stem, normalize_text, similarity
+from qr_decode import decode_qr
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_STATE = ROOT / "data" / "storage_state.json"
 DEFAULT_ANSWERS = ROOT / "data" / "answers.json"
 SCREENSHOT_DIR = ROOT / "data" / "screenshots"
+DEFAULT_LOGIN_URL = "https://tinno.study.moxueyuan.com/login"
+STUDY_EXAM_URL_TMPL = "https://tinno.study.moxueyuan.com/task/exam/questions/{exam_id}"
 
 EXTRACT_QUESTIONS_JS = r"""
 () => {
@@ -85,6 +89,71 @@ def launch_browser(playwright):
         raise first_err
 
 
+def extract_exam_id(url: str) -> Optional[str]:
+    """Extract exam id from ceping?id= / questions/<id> / similar URLs."""
+    from urllib.parse import parse_qs, urlparse
+
+    parsed = urlparse(url)
+    qs = parse_qs(parsed.query)
+    if qs.get("id"):
+        return str(qs["id"][0]).strip()
+    m = re.search(r"/questions/(\d+)", parsed.path or "")
+    if m:
+        return m.group(1)
+    m = re.search(r"[?&]id=(\d+)", url)
+    if m:
+        return m.group(1)
+    return None
+
+
+def to_study_exam_url(url: str) -> str:
+    """Map share/mobile entry URL to PC study exam questions page."""
+    eid = extract_exam_id(url)
+    if not eid:
+        return str(url).strip()
+    study = STUDY_EXAM_URL_TMPL.format(exam_id=eid)
+    already = "study.moxueyuan.com" in url and f"/questions/{eid}" in url
+    if not already:
+        print(f"Normalized exam URL -> {study}")
+    return study
+
+
+def resolve_exam_url(url: Optional[str] = None, qr: Optional[str] = None) -> str:
+    """Resolve exam page URL from --url or --qr, normalized to study domain."""
+    if bool(url) == bool(qr):
+        raise ValueError("Provide exactly one of --url or --qr")
+    if qr:
+        image = Path(qr)
+        if not image.is_file():
+            alt = ROOT / qr
+            if alt.is_file():
+                image = alt
+        decoded = decode_qr(image)
+        print(f"QR decoded -> {decoded}")
+        return to_study_exam_url(decoded)
+    return to_study_exam_url(str(url).strip())
+
+
+def resolve_login_url(url: Optional[str] = None) -> str:
+    """PC login page with 扫码登录 (default study login)."""
+    return (url or DEFAULT_LOGIN_URL).strip()
+
+
+def is_logged_in(page, context) -> bool:
+    title = page.title() or ""
+    cur = page.url or ""
+    cookies = {c["name"]: c.get("value") for c in context.cookies()}
+    islogin = str(cookies.get("enterprise:domainName:islogin", "")).upper()
+    on_login = ("登录" in title) or ("/login" in cur.lower())
+    if on_login:
+        return False
+    if islogin == "Y":
+        return True
+    if "exam" in cur.lower() or "ceping" in cur.lower() or "questions" in cur.lower():
+        return True
+    return False
+
+
 def cmd_login(url: str, state_path: Path, wait_seconds: int = 300) -> int:
     from playwright.sync_api import sync_playwright
 
@@ -94,22 +163,16 @@ def cmd_login(url: str, state_path: Path, wait_seconds: int = 300) -> int:
         context = browser.new_context()
         page = context.new_page()
         page.goto(url, wait_until="domcontentloaded")
-        print("请在【弹出的 Playwright 窗口】完成登录并进入考试答题页（不要用日常 Chrome）。")
+        print(f"已打开登录页: {url}")
+        print("请在【弹出的 Playwright 窗口】使用「扫码登录」完成认证（不要用日常 Chrome）。")
         print(f"脚本会每 3 秒检测登录态，最长等待 {wait_seconds}s…")
         deadline = time.time() + wait_seconds
         logged_in = False
         while time.time() < deadline:
             try:
-                title = page.title() or ""
-                cur = page.url or ""
-                cookies = {c["name"]: c.get("value") for c in context.cookies()}
-                islogin = cookies.get("enterprise:domainName:islogin", "")
-                on_login = ("登录" in title) or ("/login" in cur.lower())
-                if islogin.upper() == "Y" or (not on_login and "exam" in cur.lower()):
-                    # wait a bit for SPA to settle on exam page
-                    page.wait_for_timeout(2000)
-                    title2 = page.title() or ""
-                    if "登录" not in title2:
+                if is_logged_in(page, context):
+                    page.wait_for_timeout(1500)
+                    if is_logged_in(page, context):
                         logged_in = True
                         break
             except Exception as e:
@@ -162,12 +225,16 @@ def cmd_fill(
     force_submit: bool,
     dump: bool,
     keep_open: bool = True,
+    login_wait: int = 300,
 ) -> int:
     from playwright.sync_api import sync_playwright
 
     if not state_path.exists():
-        print(f"Missing login state: {state_path}. Run: python scripts/exam_bot.py login --url ...")
-        return 2
+        print(f"Missing login state: {state_path}")
+        print(f"Starting PC 扫码登录: {DEFAULT_LOGIN_URL}")
+        rc = cmd_login(DEFAULT_LOGIN_URL, state_path, wait_seconds=login_wait)
+        if rc != 0:
+            return rc
 
     try:
         bank = load_answers(answers_path)
@@ -197,6 +264,22 @@ def cmd_fill(
         page = context.new_page()
         page.goto(url, wait_until="networkidle")
         page.wait_for_timeout(2000)
+
+        if not is_logged_in(page, context):
+            print("Login state invalid or expired; starting PC 扫码登录…")
+            browser.close()
+            rc = cmd_login(DEFAULT_LOGIN_URL, state_path, wait_seconds=login_wait)
+            if rc != 0:
+                return rc
+            browser = launch_browser(p)
+            context = browser.new_context(storage_state=str(state_path))
+            page = context.new_page()
+            page.goto(url, wait_until="networkidle")
+            page.wait_for_timeout(2000)
+            if not is_logged_in(page, context):
+                print("Still not logged in after login flow.")
+                browser.close()
+                return 2
         try:
             page.wait_for_selector(".exam-content-item .exam-pre", timeout=15000)
         except Exception:
@@ -367,17 +450,30 @@ def cmd_fill(
     return 1 if problems else 0
 
 
+def _add_exam_entry_args(parser: argparse.ArgumentParser) -> None:
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("--url", help="Exam page URL (will normalize to study questions page when possible)")
+    group.add_argument("--qr", help="Path to exam entry QR code image")
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="Moxueyuan exam bot")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
-    p_login = sub.add_parser("login", help="Manual login and save storage state")
-    p_login.add_argument("--url", required=True)
+    p_login = sub.add_parser(
+        "login",
+        help=f"Pre-login via PC 扫码登录 (default {DEFAULT_LOGIN_URL})",
+    )
+    p_login.add_argument(
+        "--url",
+        default=DEFAULT_LOGIN_URL,
+        help=f"Login page URL (default: {DEFAULT_LOGIN_URL})",
+    )
     p_login.add_argument("--state", default=str(DEFAULT_STATE))
-    p_login.add_argument("--wait", type=int, default=180, help="Seconds to wait if stdin has no Enter")
+    p_login.add_argument("--wait", type=int, default=300, help="Max seconds to wait for login")
 
     p_fill = sub.add_parser("fill", help="Fill answers from answers.json")
-    p_fill.add_argument("--url", required=True)
+    _add_exam_entry_args(p_fill)
     p_fill.add_argument("--answers", default=str(DEFAULT_ANSWERS))
     p_fill.add_argument("--state", default=str(DEFAULT_STATE))
     p_fill.add_argument("--threshold", type=float, default=0.72)
@@ -389,13 +485,23 @@ def main(argv: Optional[List[str]] = None) -> int:
         action="store_true",
         help="Close browser after fill (default: keep open for review)",
     )
+    p_fill.add_argument("--wait", type=int, default=300, help="Max seconds for auto-login fallback")
 
     args = parser.parse_args(argv)
+
     if args.cmd == "login":
-        return cmd_login(args.url, Path(args.state), wait_seconds=args.wait)
+        login_url = resolve_login_url(getattr(args, "url", None))
+        print(f"Login URL -> {login_url}")
+        return cmd_login(login_url, Path(args.state), wait_seconds=args.wait)
+
     if args.cmd == "fill":
+        try:
+            exam_url = resolve_exam_url(url=getattr(args, "url", None), qr=getattr(args, "qr", None))
+        except Exception as e:
+            print(f"ERROR: {e}")
+            return 2
         return cmd_fill(
-            url=args.url,
+            url=exam_url,
             answers_path=Path(args.answers),
             state_path=Path(args.state),
             threshold=args.threshold,
@@ -403,6 +509,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             force_submit=args.force_submit,
             dump=args.dump,
             keep_open=not args.close,
+            login_wait=args.wait,
         )
     return 2
 
