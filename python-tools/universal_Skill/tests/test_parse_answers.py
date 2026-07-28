@@ -34,6 +34,19 @@ def test_parse_multi():
     assert len(items[2]["answer_texts"]) == 3
 
 
+def test_jiexi_block_does_not_leak_into_next_question():
+    items = parse_answers_text(FIXTURE)
+    marker = "针对有场景触发的问题，测试必须要备注清楚前置条件"
+    assert items[1]["stem_raw"] == "由于测试环境产生的bug单，应操作reject（ ）"
+    assert marker not in items[1]["stem_raw"]
+    for opt in items[1]["options"]:
+        assert marker not in opt["text"]
+    for item in items:
+        assert marker not in item["stem_raw"]
+        for opt in item["options"]:
+            assert marker not in opt["text"]
+
+
 def test_parse_full_july_file_has_many_items():
     text = (ROOT / "7月考试.txt").read_text(encoding="utf-8")
     items = parse_answers_text(text)
