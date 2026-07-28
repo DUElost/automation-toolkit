@@ -1,0 +1,9 @@
+data/storage_state.json
+data/answers.json
+data/screenshots/
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+*.log
