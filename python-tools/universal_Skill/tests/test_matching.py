@@ -25,7 +25,7 @@ def test_match_stem_ignores_order():
 def test_match_options_by_text_ignores_letters():
     page_options = [
         {"letter": "A", "text": "Wi-Fi连接不稳定", "locator_hint": 0},
-        {"letter": "B", "text": "死机", "locator_hint": 1},
+        {"letter": "B", "text": "B. 死机", "locator_hint": 1},
         {"letter": "C", "text": "重启", "locator_hint": 2},
     ]
     idxs = match_options_by_text(["死机"], page_options, threshold=0.9)
@@ -33,11 +33,9 @@ def test_match_options_by_text_ignores_letters():
 
 
 def test_match_stem_ambiguous_returns_none():
-    # Identical stems force gap=0 so match_stem returns None (ambiguous).
-    same = normalize_text("关于MTBF测项的通过标准描述")
     bank = [
-        {"stem": same, "id": 1},
-        {"stem": same, "id": 2},
+        {"stem": normalize_text("关于MTBF测项的通过标准"), "id": 1},
+        {"stem": normalize_text("关于MTBF测项的通过标准描述"), "id": 2},
     ]
-    hit = match_stem("关于MTBF测项的通过标准描述正确的是", bank, threshold=0.5, min_gap=0.05)
-    assert hit is None  # ambiguous
+    hit = match_stem("关于MTBF测项的通过标准描述正确的是", bank, threshold=0.5, min_gap=0.08)
+    assert hit is None  # ambiguous near-duplicates

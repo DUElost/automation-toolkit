@@ -8,12 +8,14 @@ from difflib import SequenceMatcher
 from typing import Any, Dict, List, Optional, Sequence
 
 
-_PUNCT_RE = re.compile(r"[\s\u3000]+|[，。！？、；：""''（）\(\)\[\]【】《》<>·…—\-_,\.:;!\?\"']+")
-_LEADING_NUM_RE = re.compile(r"^\d+[\.、．]\s*")
-_OPTION_PREFIX_RE = re.compile(r"^[A-Fa-f][\.、．\s]+")
+_PUNCT_RE = re.compile(
+    r'[\s\u3000]+|[，。！？、；：\u201c\u201d\u2018\u2019（）()[\]【】《》<>·…—\-_.,:;!?\'"]+'
+)
+_LEADING_NUM_RE = re.compile(r'^\d+[\.、．]\s*')
+_OPTION_PREFIX_RE = re.compile(r'^[A-Fa-f][\.、．\s]+')
 
 
-def normalize_text(text: str) -> str:
+def normalize_text(text: Optional[str]) -> str:
     if text is None:
         return ""
     s = unicodedata.normalize("NFKC", str(text)).strip()
