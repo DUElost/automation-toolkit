@@ -15,6 +15,7 @@ FTP 读取工具
 """
 
 import argparse
+import errno
 import os
 import logging
 import socket
@@ -29,7 +30,7 @@ from io import BytesIO
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Callable, Dict, Generator, Iterable, List, Optional, Tuple, TypeVar
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 
 
 T = TypeVar("T")
@@ -40,6 +41,21 @@ DOWNLOAD_BLOCKSIZE = 256 * 1024
 DEFAULT_MAX_WORKERS = 4
 CHUNKED_DOWNLOAD_THRESHOLD = 10 * 1024 * 1024
 DEFAULT_CHUNK_COUNT = 4
+DOWNLOAD_MAX_RETRIES = 5
+DOWNLOAD_RETRY_BASE_DELAY = 3.0
+# Windows / POSIX transient network errors commonly seen on large FTP transfers
+_TRANSIENT_WINERRORS = frozenset({10053, 10054, 10060, 10061, 10065})
+_TRANSIENT_ERRNOS = frozenset(
+    {
+        errno.ECONNRESET,
+        errno.ETIMEDOUT,
+        errno.ECONNABORTED,
+        errno.ECONNREFUSED,
+        getattr(errno, "EHOSTUNREACH", 113),
+        getattr(errno, "ENETUNREACH", 101),
+        getattr(errno, "EPIPE", 32),
+    }
+)
 SUSPICIOUS_MOJIBAKE_PATTERNS = (
     "涓",
     "鏂",
@@ -121,6 +137,10 @@ class DownloadProgress:
         with self._lock:
             self.completed_bytes += delta
 
+    def set_bytes(self, value: int) -> None:
+        with self._lock:
+            self.completed_bytes = max(0, int(value))
+
     def snapshot(self) -> Tuple[int, int, float]:
         with self._lock:
             return self.completed_files, self.completed_bytes, time.time() - self._start_time
@@ -161,7 +181,7 @@ class FTPConfig:
     username: str
     password: str
     ftp_encoding: str = "auto"
-    timeout: int = 30
+    timeout: int = 120
 
 
 DEFAULT_CONFIG = FTPConfig(
@@ -231,11 +251,18 @@ def apply_known_ftp_credentials(config: FTPConfig) -> FTPConfig:
     credentials = KNOWN_FTP_CREDENTIALS.get((config.host, config.port))
     if credentials is None:
         return config
-    if config.username != DEFAULT_CONFIG.username or config.password != DEFAULT_CONFIG.password:
+    known_user, known_pass = credentials
+
+    # Explicit password from CLI/URL wins.
+    if config.password != DEFAULT_CONFIG.password:
         return config
 
-    username, password = credentials
-    return replace(config, username=username, password=password)
+    # Password still default: fill known password when username is default or matches known.
+    if config.username == DEFAULT_CONFIG.username:
+        return replace(config, username=known_user, password=known_pass)
+    if config.username == known_user:
+        return replace(config, password=known_pass)
+    return config
 
 
 def apply_known_ftp_path_aliases(config: FTPConfig, remote_path: str) -> str:
@@ -357,6 +384,7 @@ class DownloadResult:
     path_type: str
     file_count: int = 0
     dir_count: int = 0
+    skipped: bool = False
 
 
 @dataclass
@@ -523,15 +551,32 @@ def download_single_file(
     progress: "Optional[DownloadProgress]" = None,
 ) -> None:
     local_file.parent.mkdir(parents=True, exist_ok=True)
+    remote_size = _try_get_size(ftp, remote_file)
+    if _is_local_download_complete(local_file, remote_size):
+        if progress is not None:
+            progress.set_bytes(remote_size)
+        return
     temp_file = local_file.with_name(f"{local_file.name}.part")
-    try:
-        with temp_file.open("wb") as file_obj:
-            _write_with_progress(ftp, remote_file, file_obj, progress)
-        temp_file.replace(local_file)
-    except Exception:
-        if temp_file.exists():
-            temp_file.unlink()
-        raise
+    existing = _part_file_size(temp_file)
+    if remote_size > 0 and existing > remote_size:
+        temp_file.unlink()
+        existing = 0
+    if existing > 0:
+        if progress is not None:
+            progress.set_bytes(existing)
+    with temp_file.open("ab" if existing > 0 else "wb") as file_obj:
+        _write_with_progress(
+            ftp,
+            remote_file,
+            file_obj,
+            progress,
+            rest=existing if existing > 0 else None,
+        )
+    if remote_size > 0 and _part_file_size(temp_file) < remote_size:
+        raise ConnectionError(
+            f"下载中断：{_format_size(_part_file_size(temp_file))}/{_format_size(remote_size)}"
+        )
+    temp_file.replace(local_file)
 
 
 def resolve_local_download_path(remote_info: RemotePathInfo, local_path: Optional[Path]) -> Path:
@@ -627,6 +672,8 @@ def download_remote_file(
 
 def format_download_message(result: DownloadResult) -> str:
     resolved_local_path = result.local_path.resolve()
+    if result.skipped:
+        return f"已跳过下载（本地文件完整）：{resolved_local_path}"
     if result.path_type == "directory":
         return (
             f"递归下载完成：{resolved_local_path} "
@@ -766,18 +813,110 @@ def walk_remote_tree(ftp: FTP, remote_dir: str) -> "List[Tuple[str, str, int]]":
     return files
 
 
+def _is_transient_network_error(exc: BaseException) -> bool:
+    """Return True for disconnect/timeout/unreachable errors worth retrying."""
+    if isinstance(
+        exc,
+        (socket.timeout, TimeoutError, ConnectionError, BrokenPipeError, ConnectionResetError),
+    ):
+        return True
+    if isinstance(exc, OSError):
+        winerror = getattr(exc, "winerror", None)
+        if winerror in _TRANSIENT_WINERRORS:
+            return True
+        if getattr(exc, "errno", None) in _TRANSIENT_ERRNOS:
+            return True
+    text = str(exc).lower()
+    markers = (
+        "10053",
+        "10054",
+        "10060",
+        "10061",
+        "10065",
+        "timed out",
+        "timeout",
+        "connection reset",
+        "forcibly closed",
+        "broken pipe",
+        "unreachable",
+    )
+    return any(marker in text for marker in markers)
+
+
+def _call_with_retries(
+    action: Callable[[], T],
+    *,
+    label: str,
+    max_retries: int = DOWNLOAD_MAX_RETRIES,
+) -> T:
+    last_exc: Optional[BaseException] = None
+    for attempt in range(1, max_retries + 1):
+        try:
+            return action()
+        except Exception as exc:
+            last_exc = exc
+            if not _is_transient_network_error(exc) or attempt >= max_retries:
+                raise
+            delay = DOWNLOAD_RETRY_BASE_DELAY * (2 ** (attempt - 1))
+            _safe_print(
+                f"[warn] {label} 失败，{delay:.0f}s 后重试 ({attempt}/{max_retries})：{exc}\n"
+            )
+            time.sleep(delay)
+    assert last_exc is not None
+    raise last_exc
+
+
+def _part_file_size(path: Path) -> int:
+    try:
+        return path.stat().st_size if path.is_file() else 0
+    except OSError:
+        return 0
+
+
+def _is_local_download_complete(local_file: Path, file_size: int) -> bool:
+    return file_size > 0 and local_file.is_file() and local_file.stat().st_size >= file_size
+
+
+def _commit_part_file(temp_file: Path, local_file: Path) -> None:
+    temp_file.replace(local_file)
+
+
+def _cleanup_chunk_part_files(local_file: Path, chunk_count: int) -> None:
+    for index in range(chunk_count):
+        part_file = local_file.with_name(f"{local_file.name}.part{index:04d}")
+        if part_file.exists():
+            try:
+                part_file.unlink()
+            except OSError:
+                pass
+
+
 def _write_with_progress(
-    ftp: FTP, remote_file: str, file_obj, progress: "Optional[DownloadProgress]"
+    ftp: FTP,
+    remote_file: str,
+    file_obj,
+    progress: "Optional[DownloadProgress]",
+    rest: Optional[int] = None,
 ) -> None:
     if progress is None:
-        ftp.retrbinary(f"RETR {remote_file}", file_obj.write, blocksize=DOWNLOAD_BLOCKSIZE)
+        ftp.retrbinary(
+            f"RETR {remote_file}",
+            file_obj.write,
+            blocksize=DOWNLOAD_BLOCKSIZE,
+            rest=rest,
+        )
         return
 
     def _cb(data: bytes) -> None:
         file_obj.write(data)
         progress.add_bytes(len(data))
 
-    ftp.retrbinary(f"RETR {remote_file}", _cb, blocksize=DOWNLOAD_BLOCKSIZE)
+    ftp.retrbinary(
+        f"RETR {remote_file}",
+        _cb,
+        blocksize=DOWNLOAD_BLOCKSIZE,
+        rest=rest,
+    )
 
 
 def download_single_file_parallel(
@@ -785,18 +924,56 @@ def download_single_file_parallel(
     remote_file: str,
     local_file: Path,
     progress: "Optional[DownloadProgress]" = None,
+    file_size: int = 0,
 ) -> None:
-    with ftp_connection(config) as ftp:
-        local_file.parent.mkdir(parents=True, exist_ok=True)
-        temp_file = local_file.with_name(f"{local_file.name}.part")
-        try:
-            with temp_file.open("wb") as fh:
-                _write_with_progress(ftp, remote_file, fh, progress)
-            temp_file.replace(local_file)
-        except Exception:
-            if temp_file.exists():
-                temp_file.unlink()
-            raise
+    local_file.parent.mkdir(parents=True, exist_ok=True)
+    if _is_local_download_complete(local_file, file_size):
+        _safe_print(f"[skip] 已存在完整文件：{local_file.name} ({_format_size(file_size)})\n")
+        if progress is not None:
+            progress.set_bytes(file_size)
+        return
+
+    temp_file = local_file.with_name(f"{local_file.name}.part")
+    existing = _part_file_size(temp_file)
+    if file_size > 0 and existing > file_size:
+        temp_file.unlink()
+        existing = 0
+    if existing > 0:
+        _safe_print(f"[resume] 从 {_format_size(existing)} 继续：{local_file.name}\n")
+        if progress is not None:
+            progress.set_bytes(existing)
+
+    def _attempt() -> None:
+        current = _part_file_size(temp_file)
+        if file_size > 0 and current >= file_size:
+            _commit_part_file(temp_file, local_file)
+            return
+        with ftp_connection(config) as ftp:
+            try:
+                with temp_file.open("ab" if current > 0 else "wb") as fh:
+                    _write_with_progress(
+                        ftp,
+                        remote_file,
+                        fh,
+                        progress,
+                        rest=current if current > 0 else None,
+                    )
+            except Exception as exc:
+                # Data may already be complete while control channel times out on 226.
+                if file_size > 0 and _part_file_size(temp_file) >= file_size:
+                    _safe_print(
+                        f"[warn] 数据已收齐，忽略收尾错误：{local_file.name} ({exc})\n"
+                    )
+                else:
+                    raise
+            final_size = _part_file_size(temp_file)
+            if file_size > 0 and final_size < file_size:
+                raise ConnectionError(
+                    f"下载中断：{_format_size(final_size)}/{_format_size(file_size)}"
+                )
+            _commit_part_file(temp_file, local_file)
+
+    _call_with_retries(_attempt, label=f"单连接下载 {remote_file}")
 
 
 def download_chunked_file(
@@ -807,6 +984,19 @@ def download_chunked_file(
     chunk_count: int = DEFAULT_CHUNK_COUNT,
     progress: "Optional[DownloadProgress]" = None,
 ) -> None:
+    if _is_local_download_complete(local_file, file_size):
+        _safe_print(f"[skip] 已存在完整文件：{local_file.name} ({_format_size(file_size)})\n")
+        if progress is not None:
+            progress.set_bytes(file_size)
+        _cleanup_chunk_part_files(local_file, chunk_count)
+        part = local_file.with_name(f"{local_file.name}.part")
+        if part.exists():
+            try:
+                part.unlink()
+            except OSError:
+                pass
+        return
+
     chunk_size = file_size // chunk_count
     chunks: "List[Tuple[int, int]]" = []
     for i in range(chunk_count):
@@ -815,63 +1005,100 @@ def download_chunked_file(
         chunks.append((start, end))
 
     local_file.parent.mkdir(parents=True, exist_ok=True)
-    part_files: "List[Tuple[int, Path]]" = []
+    part_paths = [
+        local_file.with_name(f"{local_file.name}.part{index:04d}")
+        for index in range(len(chunks))
+    ]
+
+    resumed = 0
+    for (start, end), part_file in zip(chunks, part_paths):
+        expected = end - start + 1
+        existing = _part_file_size(part_file)
+        if existing > expected:
+            part_file.unlink()
+            existing = 0
+        resumed += min(existing, expected)
+    if resumed > 0:
+        _safe_print(
+            f"[resume] 分块已下载 {_format_size(resumed)}/{_format_size(file_size)}，继续传输\n"
+        )
+        if progress is not None:
+            progress.set_bytes(resumed)
 
     def _download_chunk(start: int, end: int, index: int) -> Path:
-        part_file = local_file.with_name(f"{local_file.name}.part{index:04d}")
+        part_file = part_paths[index]
         expected = end - start + 1
-        with ftp_connection(config) as ftp:
-            ftp.voidcmd("TYPE I")
-            with part_file.open("wb") as fh:
-                with ftp.transfercmd(f"RETR {remote_file}", rest=start) as conn:
-                    bytes_read = 0
-                    while bytes_read < expected:
-                        chunk_data = conn.recv(min(DOWNLOAD_BLOCKSIZE, expected - bytes_read))
-                        if not chunk_data:
-                            break
-                        fh.write(chunk_data)
-                        bytes_read += len(chunk_data)
-                        if progress is not None:
-                            progress.add_bytes(len(chunk_data))
+
+        def _attempt() -> Path:
+            existing = _part_file_size(part_file)
+            if existing > expected:
+                part_file.unlink()
+                existing = 0
+            if existing == expected:
+                return part_file
+
+            with ftp_connection(config) as ftp:
+                ftp.voidcmd("TYPE I")
                 try:
-                    ftp.voidresp()
-                except all_errors:
-                    pass
+                    with part_file.open("ab" if existing > 0 else "wb") as fh:
+                        with ftp.transfercmd(
+                            f"RETR {remote_file}", rest=start + existing
+                        ) as conn:
+                            bytes_read = existing
+                            while bytes_read < expected:
+                                chunk_data = conn.recv(
+                                    min(DOWNLOAD_BLOCKSIZE, expected - bytes_read)
+                                )
+                                if not chunk_data:
+                                    break
+                                fh.write(chunk_data)
+                                bytes_read += len(chunk_data)
+                                if progress is not None:
+                                    progress.add_bytes(len(chunk_data))
+                        try:
+                            ftp.voidresp()
+                        except all_errors:
+                            pass
+                except Exception as exc:
+                    if _part_file_size(part_file) >= expected:
+                        _safe_print(
+                            f"[warn] 分块 {index} 数据已收齐，忽略收尾错误 ({exc})\n"
+                        )
+                    else:
+                        raise
 
-            actual_size = part_file.stat().st_size
-            if actual_size != expected:
-                raise RuntimeError(
-                    f"Chunk {index} size mismatch: expected {expected}, got {actual_size}"
-                )
-            return part_file
+                actual_size = _part_file_size(part_file)
+                if actual_size != expected:
+                    raise ConnectionError(
+                        f"Chunk {index} 中断: {_format_size(actual_size)}/"
+                        f"{_format_size(expected)}"
+                    )
+                return part_file
 
-    try:
-        with ThreadPoolExecutor(max_workers=min(chunk_count, len(chunks))) as executor:
-            futures = {
-                executor.submit(_download_chunk, start, end, i): i
-                for i, (start, end) in enumerate(chunks)
-            }
-            for future in as_completed(futures):
-                i = futures[future]
-                part_files.append((i, future.result()))
+        return _call_with_retries(_attempt, label=f"分块 {index}/{len(chunks) - 1}")
 
-        part_files.sort(key=lambda x: x[0])
-        temp_file = local_file.with_name(f"{local_file.name}.part")
-        with temp_file.open("wb") as outf:
-            for _, pf in part_files:
-                with pf.open("rb") as inf:
-                    while True:
-                        data = inf.read(DOWNLOAD_BLOCKSIZE)
-                        if not data:
-                            break
-                        outf.write(data)
-                pf.unlink()
-        temp_file.replace(local_file)
-    except Exception:
+    with ThreadPoolExecutor(max_workers=min(chunk_count, len(chunks))) as executor:
+        futures = {
+            executor.submit(_download_chunk, start, end, i): i
+            for i, (start, end) in enumerate(chunks)
+        }
+        part_files: "List[Tuple[int, Path]]" = []
+        for future in as_completed(futures):
+            i = futures[future]
+            part_files.append((i, future.result()))
+
+    part_files.sort(key=lambda x: x[0])
+    temp_file = local_file.with_name(f"{local_file.name}.part")
+    with temp_file.open("wb") as outf:
         for _, pf in part_files:
-            if pf.exists():
-                pf.unlink()
-        raise
+            with pf.open("rb") as inf:
+                while True:
+                    data = inf.read(DOWNLOAD_BLOCKSIZE)
+                    if not data:
+                        break
+                    outf.write(data)
+            pf.unlink()
+    _commit_part_file(temp_file, local_file)
 
 
 def should_use_chunked_file_download(
@@ -895,8 +1122,13 @@ def _chunked_download_is_truncated(
     local_size = local_file.stat().st_size
     if scanned_size > 0 and local_size < scanned_size:
         return True
-    with ftp_connection(config) as ftp:
-        remote_size = _try_get_size(ftp, remote_file)
+    try:
+        with ftp_connection(config) as ftp:
+            remote_size = _try_get_size(ftp, remote_file)
+    except (OSError, socket.timeout) + all_errors as exc:
+        # Don't discard a size-matched local file just because SIZE check timed out.
+        _safe_print(f"[warn] 校验远端大小失败，按已扫描大小接受本地文件 ({exc})\n")
+        return scanned_size > 0 and local_size < scanned_size
     return remote_size > 0 and local_size < remote_size
 
 
@@ -908,8 +1140,17 @@ def download_file_with_progress(
     chunk_threshold: int,
     chunk_count: int,
     progress: "Optional[DownloadProgress]" = None,
-) -> None:
-    """Download one remote file; use chunked REST when eligible, else single connection."""
+) -> bool:
+    """Download one remote file; return True if skipped because local file is complete."""
+    if _is_local_download_complete(local_file, file_size):
+        _safe_print(
+            f"[skip] 已存在完整文件：{local_file.resolve()} ({_format_size(file_size)})\n"
+        )
+        if progress is not None:
+            progress.set_bytes(file_size)
+        _cleanup_chunk_part_files(local_file, chunk_count)
+        return True
+
     if should_use_chunked_file_download(file_size, chunk_threshold, chunk_count):
         try:
             download_chunked_file(
@@ -922,12 +1163,22 @@ def download_file_with_progress(
                 raise RuntimeError(
                     f"chunked download truncated (local={local_size}, scanned={file_size})"
                 )
-            return
-        except (RuntimeError,) + all_errors as exc:
+            return False
+        except (RuntimeError, ConnectionError) + all_errors as exc:
+            # Keep chunk parts for resume; only fall back when REST/chunking is unsupported.
+            if _is_transient_network_error(exc):
+                raise
             _safe_print(
                 f"[warn] 分块下载失败，回退单连接：{remote_file} ({exc})\n"
             )
-    download_single_file_parallel(config, remote_file, local_file, progress)
+            time.sleep(DOWNLOAD_RETRY_BASE_DELAY)
+            if progress is not None:
+                progress.set_bytes(_part_file_size(local_file.with_name(f"{local_file.name}.part")))
+    download_single_file_parallel(
+        config, remote_file, local_file, progress, file_size=file_size
+    )
+    _cleanup_chunk_part_files(local_file, chunk_count)
+    return False
 
 
 def _render_loop(progress: DownloadProgress, stop_event: threading.Event) -> None:
@@ -1066,10 +1317,14 @@ def resolve_ftp_target(config: FTPConfig, raw_target: str) -> Tuple[FTPConfig, s
         if not parsed.hostname:
             raise RuntimeError(f"无法从 FTP 地址中识别主机：{raw_target}")
 
+        username = unquote(parsed.username) if parsed.username else config.username
+        password = unquote(parsed.password) if parsed.password is not None else config.password
         resolved_config = apply_known_ftp_credentials(replace(
             config,
             host=parsed.hostname,
             port=parsed.port or config.port,
+            username=username,
+            password=password,
         ))
         remote_path = apply_known_ftp_path_aliases(resolved_config, parsed.path or "/")
         note = f"已从输入中识别 FTP 主机：{resolved_config.host}:{resolved_config.port}"
@@ -1328,63 +1583,85 @@ def safe_main() -> int:
                     chunk_threshold=chunk_threshold,
                     chunk_count=chunks,
                 )
-            elif (
-                remote_info.path_type == "file"
-                and (remote_info.size or 0) >= chunk_threshold
-                and workers > 1
-                and chunks > 1
-            ):
+            elif remote_info.path_type == "file":
                 file_size = remote_info.size or 0
                 target_path = resolve_local_download_path(remote_info, local_path)
-                progress = DownloadProgress(1, file_size)
-                stop_event = threading.Event()
-                render_thread = threading.Thread(
-                    target=_render_loop, args=(progress, stop_event), daemon=True,
-                )
-                render_thread.start()
-                try:
-                    download_file_with_progress(
-                        config,
-                        remote_info.path,
-                        target_path,
-                        file_size,
-                        chunk_threshold,
-                        chunks,
-                        progress,
+                if _is_local_download_complete(target_path, file_size):
+                    print(
+                        f"[skip] 已存在完整文件：{target_path.resolve()} "
+                        f"({_format_size(file_size)})",
+                        file=sys.stderr,
                     )
-                    progress.add_file(file_size)
-                finally:
-                    stop_event.set()
-                    render_thread.join(timeout=2)
-                download_result = DownloadResult(
-                    remote_path=remote_info.path,
-                    local_path=target_path,
-                    path_type="file",
-                    file_count=1,
-                )
-            else:
-                progress = None
-                stop_event = None
-                render_thread = None
-                if remote_info.path_type == "file" and remote_info.size:
-                    progress = DownloadProgress(1, remote_info.size)
+                    download_result = DownloadResult(
+                        remote_path=remote_info.path,
+                        local_path=target_path,
+                        path_type="file",
+                        file_count=1,
+                        skipped=True,
+                    )
+                elif (
+                    file_size >= chunk_threshold
+                    and workers > 1
+                    and chunks > 1
+                ):
+                    progress = DownloadProgress(1, file_size)
                     stop_event = threading.Event()
                     render_thread = threading.Thread(
                         target=_render_loop, args=(progress, stop_event), daemon=True,
                     )
                     render_thread.start()
-                try:
-                    download_result, _ = run_ftp_operation(
-                        config,
-                        lambda ftp: download_remote_file(
-                            ftp, resolved_target, local_path, progress,
-                        ),
-                    )
-                finally:
-                    if stop_event is not None:
+                    try:
+                        download_file_with_progress(
+                            config,
+                            remote_info.path,
+                            target_path,
+                            file_size,
+                            chunk_threshold,
+                            chunks,
+                            progress,
+                        )
+                        progress.add_file()
+                    finally:
                         stop_event.set()
-                    if render_thread is not None:
                         render_thread.join(timeout=2)
+                        _safe_print("\n")
+                    download_result = DownloadResult(
+                        remote_path=remote_info.path,
+                        local_path=target_path,
+                        path_type="file",
+                        file_count=1,
+                    )
+                else:
+                    progress = None
+                    stop_event = None
+                    render_thread = None
+                    if file_size:
+                        progress = DownloadProgress(1, file_size)
+                        stop_event = threading.Event()
+                        render_thread = threading.Thread(
+                            target=_render_loop, args=(progress, stop_event), daemon=True,
+                        )
+                        render_thread.start()
+                    try:
+                        download_result, _ = run_ftp_operation(
+                            config,
+                            lambda ftp: download_remote_file(
+                                ftp, resolved_target, local_path, progress,
+                            ),
+                        )
+                    finally:
+                        if stop_event is not None:
+                            stop_event.set()
+                        if render_thread is not None:
+                            render_thread.join(timeout=2)
+                            _safe_print("\n")
+            else:
+                download_result, _ = run_ftp_operation(
+                    config,
+                    lambda ftp: download_remote_file(
+                        ftp, resolved_target, local_path, None,
+                    ),
+                )
 
             print(format_download_message(download_result))
             return 0
@@ -1430,7 +1707,26 @@ def safe_main() -> int:
             "FTP 协议错误: %s | 主机: %s:%s | 用户: %s\n%s",
             exc, config.host, config.port, config.username, traceback.format_exc(),
         )
-        print(f"FTP 操作失败：{exc}", file=sys.stderr)
+        message = str(exc)
+        if "530" in message:
+            hint = ""
+            if normalized_command == "download":
+                local_arg = Path(args.local_file) if getattr(args, "local_file", None) else None
+                candidate = local_arg if local_arg is not None else Path(
+                    remote_path_basename(resolved_target)
+                )
+                if candidate.is_file():
+                    hint = (
+                        f" 本地已有同名文件 {_format_size(candidate.stat().st_size)}："
+                        f"{candidate.resolve()}。若已下完可直接使用，无需重试。"
+                    )
+            print(
+                f"FTP 登录失败（530）：{config.username}@{config.host}:{config.port}。"
+                f"可能是账号密码错误，或服务器认证服务暂时异常。{hint} 详细：{exc}",
+                file=sys.stderr,
+            )
+        else:
+            print(f"FTP 操作失败：{exc}", file=sys.stderr)
         return 1
     except OSError as exc:
         logger.debug("OS 错误: %s\n%s", exc, traceback.format_exc())
