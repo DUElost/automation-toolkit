@@ -80,22 +80,19 @@ def cmd_login(url: str, state_path: Path) -> int:
 
 
 def _click_option_by_text(page, option_text: str) -> bool:
-    locators = [
-        page.get_by_text(option_text, exact=False),
-    ]
-    for loc in locators:
+    loc = page.get_by_text(option_text, exact=False)
+    try:
+        count = loc.count()
+    except Exception:
+        return False
+    for i in range(count):
+        item = loc.nth(i)
         try:
-            count = loc.count()
+            if item.is_visible():
+                item.click(timeout=3000)
+                return True
         except Exception:
             continue
-        for i in range(count):
-            item = loc.nth(i)
-            try:
-                if item.is_visible():
-                    item.click(timeout=3000)
-                    return True
-            except Exception:
-                continue
     return False
 
 
@@ -115,13 +112,26 @@ def cmd_fill(
         print(f"Missing login state: {state_path}. Run: python scripts/exam_bot.py login --url ...")
         return 2
 
-    bank = load_answers(answers_path)
+    try:
+        bank = load_answers(answers_path)
+    except FileNotFoundError:
+        print(
+            f"Missing answers file: {answers_path}. "
+            f"Generate it with: python scripts/parse_answers.py --input <题库.txt> --output {answers_path}"
+        )
+        return 2
+    except json.JSONDecodeError as e:
+        print(
+            f"Invalid JSON in answers file: {answers_path} ({e}). "
+            f"Regenerate with: python scripts/parse_answers.py --input <题库.txt> --output {answers_path}"
+        )
+        return 2
+
     report = {
         "filled": [],
         "unmatched": [],
         "ambiguous": [],
         "option_miss": [],
-        "skipped": [],
     }
 
     with sync_playwright() as p:
@@ -141,52 +151,62 @@ def cmd_fill(
         questions = page.evaluate(EXTRACT_QUESTIONS_JS)
         print(f"Detected {len(questions)} question blocks on page")
 
-        for q in questions:
-            page_stem = q.get("stem") or ""
-            page_options = q.get("options") or []
-            hit = match_stem(page_stem, bank, threshold=threshold, min_gap=0.05)
-            if hit is None:
-                scored = sorted(
-                    ((similarity(page_stem, b.get("stem", "")), b) for b in bank),
-                    key=lambda x: x[0],
-                    reverse=True,
-                )
-                best = scored[0][0] if scored else 0
-                second = scored[1][0] if len(scored) > 1 else 0
-                bucket = "ambiguous" if best >= threshold and best - second < 0.05 else "unmatched"
-                report[bucket].append({"stem": page_stem, "best": best, "second": second})
-                continue
+        if not questions:
+            print("No questions detected; use --dump to inspect DOM")
+            report["unmatched"].append({"stem": "", "best": 0, "second": 0, "reason": "no_questions"})
+        else:
+            for q in questions:
+                page_stem = q.get("stem") or ""
+                page_options = q.get("options") or []
+                hit = match_stem(page_stem, bank, threshold=threshold, min_gap=0.05)
+                if hit is None:
+                    scored = sorted(
+                        ((similarity(page_stem, b.get("stem", "")), b) for b in bank),
+                        key=lambda x: x[0],
+                        reverse=True,
+                    )
+                    best = scored[0][0] if scored else 0
+                    second = scored[1][0] if len(scored) > 1 else 0
+                    bucket = "ambiguous" if best >= threshold and best - second < 0.05 else "unmatched"
+                    report[bucket].append({"stem": page_stem, "best": best, "second": second})
+                    continue
 
-            idxs = match_options_by_text(hit["answer_texts"], page_options, threshold=0.85)
-            if len(idxs) != len(hit["answer_texts"]):
-                report["option_miss"].append(
-                    {
-                        "stem": page_stem,
-                        "want": hit["answer_texts"],
-                        "page": [o.get("text") for o in page_options],
-                    }
-                )
-                continue
+                idxs = match_options_by_text(hit["answer_texts"], page_options, threshold=0.85)
+                if len(idxs) != len(hit["answer_texts"]):
+                    report["option_miss"].append(
+                        {
+                            "stem": page_stem,
+                            "want": hit["answer_texts"],
+                            "page": [o.get("text") for o in page_options],
+                        }
+                    )
+                    continue
 
-            ok_all = True
-            for i in idxs:
-                text = page_options[i]["text"]
-                if not _click_option_by_text(page, text):
-                    ok_all = False
-            if ok_all:
-                report["filled"].append({"stem": page_stem, "answers": hit["answer_texts"]})
-            else:
-                report["option_miss"].append({"stem": page_stem, "want": hit["answer_texts"]})
+                ok_all = True
+                for i in idxs:
+                    text = page_options[i]["text"]
+                    if not _click_option_by_text(page, text):
+                        ok_all = False
+                if ok_all:
+                    report["filled"].append({"stem": page_stem, "answers": hit["answer_texts"]})
+                else:
+                    report["option_miss"].append({"stem": page_stem, "want": hit["answer_texts"]})
 
         problems = report["unmatched"] + report["ambiguous"] + report["option_miss"]
         print(json.dumps({k: len(v) for k, v in report.items()}, ensure_ascii=False))
         detail_path = ROOT / "data" / "last_report.json"
+        detail_path.parent.mkdir(parents=True, exist_ok=True)
         detail_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
         print(f"Detail report -> {detail_path}")
 
         if submit:
             if problems and not force_submit:
-                print("Refuse --submit because unmatched/ambiguous/option_miss exist. Use --force-submit to override.")
+                reason = (
+                    "no questions detected"
+                    if not questions
+                    else "unmatched/ambiguous/option_miss exist"
+                )
+                print(f"Refuse --submit because {reason}. Use --force-submit to override.")
                 browser.close()
                 return 1
             clicked = False
