@@ -52,3 +52,17 @@ def test_parse_full_july_file_has_many_items():
     items = parse_answers_text(text)
     assert len(items) >= 50
     assert all(item["answer_texts"] for item in items)
+
+
+def test_bom_does_not_skip_first_question():
+    raw = "\ufeff" + (ROOT / "tests" / "fixtures" / "sample_answers.txt").read_text(encoding="utf-8")
+    items = parse_answers_text(raw)
+    assert items[0]["stem_raw"].startswith("MTBF")
+    assert len(items) == 3
+
+
+def test_july_file_parses_all_60():
+    text = (ROOT / "7月考试.txt").read_text(encoding="utf-8-sig")
+    items = parse_answers_text(text)
+    assert len(items) == 60
+    assert "Bug的未关闭" in items[0]["stem_raw"] or "未关闭前的状态" in items[0]["stem_raw"]

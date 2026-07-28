@@ -39,6 +39,7 @@ def _parse_answer_letters(raw: str) -> List[str]:
 
 
 def parse_answers_text(text: str) -> List[Dict[str, Any]]:
+    text = text.lstrip("\ufeff")
     lines = text.splitlines()
     items: List[Dict[str, Any]] = []
     i = 0
@@ -116,7 +117,7 @@ def main() -> None:
     parser.add_argument("--input", required=True, help="Path to answer txt")
     parser.add_argument("--output", required=True, help="Path to answers.json")
     args = parser.parse_args()
-    text = Path(args.input).read_text(encoding="utf-8")
+    text = Path(args.input).read_text(encoding="utf-8-sig")
     items = parse_answers_text(text)
     out = Path(args.output)
     out.parent.mkdir(parents=True, exist_ok=True)
