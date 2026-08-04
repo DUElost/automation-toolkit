@@ -1,0 +1,6 @@
+# Script to start "monkey" on the device, which has a very rudimentary
+# shell.
+# /data/local/tmp/monkey.jar
+base=/data/local/tmp
+export CLASSPATH=$base/aim.jar
+exec app_process /system/bin com.android.commands.monkey.utils.MonkeyWatchdog

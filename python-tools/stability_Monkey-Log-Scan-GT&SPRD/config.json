@@ -1,0 +1,43 @@
+{
+    "_comment": "stability_Monkey-Log-Scan-GT 配置文件",
+    "general": {
+        "polling_interval_seconds": 60,
+        "state_prefix": "output",
+        "scan_buffers": ["main", "system", "events"],
+        "logcat_lines": 1000
+    },
+    "dropbox": {
+        "types": {
+            "data_app_anr": {"folder": "data_anr", "name_field": "Process"},
+            "data_app_crash": {"folder": "data_crash", "name_field": "Process", "ignore_packages": ["reliabilityuiautomatortest"]},
+            "data_app_native_crash": {"folder": "data_native_crash", "name_field": "Process"},
+            "system_app_anr": {"folder": "sys_anr", "name_field": "Process"},
+            "system_app_crash": {"folder": "sys_crash", "name_field": "Process"},
+            "system_app_native_crash": {"folder": "sys_native_crash", "name_field": "Process"},
+            "system_server_crash": {"folder": "block", "name_field": "Process"},
+            "system_server_native_crash": {"folder": "block", "name_field": "Process"},
+            "system_server_watchdog": {"folder": "block", "name_field": "Process"},
+            "system_server_anr": {"folder": "sys_anr", "name_field": "Process"},
+            "KERNEL_PANIC": {"folder": "block", "name_field": "Process"},
+            "MODEM_SILENT_PANIC": {"folder": "block", "name_field": "Process"},
+            "SUBSYS_SILENT_PANIC": {"folder": "block", "name_field": "Process"},
+            "SYSTEM_TOMBSTONE": {"folder": "sys_native_crash", "name_field": "Cmdline", "filename_tag": "SIGSEGV"}
+        }
+    },
+    "monkey": {
+        "resource_dir": "tools/monkey",
+        "apk": "app-debug.apk",
+        "android_test_apk": "app-debug-androidTest.apk",
+        "test_package": "com.transsion.testcaserepository",
+        "test_package_test": "com.transsion.testcaserepository.test",
+        "blacklist": "blacklist.txt",
+        "monkey_script": "MonkeyTestAi.sh",
+        "aim_jar": "aim.jar",
+        "aim": "aim",
+        "aimwd": "aimwd",
+        "native_libs": ["arm64-v8a", "armeabi-v7a"],
+        "device_tmp_dir": "/data/local/tmp",
+        "device_blacklist_path": "/sdcard/blacklist.txt",
+        "process_name": "com.android.commands.monkey"
+    }
+}

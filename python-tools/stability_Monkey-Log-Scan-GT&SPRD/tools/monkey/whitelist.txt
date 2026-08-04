@@ -1,0 +1,6 @@
+com.transsion.smartpanel
+com.transsion.XOSLauncher
+com.android.systemui
+com.android.settings
+com.transsion.livewallpaper.page
+com.transsion.theme

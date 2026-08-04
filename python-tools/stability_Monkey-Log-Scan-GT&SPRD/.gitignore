@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+build/
+dist/
+*.egg-info/
+.installed.cfg
+*.egg
+.pytest_cache/
+.coverage
+htmlcov/
+.env
+.venv
+env/
+venv/
+
+# IDE / 系统
+.idea/
+.vscode/
+*.iml
+*.swp
+*.swo
+*~*
+.DS_Store
+
+# 打包产物
+scan_log_gt
+scan_log_gt1
+
+# 运行日志与输出
+logs/
+log/
+*.log
+output_*.txt
+output_*.json
+result/
+scan_result/
+
+# 压缩包
+*.rar
+*.zip
+
+# 运行时必需资源（父仓库 .gitignore 忽略 *.jar/*.apk/*.so，此处反选）
+!tools/monkey/aim.jar
+!tools/monkey/app-debug.apk
+!tools/monkey/app-debug-androidTest.apk
+!tools/monkey/arm64-v8a/libfastbot_native.so
+!tools/monkey/armeabi-v7a/libfastbot_native.so

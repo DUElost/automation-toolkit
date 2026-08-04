@@ -1,0 +1,11 @@
+# Script to start "monkey" on the device, which has a very rudimentary
+# shell.
+# /data/local/tmp/monkey.jar
+base=/data/local/tmp
+export CLASSPATH=$base/aim.jar
+trap "" HUP
+for a in "$@"; do
+    echo "  bash arg:" $a
+done
+exec app_process /system/bin com.android.commands.monkey.Monkey "$@"
+
