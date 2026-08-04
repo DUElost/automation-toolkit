@@ -25,12 +25,21 @@ class SetNotMpBlockScriptTest(unittest.TestCase):
     def test_build_jql_for_single_project(self):
         module = load_module("set_not_mp_block.py", "set_not_mp_block")
 
-        jql = module.build_jql(["KO5OS16AEE"], "target.reporter")
+        jql = module.build_jql(
+            ["KO5OS16AEE"], "target.reporter", empty_field_id="customfield_15400"
+        )
 
         self.assertIn('project = "KO5OS16AEE"', jql)
         self.assertIn('reporter = "target.reporter"', jql)
-        self.assertIn('"必解标签" is EMPTY', jql)
+        self.assertIn("cf[15400] is EMPTY", jql)
         self.assertNotIn("project in", jql)
+
+    def test_build_jql_falls_back_to_field_name_without_id(self):
+        module = load_module("set_not_mp_block.py", "set_not_mp_block")
+
+        jql = module.build_jql(["KO5OS16AEE"], "target.reporter")
+
+        self.assertIn('"必解标签" is EMPTY', jql)
 
     def test_build_jql_for_multiple_projects(self):
         module = load_module("set_not_mp_block.py", "set_not_mp_block")

@@ -395,7 +395,7 @@ schtasks /Query /TN "TranssionJiraVerifyResolvedIssuesDaily"
 
 ## 行为说明
 
-- 工具通过 JQL `"必解标签" is EMPTY` 直接筛选空标签问题单。
+- 工具通过 JQL `cf[15400] is EMPTY` 直接筛选空标签问题单。
 - 可通过 `--priority-name` / `--exclude-priority-name` / `--component-name` 进行额外筛选（同时提供时会一起生效）。
 - `--priority-name` 与 `--exclude-priority-name` 均支持多个值。
 - 默认只处理最新的一条空标签单；加上 `--update-all` 会批量更新。

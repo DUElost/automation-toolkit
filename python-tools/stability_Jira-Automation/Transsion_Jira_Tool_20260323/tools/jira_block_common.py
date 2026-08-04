@@ -114,6 +114,14 @@ def _format_reporter_clause(reporter):
     return f'reporter = "{reporter}"'
 
 
+def _format_empty_field_clause(field_id, field_name):
+    if field_id:
+        cf_num = field_id.replace("customfield_", "")
+        if cf_num.isdigit():
+            return f"cf[{cf_num}] is EMPTY"
+    return f'"{field_name}" is EMPTY'
+
+
 def build_jql(
     project_key,
     reporter,
@@ -122,6 +130,7 @@ def build_jql(
     exclude_priority_names=None,
     require_empty_field=True,
     empty_field_name=TARGET_FIELD_NAME,
+    empty_field_id=None,
 ):
     clauses = [
         _format_project_clause(project_key),
@@ -135,8 +144,8 @@ def build_jql(
         clauses.append(exclude_priority_clause)
     if component_name:
         clauses.append(f'component = "{component_name}"')
-    if require_empty_field and empty_field_name:
-        clauses.append(f'"{empty_field_name}" is EMPTY')
+    if require_empty_field and (empty_field_id or empty_field_name):
+        clauses.append(_format_empty_field_clause(empty_field_id, empty_field_name))
     return " AND ".join(clauses) + " ORDER BY created DESC"
 
 
@@ -269,6 +278,7 @@ def set_block_labels(
         component_name,
         exclude_priority_names=exclude_priority_names,
         require_empty_field=True,
+        empty_field_id=field_id,
     )
 
     if update_all:
