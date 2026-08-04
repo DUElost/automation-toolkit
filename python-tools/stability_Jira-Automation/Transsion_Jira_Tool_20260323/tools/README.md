@@ -97,7 +97,7 @@ python Transsion_Jira_Tool_20260323/tools/set_mp_block.py \
 - `--priority-name`：优先级名称（可选，支持多个值，缺省仅 Blocker）
 - `--exclude-priority-name`：排除的优先级名称（可选，支持多个值）
 - `--component-name`：模块名称（可选，不填写则不限制模块）
-- `--update-all`：更新所有“必解标签为空”的问题单（默认只更新最新一条）
+- `--update-all`：更新所有“必解标签为空或为 Not MP Block”的问题单（默认只更新最新一条）
 
 ### set_mandatory_label_by_rule.py
 
