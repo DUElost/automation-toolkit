@@ -3,6 +3,10 @@
 该工具用于在 `http://jira.transsion.com` 上，将指定项目中 **提单人(report) 的问题单**里
 “必解标签”为空的条目设置为 **Not MP Block**。
 
+**默认行为**：`set_not_mp_block.py` 默认排除 A 类问题（`Blocker`/紧急），只对 B 类
+（`Critical`/严重）及以下优先级标记 `Not MP Block`；`set_mp_block.py` 默认只处理 A 类
+问题（`Blocker`/紧急）。显式传 `--priority-name` / `--exclude-priority-name` 可覆盖默认规则。
+
 ## 依赖
 
 - Python 3.10+
@@ -45,7 +49,11 @@ python set_not_mp_block.py \
 
 ### set_mp_block.py
 
-将 **最新一条**（或批量）“必解标签为空”且满足筛选条件的问题单设置为 `MP Block`。
+将 A 类问题（`Blocker`/紧急）的必解标签设置为 `MP Block`：
+- “必解标签为空”的问题单
+- “必解标签为 `Not MP Block`”的问题单（自动覆盖为 `MP Block`）
+
+可显式传 `--priority-name` 覆盖默认的 A 类范围。
 
 示例：
 
@@ -86,7 +94,7 @@ python Transsion_Jira_Tool_20260323/tools/set_mp_block.py \
 - `--jira-username` / `-u`：登录用账号（可选，缺省读取 `.env`）
 - `--jira-password` / `-w`：登录用密码（可选，缺省读取 `.env`）
 - `--report-username` / `-r`：提单人用户名（可选，支持多个值，缺省使用 currentUser）
-- `--priority-name`：优先级名称（可选，支持多个值）
+- `--priority-name`：优先级名称（可选，支持多个值，缺省仅 Blocker）
 - `--exclude-priority-name`：排除的优先级名称（可选，支持多个值）
 - `--component-name`：模块名称（可选，不填写则不限制模块）
 - `--update-all`：更新所有“必解标签为空”的问题单（默认只更新最新一条）

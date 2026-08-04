@@ -35,7 +35,10 @@ def parse_args():
 
 
 def main():
-    common.run_block_tool(TARGET_FIELD_VALUE)
+    common.run_block_tool(
+        TARGET_FIELD_VALUE,
+        default_exclude_priority_names=[common.A_PRIORITY_NAME],
+    )
 
 
 if __name__ == "__main__":

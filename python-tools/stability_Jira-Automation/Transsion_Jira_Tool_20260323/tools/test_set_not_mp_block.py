@@ -92,6 +92,50 @@ class SetNotMpBlockScriptTest(unittest.TestCase):
 
         self.assertEqual(args.report_username, ["dailv.tinno", "qimingwang.tinno"])
 
+    def test_main_defaults_exclude_blocker_priority(self):
+        module = load_module("set_not_mp_block.py", "set_not_mp_block")
+
+        with patch.object(
+            sys, "argv", ["set_not_mp_block.py", "--project-key", "KO5OS16AEE"]
+        ), patch.object(
+            module.common, "get_jira_credentials", return_value=("user", "pass")
+        ), patch.object(
+            module.common, "connect_to_jira", return_value=object()
+        ), patch.object(
+            module.common, "set_block_labels"
+        ) as mock_set:
+            module.main()
+
+        kwargs = mock_set.call_args.kwargs
+        self.assertEqual(kwargs["exclude_priority_names"], ["Blocker"])
+        self.assertIsNone(kwargs["priority_name"])
+
+    def test_main_cli_priority_overrides_default(self):
+        module = load_module("set_not_mp_block.py", "set_not_mp_block")
+
+        with patch.object(
+            sys,
+            "argv",
+            [
+                "set_not_mp_block.py",
+                "--project-key",
+                "KO5OS16AEE",
+                "--priority-name",
+                "Major",
+            ],
+        ), patch.object(
+            module.common, "get_jira_credentials", return_value=("user", "pass")
+        ), patch.object(
+            module.common, "connect_to_jira", return_value=object()
+        ), patch.object(
+            module.common, "set_block_labels"
+        ) as mock_set:
+            module.main()
+
+        kwargs = mock_set.call_args.kwargs
+        self.assertEqual(kwargs["priority_name"], ["Major"])
+        self.assertEqual(kwargs["exclude_priority_names"], ["Blocker"])
+
 
 if __name__ == "__main__":
     unittest.main()

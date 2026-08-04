@@ -4,6 +4,7 @@ import jira_block_common as common
 JIRA_SERVER = common.JIRA_SERVER
 TARGET_FIELD_NAME = common.TARGET_FIELD_NAME
 TARGET_FIELD_VALUE = "MP Block"
+NOT_MP_BLOCK_VALUE = "Not MP Block"
 
 build_jql = common.build_jql
 _format_project_clause = common._format_project_clause
@@ -35,7 +36,11 @@ def parse_args():
 
 
 def main():
-    common.run_block_tool(TARGET_FIELD_VALUE)
+    common.run_block_tool(
+        TARGET_FIELD_VALUE,
+        default_priority_names=[common.A_PRIORITY_NAME],
+        default_include_existing_values=[NOT_MP_BLOCK_VALUE],
+    )
 
 
 if __name__ == "__main__":

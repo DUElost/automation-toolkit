@@ -12,6 +12,8 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 JIRA_SERVER = "http://jira.transsion.com"
 TARGET_FIELD_NAME = "必解标签"
+A_PRIORITY_NAME = "Blocker"
+B_PRIORITY_NAME = "Critical"
 
 
 def normalize_field_name(name):
@@ -114,12 +116,20 @@ def _format_reporter_clause(reporter):
     return f'reporter = "{reporter}"'
 
 
-def _format_empty_field_clause(field_id, field_name):
+def _format_empty_field_clause(field_id, field_name, include_existing_values=None):
     if field_id:
         cf_num = field_id.replace("customfield_", "")
         if cf_num.isdigit():
-            return f"cf[{cf_num}] is EMPTY"
-    return f'"{field_name}" is EMPTY'
+            empty_clause = f"cf[{cf_num}] is EMPTY"
+            if include_existing_values:
+                quoted = ", ".join(f'"{value}"' for value in include_existing_values)
+                return f"({empty_clause} OR cf[{cf_num}] in ({quoted}))"
+            return empty_clause
+    empty_clause = f'"{field_name}" is EMPTY'
+    if include_existing_values:
+        quoted = ", ".join(f'"{value}"' for value in include_existing_values)
+        return f"({empty_clause} OR \"{field_name}\" in ({quoted}))"
+    return empty_clause
 
 
 def build_jql(
@@ -131,6 +141,7 @@ def build_jql(
     require_empty_field=True,
     empty_field_name=TARGET_FIELD_NAME,
     empty_field_id=None,
+    include_existing_values=None,
 ):
     clauses = [
         _format_project_clause(project_key),
@@ -145,7 +156,11 @@ def build_jql(
     if component_name:
         clauses.append(f'component = "{component_name}"')
     if require_empty_field and (empty_field_id or empty_field_name):
-        clauses.append(_format_empty_field_clause(empty_field_id, empty_field_name))
+        clauses.append(
+            _format_empty_field_clause(
+                empty_field_id, empty_field_name, include_existing_values
+            )
+        )
     return " AND ".join(clauses) + " ORDER BY created DESC"
 
 
@@ -260,6 +275,23 @@ def build_field_value(field_info, target_value):
     return selected
 
 
+def extract_option_values(value):
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return [
+            item.get("value") or item.get("name")
+            for item in value
+            if isinstance(item, dict) and (item.get("value") or item.get("name"))
+        ]
+    if isinstance(value, dict):
+        option_value = value.get("value") or value.get("name")
+        return [option_value] if option_value else []
+    if isinstance(value, str):
+        return [value.strip()] if value.strip() else []
+    return []
+
+
 def set_block_labels(
     client,
     target_value,
@@ -269,6 +301,7 @@ def set_block_labels(
     priority_name=None,
     component_name=None,
     exclude_priority_names=None,
+    include_existing_values=None,
 ):
     field_id = resolve_field_id(client, TARGET_FIELD_NAME)
     jql = build_jql(
@@ -279,6 +312,7 @@ def set_block_labels(
         exclude_priority_names=exclude_priority_names,
         require_empty_field=True,
         empty_field_id=field_id,
+        include_existing_values=include_existing_values,
     )
 
     if update_all:
@@ -303,9 +337,18 @@ def set_block_labels(
             cached_field_info = field_info
 
         issue_value = issue.raw.get("fields", {}).get(issue_field_id)
-        if not is_empty_field_value(issue_value):
-            print(f"问题 {issue.key} 的 {TARGET_FIELD_NAME} 已有值，跳过。")
+        if target_value in extract_option_values(issue_value):
+            print(f"问题 {issue.key} 的 {TARGET_FIELD_NAME} 已是 {target_value}，跳过。")
             continue
+        if not is_empty_field_value(issue_value):
+            current_values = extract_option_values(issue_value)
+            if include_existing_values and any(
+                value in include_existing_values for value in current_values
+            ):
+                print(f"问题 {issue.key} 的 {TARGET_FIELD_NAME} 为 {current_values}，将覆盖为 {target_value}。")
+            else:
+                print(f"问题 {issue.key} 的 {TARGET_FIELD_NAME} 已有其他值，跳过。")
+                continue
 
         field_value = build_field_value(cached_field_info, target_value)
         try:
@@ -376,7 +419,12 @@ def parse_block_args(description):
     return parser.parse_args()
 
 
-def run_block_tool(target_value):
+def run_block_tool(
+    target_value,
+    default_priority_names=None,
+    default_exclude_priority_names=None,
+    default_include_existing_values=None,
+):
     args = parse_block_args(
         f"设置当前用户提单的必解标签为 {target_value}"
     )
@@ -388,13 +436,25 @@ def run_block_tool(target_value):
     if not jira:
         sys.exit(1)
 
+    priority_name = (
+        args.priority_name
+        if args.priority_name is not None
+        else default_priority_names
+    )
+    exclude_priority_names = (
+        args.exclude_priority_name
+        if args.exclude_priority_name is not None
+        else default_exclude_priority_names
+    )
+
     set_block_labels(
         jira,
         target_value,
         args.project_key,
         args.report_username,
         update_all=args.update_all,
-        priority_name=args.priority_name,
+        priority_name=priority_name,
         component_name=args.component_name,
-        exclude_priority_names=args.exclude_priority_name,
+        exclude_priority_names=exclude_priority_names,
+        include_existing_values=default_include_existing_values,
     )

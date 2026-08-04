@@ -122,6 +122,98 @@ class SetMpBlockScriptTest(unittest.TestCase):
 
         self.assertEqual(args.exclude_priority_name, ["Major", "Minor"])
 
+    def test_main_defaults_to_blocker_priority(self):
+        module = load_module("set_mp_block.py", "set_mp_block")
+
+        with patch.object(
+            sys, "argv", ["set_mp_block.py", "--project-key", "KO5OS16AEE"]
+        ), patch.object(
+            module.common, "get_jira_credentials", return_value=("user", "pass")
+        ), patch.object(
+            module.common, "connect_to_jira", return_value=object()
+        ), patch.object(
+            module.common, "set_block_labels"
+        ) as mock_set:
+            module.main()
+
+        kwargs = mock_set.call_args.kwargs
+        self.assertEqual(kwargs["priority_name"], ["Blocker"])
+        self.assertIsNone(kwargs["exclude_priority_names"])
+
+    def test_main_cli_priority_overrides_default(self):
+        module = load_module("set_mp_block.py", "set_mp_block")
+
+        with patch.object(
+            sys,
+            "argv",
+            [
+                "set_mp_block.py",
+                "--project-key",
+                "KO5OS16AEE",
+                "--priority-name",
+                "Critical",
+            ],
+        ), patch.object(
+            module.common, "get_jira_credentials", return_value=("user", "pass")
+        ), patch.object(
+            module.common, "connect_to_jira", return_value=object()
+        ), patch.object(
+            module.common, "set_block_labels"
+        ) as mock_set:
+            module.main()
+
+        kwargs = mock_set.call_args.kwargs
+        self.assertEqual(kwargs["priority_name"], ["Critical"])
+        self.assertIsNone(kwargs["exclude_priority_names"])
+
+    def test_build_jql_includes_existing_not_mp_block(self):
+        module = load_module("set_mp_block.py", "set_mp_block")
+
+        jql = module.build_jql(
+            ["KO5OS16AEE"],
+            "target.reporter",
+            empty_field_id="customfield_15400",
+            include_existing_values=["Not MP Block"],
+        )
+
+        self.assertIn(
+            '(cf[15400] is EMPTY OR cf[15400] in ("Not MP Block"))',
+            jql,
+        )
+
+    def test_main_defaults_include_existing_not_mp_block(self):
+        module = load_module("set_mp_block.py", "set_mp_block")
+
+        with patch.object(
+            sys, "argv", ["set_mp_block.py", "--project-key", "KO5OS16AEE"]
+        ), patch.object(
+            module.common, "get_jira_credentials", return_value=("user", "pass")
+        ), patch.object(
+            module.common, "connect_to_jira", return_value=object()
+        ), patch.object(
+            module.common, "set_block_labels"
+        ) as mock_set:
+            module.main()
+
+        kwargs = mock_set.call_args.kwargs
+        self.assertEqual(kwargs["include_existing_values"], ["Not MP Block"])
+        self.assertEqual(kwargs["priority_name"], ["Blocker"])
+
+    def test_extract_option_values(self):
+        module = load_module("set_mp_block.py", "set_mp_block")
+
+        self.assertEqual(module.common.extract_option_values(None), [])
+        self.assertEqual(
+            module.common.extract_option_values({"value": "MP Block", "id": "1"}),
+            ["MP Block"],
+        )
+        self.assertEqual(
+            module.common.extract_option_values(
+                [{"value": "Not MP Block", "id": "1"}, {"value": "MP Block", "id": "2"}]
+            ),
+            ["Not MP Block", "MP Block"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
