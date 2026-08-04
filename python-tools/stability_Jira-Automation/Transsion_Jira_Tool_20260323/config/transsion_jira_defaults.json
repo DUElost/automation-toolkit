@@ -1,7 +1,7 @@
 {
   "jira_server": "http://jira.transsion.com",
   "project_key": "X6726BO151",
-  "issue_type": "故障",
+  "issue_type": "Bug",
   "default_reporter": "dailv.tinno",
   "default_assignee": "dailv.tinno",
   "default_issue_source": "内测 (自动化测试)",

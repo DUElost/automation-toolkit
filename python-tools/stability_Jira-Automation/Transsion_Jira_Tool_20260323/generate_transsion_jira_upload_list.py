@@ -68,7 +68,7 @@ def setup_logging() -> None:
     )
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="生成 Transsion Jira 上传模板")
     parser.add_argument("--add-main-excel", dest="main_excel_path", default=str(DEFAULT_MAIN_EXCEL), help="原始结果 Excel 路径")
     parser.add_argument("--set-project-key", dest="project_key", default=None, help="目标 Jira 项目 Key")
@@ -79,6 +79,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--set-case-no", dest="case_no", default="NA", help="默认用例编号")
     parser.add_argument("--set-reporter", dest="reporter", default=None, help="默认 Reporter")
     parser.add_argument("--set-assignee", dest="assignee", default=None, help="默认 Assignee")
+    assignee_group = parser.add_mutually_exclusive_group()
+    assignee_group.add_argument(
+        "--assignee-auto",
+        dest="assignee_auto",
+        action="store_true",
+        help="经办人方案：Assignee 固定填写内置规则值“自动”",
+    )
+    assignee_group.add_argument(
+        "--assignee-manual",
+        dest="assignee_manual",
+        action="store_true",
+        help="经办人方案：按“包名与模块&经办人对应表”匹配负责人，匹配为空的数据行跳过",
+    )
     parser.add_argument("--summary-tags", nargs="*", default=["OP", "MR", "GKI"], help="概要中的附加标签")
     parser.add_argument("--config-file", dest="config_file", default=str(DEFAULT_CONFIG_FILE), help="默认配置路径")
     parser.add_argument(
@@ -92,10 +105,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--probability-rules-file", dest="probability_rules_file", default=str(DEFAULT_PROBABILITY_RULES), help="问题出现概率评级表路径")
     parser.add_argument("--test-summary-file", dest="test_summary_file", default=str(DEFAULT_TEST_CASE_SUMMARY), help="稳定性专项汇总表路径")
     parser.add_argument("--component-regex-file", dest="component_regex_file", default=str(DEFAULT_COMPONENT_REGEX), help="正则模块映射文件路径")
-    return parser.parse_args()
+    args = parser.parse_args(argv)
+    if not args.assignee_auto and not args.assignee_manual:
+        parser.error("必须且只能提供一个经办人方案参数: --assignee-auto 或 --assignee-manual")
+    return args
 
 
-def build_upload_rows(args: argparse.Namespace) -> tuple[List[dict], List[str]]:
+def build_upload_rows(args: argparse.Namespace) -> tuple[List[dict], List[str], List[Dict[str, str]]]:
     defaults = load_defaults(args.config_file)
     if args.project_key:
         defaults["project_key"] = args.project_key
@@ -117,8 +133,10 @@ def build_upload_rows(args: argparse.Namespace) -> tuple[List[dict], List[str]]:
 
     logger.info("读取原始结果成功，共 %d 条，列: %s", len(main_df), list(main_df.columns))
 
+    assignee_mode = "auto" if getattr(args, "assignee_auto", False) else "manual"
     rows: List[dict] = []
     resolved_test_cases: List[str] = []
+    skipped_issues: List[Dict[str, str]] = []
     for index, row in main_df.iterrows():
         if not clean_cell_value(row.get("ExpClass")) and not clean_cell_value(row.get("Package")):
             logger.info("跳过第 %d 行：关键字段为空", index + 1)
@@ -150,12 +168,38 @@ def build_upload_rows(args: argparse.Namespace) -> tuple[List[dict], List[str]]:
                 default_case_no=args.case_no,
                 default_reporter=args.reporter,
                 default_assignee=args.assignee,
+                assignee_mode=assignee_mode,
             )
+            if assignee_mode == "manual" and not str(issue_row.get("Assignee") or "").strip():
+                skipped_issues.append(
+                    {
+                        "row_number": str(index + 1),
+                        "package": str(issue_row.get("Package") or ""),
+                        "exp_class": str(issue_row.get("Exp Class") or ""),
+                        "reason": "包名与模块&经办人对应表未匹配到经办人",
+                    }
+                )
+                logger.warning("第 %d 行经办人为空，已跳过：Package=%s", index + 1, issue_row.get("Package"))
+                continue
             rows.append(issue_row)
             resolved_test_cases.append(resolved_test_case)
         except Exception:
             logger.exception("第 %d 行生成上传模板失败", index + 1)
-    return rows, resolved_test_cases
+    return rows, resolved_test_cases, skipped_issues
+
+
+def log_skipped_issues(skipped_issues: List[Dict[str, str]]) -> None:
+    if not skipped_issues:
+        return
+    logger.error("以下 %d 条问题未生成到上传模板（未提交成功）：", len(skipped_issues))
+    for item in skipped_issues:
+        logger.error(
+            "第 %s 行未提交成功，原因：%s（Package=%s，ExpClass=%s）",
+            item.get("row_number", "?"),
+            item.get("reason", ""),
+            item.get("package", ""),
+            item.get("exp_class", ""),
+        )
 
 
 def save_upload_list(rows: List[dict], output_path: str) -> None:
@@ -211,9 +255,11 @@ def main() -> int:
     logger.info("等级规则表: %s", os.path.abspath(args.severity_rules_file))
     logger.info("问题出现概率评级表: %s", os.path.abspath(args.probability_rules_file))
     logger.info("稳定性专项汇总表: %s", os.path.abspath(args.test_summary_file))
+    logger.info("经办人方案: %s", "auto（Assignee 固定为“自动”）" if args.assignee_auto else "manual（按包名与模块&经办人对应表匹配）")
 
-    rows, resolved_test_cases = build_upload_rows(args)
+    rows, resolved_test_cases, skipped_issues = build_upload_rows(args)
     if not rows:
+        log_skipped_issues(skipped_issues)
         logger.error("没有生成任何上传记录")
         return 1
 
@@ -228,6 +274,7 @@ def main() -> int:
     save_upload_list(rows, output_path)
     logger.info("上传模板已生成: %s", os.path.abspath(output_path))
     logger.info("成功处理 %d 条记录", len(rows))
+    log_skipped_issues(skipped_issues)
     return 0
 
 

@@ -23,6 +23,8 @@ logger = logging.getLogger(__name__)
 CURRENT_DIR = Path(__file__).resolve().parent
 CONFIG_DIR = CURRENT_DIR / "config"
 
+ASSIGNEE_AUTO_VALUE = "自动"
+
 
 def load_defaults(config_path: str | Path) -> Dict[str, Any]:
     with open(config_path, "r", encoding="utf-8") as fp:
@@ -728,6 +730,7 @@ def prepare_issue_record(
     default_case_no: Optional[str],
     default_reporter: Optional[str],
     default_assignee: Optional[str],
+    assignee_mode: Optional[str] = None,
 ) -> Dict[str, Any]:
     count_raw = clean_cell_value(raw_row.get("Count")) or 0
     device_id = clean_cell_value(raw_row.get("DeviceId"))
@@ -773,7 +776,12 @@ def prepare_issue_record(
     component, owner = infer_component_and_owner(issue_data, package_owner_mapping, regex_mapping)
     severity_level, severity_rule = detect_severity_result(issue_data, severity_rules)
     reporter = default_reporter or defaults.get("default_reporter", "")
-    assignee = owner or default_assignee or defaults.get("default_assignee", reporter)
+    if assignee_mode == "auto":
+        assignee = ASSIGNEE_AUTO_VALUE
+    elif assignee_mode == "manual":
+        assignee = owner
+    else:
+        assignee = owner or default_assignee or defaults.get("default_assignee", reporter)
     # Transsion 当前流程中 Case No 不使用原始 Activity，统一固定为 NA。
     case_no = default_case_no or "NA"
     affect_project_option = resolve_affect_project_template_value(

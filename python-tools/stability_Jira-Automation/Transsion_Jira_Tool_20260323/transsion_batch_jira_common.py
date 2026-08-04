@@ -19,6 +19,8 @@ from jira import JIRA
 
 logger = logging.getLogger(__name__)
 
+ASSIGNEE_AUTO_VALUE = "自动"
+
 EXCEL_FIELD_CANDIDATES = {
     "project": ["Project", "project"],
     "issue_type": ["Issue Type", "issuetype", "issue_type"],
@@ -533,6 +535,30 @@ def is_field_available(create_fields: Dict[str, Any], field_id: str) -> bool:
     return bool(field_id) and field_id in create_fields
 
 
+def collect_priority_candidates(
+    normalized_name: str,
+    raw_text: str,
+    priority_alias_mapping: Dict[str, List[str]],
+) -> List[str]:
+    candidates: List[str] = [normalized_name, raw_text]
+    norm_lower = normalized_name.lower()
+    raw_lower = raw_text.lower()
+    for canonical_name, aliases in priority_alias_mapping.items():
+        related = [str(item).strip() for item in [canonical_name, *aliases] if str(item).strip()]
+        related_lower = {item.lower() for item in related}
+        if norm_lower in related_lower or (raw_lower and raw_lower in related_lower):
+            candidates.extend(related)
+            break
+    seen: set[str] = set()
+    deduped: List[str] = []
+    for candidate in candidates:
+        if not candidate or candidate in seen:
+            continue
+        seen.add(candidate)
+        deduped.append(candidate)
+    return deduped
+
+
 def resolve_priority_payload(
     raw_value: Any,
     allowed_values: Dict[str, Dict[str, Any]],
@@ -542,8 +568,9 @@ def resolve_priority_payload(
     normalized_name = normalize_priority_name(raw_value, severity_to_priority_mapping, priority_alias_mapping)
     raw_text = str(raw_value).strip() if raw_value is not None else ""
     field_allowed = allowed_values.get("priority", {})
+    candidates = collect_priority_candidates(normalized_name, raw_text, priority_alias_mapping)
 
-    for candidate in [normalized_name, raw_text]:
+    for candidate in candidates:
         if candidate and candidate in field_allowed:
             item = field_allowed[candidate]
             priority_id = str(item.get("id") or "").strip()
@@ -552,13 +579,21 @@ def resolve_priority_payload(
                 return priority_name, {"id": priority_id}
             return priority_name, {"name": priority_name}
 
-    for item in field_allowed.values():
-        priority_name = str(item.get("name") or "").strip()
-        priority_id = str(item.get("id") or "").strip()
-        if normalized_name == priority_name or raw_text == priority_name or normalized_name == priority_id or raw_text == priority_id:
-            if priority_id:
-                return priority_name, {"id": priority_id}
-            return priority_name, {"name": priority_name}
+    for candidate in candidates:
+        if not candidate:
+            continue
+        for key, item in field_allowed.items():
+            item_name = str(item.get("name") or key).strip()
+            priority_id = str(item.get("id") or "").strip()
+            if (
+                candidate.lower() == key.lower()
+                or candidate.lower() == item_name.lower()
+                or candidate.lower() == priority_id.lower()
+            ):
+                priority_name = str(item.get("name") or key).strip()
+                if priority_id:
+                    return priority_name, {"id": priority_id}
+                return priority_name, {"name": priority_name}
 
     if field_allowed:
         allowed_names = list(field_allowed.keys())
@@ -674,7 +709,10 @@ def build_issue_fields(
         if create_reporter_override
         else resolve_user_name(jira_client, reporter_raw, user_cache, fallback=defaults.get("default_reporter"))
     )
-    assignee = resolve_user_name(jira_client, assignee_raw, user_cache, fallback=defaults.get("default_assignee"))
+    if str(assignee_raw or "").strip() == ASSIGNEE_AUTO_VALUE:
+        assignee = ""
+    else:
+        assignee = resolve_user_name(jira_client, assignee_raw, user_cache, fallback=defaults.get("default_assignee"))
     create_assignee = resolve_user_name(jira_client, create_assignee_override, user_cache, fallback=assignee) if create_assignee_override else assignee
 
     if not components:

@@ -168,6 +168,67 @@ def test_prepare_issue_record_reads_rom_ram_and_updates_description(upload_templ
     assert "A)Preconditions" not in result["Description"]
 
 
+def test_prepare_issue_record_assignee_mode_auto(upload_template_module):
+    module = upload_template_module
+    raw_row = pd.Series(
+        {
+            "Id": "1",
+            "Path": "server/path",
+            "Version": "X6851-16.3.0.021(OP001PF001AZ)_SU",
+            "ExpClass": "ANR",
+            "ExpType ": "ANR",
+            "CurProcess": "com.android.systemui",
+            "Package": "com.android.systemui",
+            "Count": 1,
+        }
+    )
+    kwargs = _prepare_issue_record_kwargs()
+    kwargs["default_assignee"] = "assignee"
+    result = module.prepare_issue_record(raw_row=raw_row, assignee_mode="auto", **kwargs)
+
+    assert result["Assignee"] == "自动"
+
+
+def test_prepare_issue_record_assignee_mode_manual_uses_owner(upload_template_module):
+    module = upload_template_module
+    raw_row = pd.Series(
+        {
+            "Id": "1",
+            "Path": "server/path",
+            "Version": "X6851-16.3.0.021(OP001PF001AZ)_SU",
+            "ExpClass": "ANR",
+            "ExpType ": "ANR",
+            "CurProcess": "com.android.systemui",
+            "Package": "com.android.systemui",
+            "Count": 1,
+        }
+    )
+    kwargs = _prepare_issue_record_kwargs()
+    result = module.prepare_issue_record(raw_row=raw_row, assignee_mode="manual", **kwargs)
+
+    assert result["Assignee"] == "owner"
+
+
+def test_prepare_issue_record_assignee_mode_manual_empty_owner_no_fallback(upload_template_module):
+    module = upload_template_module
+    raw_row = pd.Series(
+        {
+            "Id": "1",
+            "Path": "server/path",
+            "Version": "X6851-16.3.0.021(OP001PF001AZ)_SU",
+            "ExpClass": "ANR",
+            "ExpType ": "ANR",
+            "CurProcess": "com.android.phone",
+            "Package": "com.android.phone",
+            "Count": 1,
+        }
+    )
+    kwargs = _prepare_issue_record_kwargs()
+    result = module.prepare_issue_record(raw_row=raw_row, assignee_mode="manual", **kwargs)
+
+    assert result["Assignee"] == ""
+
+
 def test_build_environment_text_falls_back_to_rom_ram_without_detail(upload_template_module):
     module = upload_template_module
 

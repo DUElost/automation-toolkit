@@ -29,6 +29,7 @@ if str(CURRENT_DIR) not in sys.path:
 
 from transsion_upload_template_common import load_defaults, load_priority_mapping_from_rules_excel, read_excel_smart
 from transsion_batch_jira_common import (
+    ASSIGNEE_AUTO_VALUE,
     EXCEL_FIELD_CANDIDATES,
     add_issue_comment,
     assign_issue_to_user,
@@ -1492,12 +1493,16 @@ def run_excel_mode(args: argparse.Namespace) -> int:
             if requires_issue_fields:
                 bundle = get_meta_bundle(jira, project_key, issue_type_name, meta_cache)
                 target_assignee_raw = find_first_value(row, "assignee", defaults.get("default_assignee"))
-                target_assignee = resolve_user_name(
-                    jira,
-                    target_assignee_raw,
-                    user_cache,
-                    fallback=defaults.get("default_assignee"),
-                )
+                if str(target_assignee_raw or "").strip() == ASSIGNEE_AUTO_VALUE:
+                    target_assignee = None
+                    logger.info("第 %d 行模板经办人为「%s」，跳过经办人回写，保持当前提交人", row_number, ASSIGNEE_AUTO_VALUE)
+                else:
+                    target_assignee = resolve_user_name(
+                        jira,
+                        target_assignee_raw,
+                        user_cache,
+                        fallback=defaults.get("default_assignee"),
+                    )
                 issue_fields = build_issue_fields(
                     jira_client=jira,
                     row=row,

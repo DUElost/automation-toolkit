@@ -82,7 +82,14 @@ python generate_transsion_jira_upload_list.py
 - --set-environment
   默认 Environment，默认：PR1-A1
 - --set-case-no
-  默认用例编号，默认：NA
+   默认用例编号，默认：NA
+- --assignee-auto
+   经办人方案：Assignee 固定填写内置规则值 `自动`
+- --assignee-manual
+   经办人方案：按 `config/包名与模块&经办人对应表_transsion.xlsx` 匹配模块负责人
+   对应表未匹配到经办人的数据行会跳过，不写入上传模板，并在最后日志汇总中列出
+   哪些问题未提交成功及原因
+   注：`--assignee-auto` 与 `--assignee-manual` 必须且只能提供一个，缺少或同时提供都会报错
 - --affect-project-mapping-file
   Affect Project 统一映射文件
   单个机型条目同时包含：
@@ -107,6 +114,10 @@ python generate_transsion_jira_upload_list.py
 python generate_transsion_jira_upload_list.py --add-main-excel Result_None_None_MonkeyAEE_SH_20260323.xls --set-test-case 开关机专项 --summary-tags OP
 
 python generate_transsion_jira_upload_list.py --add-main-excel Result_None_None_MonkeyAEE_SH_20260323.xls --set-test-case 3 --summary-tags OP
+
+python generate_transsion_jira_upload_list.py --add-main-excel Result_None_None_MonkeyAEE_SH_20260323.xls --set-test-case 开关机专项 --assignee-auto
+
+python generate_transsion_jira_upload_list.py --add-main-excel Result_None_None_MonkeyAEE_SH_20260323.xls --set-test-case 开关机专项 --assignee-manual
 
 原始结果表 `TestCase` 列说明：
 - 如果原始结果表包含 `TestCase` 列，脚本会优先读取该列作为每行的测试专项

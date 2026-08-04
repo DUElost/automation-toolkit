@@ -2069,6 +2069,82 @@ def test_run_batch_create_create_new_records_new_issue_key(
     ]
 
 
+def test_run_batch_create_skips_assignee_backfill_for_auto_value(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    batch_entry_module,
+    caplog: pytest.LogCaptureFixture,
+):
+    module = batch_entry_module
+    result_dir = tmp_path / "result"
+    store_events: dict[str, object] = {"execution_results": []}
+    assign_calls: list[tuple[str, str]] = []
+    caplog.set_level(logging.INFO)
+
+    class FakeJira:
+        def current_user(self) -> str:
+            return "robot"
+
+        def search_issues(self, jql: str, maxResults: int = 50, fields: str | None = None):
+            return []
+
+        def create_issue(self, fields):
+            return SimpleNamespace(key="TRANSSION-NEW-1")
+
+        def add_comment(self, issue_key, comment):
+            return None
+
+        def add_attachment(self, **kwargs):
+            return None
+
+        def issue(self, issue_key):
+            return SimpleNamespace(fields=SimpleNamespace(status=SimpleNamespace(name="Open")))
+
+        def transitions(self, issue):
+            return []
+
+    class FakeStore:
+        def __init__(self, db_path: Path):
+            store_events["db_path"] = Path(db_path)
+
+        def save_sync_run(self, record):
+            store_events["sync_run"] = dict(record)
+
+        def save_snapshot(self, run_id, rows):
+            store_events["snapshot_rows"] = list(rows)
+
+        def save_execution_result(self, result):
+            store_events["execution_results"].append(dict(result))
+
+    monkeypatch.setattr(module, "RESULT_DIR", result_dir)
+    monkeypatch.setattr(module, "load_defaults", lambda _: {"jira_server": "http://jira.example.com", "project_key": "TRANSSION", "issue_type": "故障"})
+    monkeypatch.setattr(module, "load_priority_mapping_from_rules_excel", lambda _: {"severity_to_priority": {}, "priority_aliases": {}})
+    monkeypatch.setattr(module, "read_excel_smart", lambda _: pd.DataFrame([_make_row(Assignee="自动")]))
+    monkeypatch.setattr(module, "connect_to_jira", lambda *_: FakeJira())
+    monkeypatch.setattr(module, "load_regression_rules", lambda _: _make_rules(tmp_path, result_dir))
+    monkeypatch.setattr(module, "RegressionStore", FakeStore)
+    monkeypatch.setattr(module, "get_meta_bundle", lambda *_: {"create_fields": {}, "allowed_values": {}, "field_name_lookup": {}})
+    monkeypatch.setattr(module, "fetch_issue_snapshot_fields", lambda *_args, **_kwargs: {})
+    monkeypatch.setattr(module, "is_strong_match", lambda *_args, **_kwargs: False)
+    monkeypatch.setattr(module, "build_issue_fields", lambda **_: {"summary": "stub", "description": "stub-desc", "priority": {"name": "Major"}})
+    monkeypatch.setattr(module, "decide_action", lambda *_args, **kwargs: SimpleNamespace(
+        action="CREATE_NEW",
+        update_jira=False,
+        manual_review=False,
+        comment_required=False,
+        recreate_issue=True,
+    ))
+    monkeypatch.setattr(module, "resolve_bug_severity_attachment_name", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(module, "transition_issue_to_open", lambda *_args, **_kwargs: (False, "skip"))
+    monkeypatch.setattr(module, "assign_issue_to_user", lambda jira, issue_key, assignee: assign_calls.append((issue_key, assignee)) or (True, assignee))
+
+    exit_code = module.run_batch_create(_make_args(tmp_path, add_comments=False))
+
+    assert exit_code == 0
+    assert assign_calls == []
+    assert "跳过经办人回写" in caplog.text
+
+
 def test_run_batch_create_preserves_issue_key_when_create_succeeds_but_followup_fails(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

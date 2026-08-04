@@ -33,5 +33,10 @@
     "jira_project": "X6728S1510",
     "affect_project": "X6728",
     "monkey_project": "X6728O5AEE"
+  },
+    "X1102D": {
+    "jira_project": "X1102DOS16",
+    "affect_project": "X1102D",
+    "monkey_project": "X1102DAEE"
   }
 }

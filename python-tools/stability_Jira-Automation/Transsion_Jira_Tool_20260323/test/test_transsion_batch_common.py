@@ -212,3 +212,71 @@ def test_build_issue_fields_uses_create_reporter_override_for_reporter_and_opene
 
     assert issue_fields["reporter"] == {"name": "qimingwang.tinno"}
     assert issue_fields["customfield_10000"] == {"name": "qimingwang.tinno"}
+
+
+def test_resolve_priority_payload_matches_english_priority_via_alias(batch_common_module):
+    module = batch_common_module
+    priority_name, payload = module.resolve_priority_payload(
+        raw_value="重要",
+        allowed_values={"priority": {"Major": {"name": "Major", "id": "3"}}},
+        severity_to_priority_mapping={},
+        priority_alias_mapping={"重要": ["B", "3", "medium", "major"]},
+    )
+    assert priority_name == "Major"
+    assert payload == {"id": "3"}
+
+
+def test_resolve_priority_payload_matches_chinese_priority_exactly(batch_common_module):
+    module = batch_common_module
+    priority_name, payload = module.resolve_priority_payload(
+        raw_value="重要",
+        allowed_values={"priority": {"重要": {"name": "重要", "id": "4"}}},
+        severity_to_priority_mapping={},
+        priority_alias_mapping={"重要": ["B", "3", "medium", "major"]},
+    )
+    assert priority_name == "重要"
+    assert payload == {"id": "4"}
+
+
+def test_resolve_priority_payload_matches_english_priority_raw_text(batch_common_module):
+    module = batch_common_module
+    priority_name, payload = module.resolve_priority_payload(
+        raw_value="Major",
+        allowed_values={"priority": {"Major": {"name": "Major", "id": "3"}}},
+        severity_to_priority_mapping={},
+        priority_alias_mapping={"重要": ["B", "3", "medium", "major"]},
+    )
+    assert priority_name == "Major"
+    assert payload == {"id": "3"}
+
+
+def test_resolve_priority_payload_raises_for_unmatched(batch_common_module):
+    module = batch_common_module
+    with pytest.raises(ValueError, match="Priority"):
+        module.resolve_priority_payload(
+            raw_value="未知级别",
+            allowed_values={"priority": {"Major": {"name": "Major", "id": "3"}}},
+            severity_to_priority_mapping={},
+            priority_alias_mapping={"重要": ["B", "3", "medium", "major"]},
+        )
+
+
+def test_build_issue_fields_assignee_auto_value_not_resolved_as_user(batch_common_module):
+    module = batch_common_module
+    issue_fields = module.build_issue_fields(
+        jira_client=_FakeJira(),
+        row=_make_row(Assignee="自动"),
+        defaults=_make_defaults(),
+        create_fields={},
+        allowed_values={
+            "components": {"NavigationBar": {"name": "NavigationBar"}},
+            "versions": {"V10": {"name": "V10"}},
+            "priority": {"重要": {"name": "重要"}},
+        },
+        severity_to_priority_mapping={},
+        priority_alias_mapping={},
+        user_cache={},
+        project_cache={},
+        create_assignee_override=None,
+    )
+    assert issue_fields["assignee"] == {"name": ""}
