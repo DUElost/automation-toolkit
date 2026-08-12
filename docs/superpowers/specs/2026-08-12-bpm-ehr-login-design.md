@@ -89,6 +89,22 @@ python main.py
 - 无头模式、登录态持久化、多账号并发
 - 破解验证码或绕过二次验证
 
+## 实测修正（2026-08-12）
+
+实机验证后，以下几点与初始假设不同，实现已按实测调整：
+
+| 环节 | 实测情况 | 处理 |
+|------|----------|------|
+| 站点准入 | `bpm.tinno.com` 要求个人数字证书，浏览器弹出原生证书选择框；未确认时导航一直挂起，HTTP 层会 302 到 `ca.tinno.com/tinno/certificate/errorHtml` | 新增 `cert_dialog.py`，在导航期间向浏览器窗口发送回车自动确认 |
+| 免弹窗策略 | `AutoSelectCertificateForUrls` 策略键被组策略锁定（`HKCU\Software\Policies` 拒绝写入，HKLM 需管理员） | README 记录管理员可选写法，默认走自动确认 |
+| 登录页 | 默认显示企业微信扫码，密码表单在隐藏容器内，需先点 `#pwLogin .qiehuan` 切换 | `bpm_login.py` 先切换再填表 |
+| 密码框 | `#pwd` 的 `type` 是 `text`（用 `-webkit-text-security` 伪装），按 `input[type=password]` 找不到 | 直接用 `#username` / `#pwd` |
+| 登录后落地页 | 落在工时提报界面，EHR 入口尚未渲染 | 先点顶栏「门户」（`#Shortcutmenu a`） |
+| EHR 入口 | 门户主页右下角「导航」面板中的图标块，`onclick` 为 `window.open('extern/vehrlogin.jsp')`，新标签打开 | 等 `td[onclick*="vehrlogin"]` 可见后点击 |
+| EHR 结果 | `https://ehr.tinno.com/scripts/mgrqispi.dll?...EHR_BPM_SSO...`，标题 `Vantop`，SSO 免登录 | 以 `ehr.tinno.com` 作为成功判定 |
+
+顶栏 🔗 图标（`img[src*="frame/link.png"]`）hover 也能展开外部系统菜单进 EHR，但菜单依赖鼠标停留，点击时易收起，故未采用。
+
 ## 风险与假设
 
 - 假设账号密码即可登录 BPM（无强制验证码/二次验证）；若实测相反，本阶段以明确报错 + 截图为止，再决定是否加人机协作步骤

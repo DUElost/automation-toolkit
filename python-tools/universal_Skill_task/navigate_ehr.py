@@ -1,72 +1,48 @@
 # -*- coding: utf-8 -*-
-"""Navigate from BPM home to EHR via portal tile."""
+"""Open EHR from the navigation panel on the BPM portal home page."""
 
 from __future__ import annotations
 
 from playwright.sync_api import BrowserContext, Page, TimeoutError as PlaywrightTimeoutError
 
-# --- selectors (adjust after live probe) ---
-EHR_CLICK_SELECTORS = [
-    'text=EHR',
-    'a:has-text("EHR")',
-    'div:has-text("EHR")',
-    '[title*="EHR"]',
-    '[aria-label*="EHR"]',
-]
+from cert_dialog import confirm_in_background
+
+# After login the portal lands on the timesheet view; 门户 switches to the home panels.
+PORTAL_TAB = "#Shortcutmenu a"
+# Tile in the 导航 panel at the bottom right; its onclick opens EHR in a new tab.
+EHR_TILE = 'td[onclick*="vehrlogin"]'
+EHR_HOST = "ehr.tinno.com"
 
 
 class NavigateEhrError(RuntimeError):
-    """Failed to open EHR from BPM home."""
-
-
-def _find_ehr_locator(page: Page):
-    for sel in EHR_CLICK_SELECTORS:
-        loc = page.locator(sel).first
-        try:
-            if loc.count() and loc.is_visible():
-                return loc
-        except Exception:
-            continue
-    return None
-
-
-def _looks_like_ehr(url: str, title: str) -> bool:
-    blob = f"{url} {title}".lower()
-    return any(k in blob for k in ("ehr", "hr", "human", "人事", "人力"))
+    """Failed to open EHR from the BPM portal."""
 
 
 def open_ehr(page: Page, context: BrowserContext) -> Page:
-    """Click EHR on BPM home; return the page that shows EHR (may be a new tab)."""
-    page.wait_for_timeout(1500)
-    target = _find_ehr_locator(page)
-    if target is None:
-        raise NavigateEhrError(f"EHR entry not found on BPM home. url={page.url}")
+    """Switch to the portal home, click the EHR tile, and return the new EHR tab."""
+    try:
+        page.click(PORTAL_TAB, timeout=30_000)
+    except PlaywrightTimeoutError as exc:
+        raise NavigateEhrError(f"Could not click the 门户 tab. url={page.url}") from exc
 
     try:
-        with context.expect_page(timeout=5_000) as new_page_info:
-            target.click()
-        ehr_page = new_page_info.value
-        ehr_page.wait_for_load_state("domcontentloaded")
-    except PlaywrightTimeoutError:
-        # Same-tab navigation
-        try:
-            page.wait_for_load_state("domcontentloaded", timeout=30_000)
-        except PlaywrightTimeoutError:
-            pass
-        ehr_page = page
+        page.wait_for_selector(EHR_TILE, state="visible", timeout=45_000)
+    except PlaywrightTimeoutError as exc:
+        raise NavigateEhrError(f"EHR tile never became visible on the portal home. url={page.url}") from exc
 
+    _thread, stop_confirming = confirm_in_background(deadline_s=40)
     try:
-        ehr_page.wait_for_timeout(2000)
-        if not _looks_like_ehr(ehr_page.url, ehr_page.title()):
-            # Soft wait: allow SPA redirect
-            ehr_page.wait_for_timeout(3000)
-        if not _looks_like_ehr(ehr_page.url, ehr_page.title()):
-            raise NavigateEhrError(
-                f"Opened a page but it does not look like EHR. url={ehr_page.url} title={ehr_page.title()}"
-            )
-    except NavigateEhrError:
-        raise
-    except Exception as exc:
-        raise NavigateEhrError(f"EHR page check failed: {exc}") from exc
+        with context.expect_page(timeout=30_000) as new_page:
+            page.click(EHR_TILE, timeout=15_000)
+        ehr_page = new_page.value
+        ehr_page.wait_for_load_state("domcontentloaded", timeout=60_000)
+        ehr_page.wait_for_timeout(5_000)
+    except PlaywrightTimeoutError as exc:
+        raise NavigateEhrError(f"EHR tab did not open after clicking the tile. url={page.url}") from exc
+    finally:
+        stop_confirming.set()
+
+    if EHR_HOST not in ehr_page.url:
+        raise NavigateEhrError(f"Opened tab is not EHR. url={ehr_page.url} title={ehr_page.title()}")
 
     return ehr_page

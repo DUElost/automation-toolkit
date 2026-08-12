@@ -631,6 +631,24 @@ git commit -m "fix(universal_Skill_task): tune BPM/EHR selectors after live prob
 
 ---
 
+## Task 7 实测结果（2026-08-12）
+
+`python main.py` 连续两次成功，退出码 0：
+
+```text
+[OK] BPM login success url=https://bpm.tinno.com/
+[OK] EHR opened url=https://ehr.tinno.com/scripts/mgrqispi.dll?...EHR_BPM_SSO... title=Vantop
+```
+
+相比计划的额外改动（原因见 spec「实测修正」一节）：
+
+- 新增 `cert_dialog.py`：自动确认个人数字证书弹窗
+- 新增 `tests/test_cert_dialog.py`：验证 stop 事件能阻止按键外泄到页面
+- `bpm_login.py`：改用 `#pwLogin .qiehuan` / `#username` / `#pwd` / `input[type=submit].sub-zh`
+- `navigate_ehr.py`：先点 `#Shortcutmenu a`（门户），再点 `td[onclick*="vehrlogin"]`
+
+单测：`pytest tests -v` → 4 passed。
+
 ## Spec coverage（自检）
 
 | Spec 要求 | Task |

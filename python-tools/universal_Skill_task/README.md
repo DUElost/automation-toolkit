@@ -1,6 +1,6 @@
 # universal_Skill_task — BPM → EHR 可行性脚本
 
-用 Playwright（有界面）登录 [BPM](https://bpm.tinno.com)，在首页点击 EHR，经 SSO 进入 EHR。
+用 Playwright（有界面）登录 [BPM](https://bpm.tinno.com)，进入门户主页后点击右下角 EHR 入口，经 SSO 进入 EHR。
 
 ## 准备
 
@@ -18,7 +18,34 @@ copy .env.example .env
 python main.py
 ```
 
-成功时控制台输出 `[OK] BPM login success` 与 `[OK] EHR opened`；失败时在 `artifacts/` 留截图。
+成功时控制台输出：
+
+```text
+[OK] BPM login success url=https://bpm.tinno.com/
+[OK] EHR opened url=https://ehr.tinno.com/... title=Vantop
+```
+
+失败时在 `artifacts/` 留截图，并打印当前 URL。
+
+## 流程说明
+
+1. 打开 `https://bpm.tinno.com`，浏览器弹出**个人数字证书**选择框，脚本自动确认
+2. 登录页默认是企业微信扫码，脚本切到密码登录并提交账号密码
+3. 登录后落在工时提报界面，脚本点击顶栏「门户」进入主页
+4. 在右下角「导航」面板点击 EHR，新标签页经 SSO 打开 EHR，无需二次登录
+
+## 关于证书弹窗
+
+站点要求个人数字证书。证书弹窗是浏览器原生窗口，Playwright 无法操作，脚本改为在导航期间向浏览器窗口发送回车确认（见 `cert_dialog.py`），仅在导航期间生效，避免误触页面。
+
+彻底免弹窗需要企业策略 `AutoSelectCertificateForUrls`，本机 `HKCU\Software\Policies` 被组策略锁定，需**管理员**写入 HKLM 后才可用：
+
+```powershell
+# 以管理员身份运行 PowerShell
+reg add "HKLM\SOFTWARE\Policies\Chromium\AutoSelectCertificateForUrls" /v 1 /t REG_SZ /d "{\"pattern\":\"https://[*.]tinno.com\",\"filter\":{\"ISSUER\":{\"CN\":\"TINNO CA\"}}}" /f
+```
+
+写入后浏览器会静默选用该证书；脚本的回车兜底逻辑仍可保留，互不冲突。
 
 ## 安全
 
