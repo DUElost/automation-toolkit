@@ -1,0 +1,39 @@
+{
+    "expclass_map": {
+        "data_app_anr": "ANR",
+        "system_app_anr": "ANR",
+        "system_server_anr": "ANR",
+        "data_app_crash": "JE",
+        "system_app_crash": "JE",
+        "system_server_crash": "JE",
+        "data_app_native_crash": "NE",
+        "system_app_native_crash": "NE",
+        "system_server_native_crash": "NE",
+ "SYSTEM_TOMBSTONE": "NE",
+ "native_crash": "NE",
+ "system_server_watchdog": "SWT",
+        "KERNEL_PANIC": "KE",
+        "FATAL.NE": "KE",
+        "SYSTEM_RESTART": "SR",
+        "SYSTEM_BOOT": "SR",
+        "Reboot": "SR",
+        "Jank": "Jank",
+        "Assert": "Assert",
+        "WCN": "WCN",
+        "MODEM_SILENT_PANIC": "MSP",
+        "SUBSYS_SILENT_PANIC": "SSP"
+    },
+    "dedup": {
+        "similarity_threshold": 0.9,
+        "compare_fields": ["ExpClass", "Package", "CausedBy"]
+    },
+    "export": {
+        "columns": ["Id", "Path", "Version", "ExpTime", "ExpClass", "ExpType", "CurProcess",
+                    "Package", "Detail", "CausedBy", "extraTag", "Count", "Activity",
+                    "DeviceCount", "Rom_Ram"],
+        "output_before": "Result_None_None_MonkeyAEE_SPRD_{ts}_org.xls",
+        "output_after": "Result_None_None_MonkeyAEE_SPRD_{ts}.xls",
+        "rom_ram": "/",
+        "activity": "None"
+    }
+}

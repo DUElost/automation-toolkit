@@ -1,0 +1,6 @@
+Uniview为展锐新增的维测打点系统，作用是在各模块关键路径设置埋点，当埋点模块出现异常时就会触发打点，打点系统在接收到打点事件后对相关异常信息进行保存，具体使用说明如下：
+⚫Uniview存储路径：
+➢故障类：/data/ylog/uniview_exception
+➢统计类：/data/ylog/uniview_event
+⚫稳定性相关维测打点故障类型如下：见"F:\automation-toolkit\python-tools\stability_Monkey-Log-Scan-GT&SPRD\docs\uniview_list.xlsx"
+⚫故障点路径下unieventinfo文件为故障清单，请在unieventinfo文件中查找本问题的kick_datetime，kick_datetime即对应Log

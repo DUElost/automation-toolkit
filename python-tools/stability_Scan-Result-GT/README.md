@@ -1,0 +1,63 @@
+﻿# stability_Scan-Result-GT
+
+第二阶段：问题包**汇总与去重**（第一阶段问题包 → 去重前/去重后两份 .xls，对齐 MTK 工具），
+交付后续 jira 自动化提交流水线。
+
+## 用法
+
+```bash
+python scan_result.py -d <第一阶段保存根目录> [--threshold 0.9]
+```
+
+| 参数 | 说明 |
+|---|---|
+| `-d` | 第一阶段保存根目录（含 `{version}/{device}/{type}_{ts}/`）；产物 .xls 生成在此 |
+| `--threshold` | 去重相似度阈值（默认 0.9，覆盖 config；NE 类用 pc 指纹硬匹配，不受阈值影响） |
+
+## 输出（生成在 -d 目录下）
+
+- `Result_None_None_MonkeyAEE_SPRD_{时间戳}.xls`：去重后（每组代表一行，Count=组内条数）
+- `Result_None_None_MonkeyAEE_SPRD_{时间戳}_org.xls`：去重前（每问题一行，Count=1）
+
+15 列（MTK 格式，表名 aeeexp）：`Id / Path / Version / ExpTime / ExpClass / ExpType / CurProcess / Package / Detail / CausedBy / extraTag / Count / Activity / DeviceCount / Rom_Ram`
+
+## 字段提取
+
+| 字段 | 来源 |
+|---|---|
+| ExpType | 问题包名类型段（`system-app-crash` → `system_app_crash`） |
+| ExpClass | 类型映射（`config.json expclass_map`）；Jank/Assert/WCN/SR 的 CurProcess/Package 填类型名 |
+| Package | detail `Process:` / anr_trace `Cmd line:` / unievent_info proc / summary，路径型统一 `/` |
+| Detail | MTK 识别报告模板：Device_id / 解析库版本 / 手机版本 / 异常包名（含应用版本）/ 异常进程 / pid / Backtrace（根因行+栈帧）+ 类型附加现场段 |
+| CausedBy | NE：backtrace 首帧 pc（去重指纹）；JE：`Caused by:`/异常行；ANR：main 栈顶帧；SWT：`Blocked in` 详情；SR/无根因：MTK 兜底（随机串防误合并） |
+| Rom_Ram | 设备级 `rom_ram.json`（第一阶段采集，SN 对应）优先，聚合包 SYS_* 提取兜底 |
+| DeviceCount | 去重组内不同设备数（跨设备归并） |
+
+## 去重规则
+
+- 前置：ExpClass + Package 相同
+- **NE**：CausedBy 提取 pc 地址指纹，同 pc 才合并（不同 pc 的 backtrace 首帧相似度高会被误并，实测修复）
+- 其他类型：difflib `SequenceMatcher` 比较 CausedBy（阈值默认 0.9）
+- 空 CausedBy：同秒视为同一事件（uniview + dropbox 双写）
+- 组内保留 ExpTime 最早的代表条目，`Count` = 组内条数；`DeviceCount` = 组内设备数
+
+## 测试
+
+```bash
+python -m pytest test/ -v
+```
+
+21 passed（classify/collect/dedup/export）。
+
+## 目录结构
+
+```
+scan_result.py            # 主入口（-d 输出）
+config.json               # ExpClass 映射 / 去重阈值 / 输出配置（15 列 / 文件名模板）
+modules/collect.py        # 问题包扫描 + 字段提取（MTK Detail 模板 / pid / Rom_Ram）
+modules/classify.py       # ExpClass 映射
+modules/dedup.py          # pc 指纹 + SequenceMatcher 去重
+modules/export.py         # xlwt .xls 导出（MTK 样式/列宽）
+test/                     # pytest
+docs/superpowers/         # spec 与实施计划
+```

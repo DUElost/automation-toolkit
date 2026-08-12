@@ -1,0 +1,146 @@
+﻿在紫光展锐（UNISOC）平台上，CP（Cellular Processor，即 MSP/Modem）或 SSP（Sensor Subsystem Processor / Smart Subsystem Processor）的手动 Trigger 方式通常由展锐专属的 SIPC (Shared Memory IPC) 架构和 MODEM Control (modem_ctl / spipe) 驱动支持。
+
+展锐平台手动触发 CP 或 SSP Panic 主要有以下三种手段：
+
+1. 通过 Sysfs / Proc 节点直接触发（最简便）
+展锐的 modem_control 驱动在 /sys/ 或 /proc/ 下暴露了用于稳定性测试（Assertion Test）的调试节点。
+
+A. 触发 CP (Modem/MSP) Panic
+以 root 权限在终端或 adb 中直接注入 assert 命令：
+
+Bash
+# 1. 常见 Sysfs 节点路径（视 Android/Kernel 版本而定）
+echo "assert" > /sys/class/modem/modem/device/crash
+# 或
+echo 1 > /sys/devices/platform/modem_control/modem_assert
+
+# 2. 部分 Linux 内核/内核驱动版本支持 proc 节点
+echo "assert" > /proc/modem/assert
+B. 触发 SSP / WCN (无线三合一/Sensor Subsystem) Panic
+展锐平台通常将 WCN (Wi-Fi/BT/FM) 和 SSP (Sensor Hub/PMU Core) 作为独立的 Subsystem 进行管理：
+
+Bash
+# 触发 WCN / SSP 子系统 Assert
+echo "assert" > /sys/class/modem/wcn/device/crash
+# 或
+echo "assert" > /sys/devices/platform/wcn_control/wcn_assert
+2. 通过 AT 指令触发 Modem Assert
+如果处于 Debug 版本（如 Userdebug/Eng）且已连接 AT 端口或通过 slogmodem 交互，可以直接向 CP 发送展锐私有 AT 指令：
+
+Bash
+# 通过 adb 向 spipe / smux 模拟串口发送 AT 指令
+echo -e "AT+SPASSERT\r" > /dev/spipe_lte0
+# 或部分 Older/3G Modem 节点
+echo -e "AT+SPASSERT\r" > /dev/ttyGS0
+注：AT+SPASSERT 是展锐 CP 固件中硬编码的断言测试指令，CP 收到后会立即抛出主线程 Exception 并进入 Dump 流程。
+
+3. 利用展锐工程调试工具 (SLogModem / Ylog / Orca)
+展锐平台拥有专用的日志与调试服务组件：
+
+slogmodem (Modem Log Engine)：
+可以通过 slogmodem 提供的 Client 命令行触发 CP 复位与 Dump 保存：
+
+Bash
+# 向 slogmodem 进程发送命令触发 Modem crash 抓取
+slogmodem-cli assert modem
+Orca / EngineerMode (工程模式)：
+在拨号盘输入 *#*#83781#*#* 进入 EngineerMode（工程模式） -> Telephony -> Modem Debug -> 点击 "Assert Modem" 或 "Trigger CP Dump" 按钮。
+
+展锐平台特有机制提示 (Dump & Reset)
+Dump 抓取模式确认：
+在触发 Panic 前，需通过工程模式或 sysfs 确认系统处于 Dump 模式 还是 Direct Reset 模式：
+
+Bash
+# 查看当前 dump 模式 (0: 直接重启, 1: 停在 Dump 界面/保存 Memory Dump)
+cat /sys/module/modem_control/parameters/dump_enable
+
+# 如果需要抓取完整 CP RAMDump，请确保其置为 1
+echo 1 > /sys/module/modem_control/parameters/dump_enable
+日志节点验证：
+CP Panic 后，日志将通过 slogmodem 自动存入 /data/ylog/ 或 /data/slog/ 目录下，包含 CP_Crash 及 modem_memory.dump 文件，可直接导入 Unisoc ChannelServer / DebugServer 工具解析。
+========== 手动触发方法验证记录（2026-08-11 真机实测 Z2581/MyOS16 userdebug）==========
+状态说明：已验证=实测触发成功并生成 uniview 记录；未验证=尚未实测；失效=实测未生效；
+未知=方法不确定/待确认。
+
+| 故障类型 | 触发方法 | 实测结果 | 状态 |
+|---|---|---|---|
+| JE（Java crash） | adb shell am crash <package> | 14:07:13 com.android.settings，JE.103000004 记录+1，生成聚合包 tar | 已验证 |
+| NE（Native crash） | adb shell kill -SEGV <pid> | 14:07:43 com.android.systemui，NE.103000003 记录+1，tar+tombstone 双包 | 已验证 |
+| FATAL.NE（Fatal Native） | adb shell kill -SEGV <system_server_pid> | 14:16:17 system_server，FATAL.NE.103100003 记录+1，tar 生成；系统自动重启恢复 | 已验证 |
+| SWT（FW Watchdog） | adb shell am hang（& 后台） | 14:10:21/14:11:48 两条 system_server_watchdog，SWT.103000006 记录+2，首条含 tar | 已验证 |
+| SWT（FW Watchdog） | adb shell am crash <system_server_pid> | 14:13/14:14/14:16 三条 watchdog（含 Blocked in 详情），SWT 记录+3 | 已验证 |
+| ANR（half ANR） | adb shell am hang 连带 | 14:12:19 /data/anr/anr_*_half 生成；uniview ANR 目录无 unievent_info 行（half 类型），第一阶段 prelogs 补采进既有 ANR 包 | 已验证 |
+| FATAL.JE（Fatal Java） | adb shell am crash <system_server_pid> | 仅触发 SWT watchdog，未生成 FATAL.JE 记录；am crash 无 --fatal 选项 | 失效 |
+| FATAL.JE | （待研究：需 fatal Java 异常路径，如 system_server 未捕获异常） | - | 未验证 |
+| Reboot（异常重启） | （待研究：reboot 命令仅 normalboot，需异常路径如 panic/watchdog 重启） | - | 未验证 |
+| Shutdown Error | （待研究：reboot -p 或长按电源，按用户要求后放） | - | 未验证 |
+| SFSWT（surfaceflinger watchdog） | （待研究） | - | 未验证 |
+| No space left on data JE | （待研究：填充 /data 有风险，需谨慎） | - | 未验证 |
+| CP2 Assert（Assert.109000001） | （待研究：/sys/devices/platform/cpwcn-btwf 等节点） | - | 未验证 |
+| Modem Assert（Assert.110000001） | （待研究：modem assert 节点；此前结论无法软件触发） | - | 未验证 |
+| GNSS Assert（Assert.109000002） | （待研究：/sys/devices/platform/cpwcn-gnss 等节点） | - | 未验证 |
+| WCN/Assert 类（既有数据） | （历史 07-01 数据为自然/测试环境产生） | - | 未知 |
+
+注意：
+1. am hang 后 system_server 挂起约 60-90s，adb 短暂无响应，watchdog 自动恢复（可接受）
+2. kill -SEGV system_server 后系统自动重启（zygote 拉起），约 30-60s 恢复
+3. half ANR 无独立聚合包，prelogs（SYS_ANDROID_LOG/SYS_KERNEL_LOG）补采进同类型最新问题包
+4. 触发验证后第一阶段增量采集：新事件包（tar/ylog/tombstone）自动落盘；第二阶段 45→24 条确认
+========== 第二批触发验证（2026-08-11）==========
+| 故障类型 | 触发方法 | 实测结果 | 状态 |
+|---|---|---|---|
+| SFSWT（surfaceflinger watchdog） | adb shell kill -STOP <surfaceflinger_pid>（75s 后 CONT） | 未生成 SFSWT.111000001 记录（该版本可能无 surfaceflinger watchdog 或阈值更长） | 未验证 |
+| Reboot（异常重启/内核 panic） | adb shell "echo 1 > /proc/sys/kernel/sysrq; echo c > /proc/sysrq-trigger" | 18:02:08 uniview Reboot 记录 reboot_reason=kernel_crash，聚合包 tar 含 dump_report（Reboot into panic），第一阶段采集+第二阶段报表（SR 25 条）全链路确认；注意：触发后设备进入 dump 需长按电源恢复 | 已验证 |
+| Modem Assert（Assert.110000001） | echo 1 > /sys/module/audio_sipc/parameters/assert_trigger | 无新 Assert 记录（节点写入无效） | 失效 |
+| CP2/GNSS Assert | /sys/devices/platform/cpwcn-btwf、cpwcn-gnss 下无 assert/crash 节点（目录为空）；全 /sys 搜索仅 audio_sipc assert_trigger | 无可用节点 | 未验证 |
+| Shutdown Error | （reboot -p 关机后需手动开机，按用户要求后放） | - | 未验证 |
+| No space left on data JE | （填充 /data 有系统风险，后放） | - | 未验证 |
+| FATAL.JE | （am crash 无 --fatal；am crash system_server 仅触发 SWT；需 fatal Java 异常路径） | - | 未验证 |
+
+注意：sysrq panic 触发后设备进入 dump 需长按电源恢复（用户已预判此类后放）。
+========== ATTS apk 补充验证（2026-08-11，D:\Tinno_auto\ATTS 编译安装）==========
+编译：gradlew assembleDebug（需 JDK17，JDK1.8 会 SSL 失败；产物 app-arm64-v8a-debug.apk）
+安装：com.tinno.autotesttool，入口仅 NativeCrashActivity（manifest 只注册它；JavaExceptionActivity
+被注释未注册，其数组越界/类型转换按钮在 NativeCrashActivity 布局中未绑定监听）
+
+| 触发项 | 操作 | 实测结果 | 状态 |
+|---|---|---|---|
+| NE（app native crash） | NativeCrashActivity 点击"触发Native段错误崩溃" | tombstone_11/12（com.tinno.autotesttool SIGSEGV null dereference）+ dropbox data_app_native_crash×2；第一阶段建包 SYSTEM-TOMBSTONE_08-12-002212/002237（detail+tombstone+ylog）；**uniview NE 无记录** | 已验证（dropbox/tombstone 链路） |
+| ANR | 连点两次"ANR"按钮（主线程 sleep 10s + input 排队） | Toast 出现但无 /data/anr trace、无 dropbox data_app_anr（该版本 input ANR 未检出或阈值不同） | 未验证 |
+| JE | （JavaExceptionActivity 未注册，按钮未绑定） | - | 未验证（am crash 已覆盖） |
+
+重要发现：uniview NE 埋点对第三方 app 进程的 native crash 不记录（tombstone/dropbox 正常记录）；
+kill -SEGV 到 system_server/systemui（系统关键进程）uniview 有记录。第一阶段 dropbox 源可兜底建包。
+========== FATAL.JE 最终结论（2026-08-11）==========
+状态：未验证（无可用触发方法，验收以已验证 6 类 + dropbox 兜底为准）
+
+已穷尽的触发路径：
+1. am crash system_server -> 仅 SWT（watchdog），非 FATAL.JE
+2. kill -SEGV system_server -> FATAL.NE（native 路径），非 FATAL.JE
+3. kill -9 system_server -> 无 uniview 记录（SIGKILL 无 Java 异常路径，系统软重启）
+4. am crash --fatal -> 该版本（Android 16 MyOS16）不支持该选项
+5. ATTS apk（JavaExceptionActivity 未注册/按钮未绑定）-> 无 fatal 路径
+
+剩余理论路径（Binder 恶意 Parcel 注入 system_server 触发 Java OOM/异常 -> FATAL EXCEPTION
+IN SYSTEM PROCESS）：需逆向 Android 16 IActivityManager（ZTE 定制 UFwActivityManagerService）
+transaction code + Parcel 格式，成本高且触发后 uniview 是否记录 FATAL.JE 不确定；
+经评估暂不投入，如需触发建议向展锐索取 fatal 注入工具/工程指令。
+
+注意：FATAL.JE.103100004 在设备上从未出现过目录（无历史数据），该类型实际触发条件
+（Android fatal 异常路径）在本机型上可能极少出现。
+========== 未验证类型深入研究（2026-08-11）==========
+| 类型 | 研究方法 | 实测结果 | 状态 |
+|---|---|---|---|
+| Modem Assert（Assert.110000001） | /dev/spipe_lte0 发 AT+SPASSERT；/sys 全搜 assert 节点 | 无记录（AT 指令无效果；无 assert 内核节点） | 未验证 |
+| CP2 Assert（Assert.109000001） | /proc/wcn_btwf/stop 停止 WCN + svc bluetooth/wifi enable | 无新记录（历史 07-01 记录为 WCN-CP2-EXCEPTION BT assert，需 BT 固件异常场景） | 未验证 |
+| GNSS Assert（Assert.109000002） | /proc/wcn_gnss 仅 start/stop/status（无 assert 口） | 无记录 | 未验证 |
+| SFSWT（111000001） | kill -STOP surfaceflinger 3 分钟 + UI 压力（APP_SWITCH/swipe） | 无记录（该类型设备从未出现，触发条件特殊） | 未验证 |
+| No space left on data JE（JE.103000007） | dd 填充 /data 至 100%（30GB）+ am crash ×2 | YLog 报 ENOSPC（write ret -1 error 28）但 uniview 未记录 no-space JE（/blackbox/ylog/uniview_exception 不存在；该类型设备无历史） | 未验证 |
+| Shutdown Error（103000001） | （研究） | 设备无 Shutdown 目录/历史；异常关机场景（断电/关机流程异常）难以软件模拟 | 未验证 |
+
+补充结论：
+1. /proc/wcn_btwf、/proc/wcn_gnss 仅有 start/stop/status 控制口，无 assert 注入点
+2. /dev/spipe_lte0-18 存在但 AT 指令（AT+SPASSERT）无响应（通道非标准 AT 或指令已禁用）
+3. 展锐 uniview 的 no-space 检测链路未在 uniview_exception 体现（仅 ylog ENOSPC 日志）
+4. 全部未验证类型设备上均无历史记录（首次出现条件未知），建议后续向展锐厂商索取：
+   官方触发方法/工程指令（modem assert、GNSS assert、Shutdown）、no-space 检测机制说明、SFSWT 触发条件

@@ -1,10 +1,12 @@
 {
     "_comment": "stability_Monkey-Log-Scan-GT 配置文件",
     "general": {
-        "polling_interval_seconds": 60,
+        "polling_interval_seconds": 180,
         "state_prefix": "output",
-        "scan_buffers": ["main", "system", "events"],
-        "logcat_lines": 1000
+        "max_thread_pool_workers": 4,
+        "max_consecutive_failures": 5,
+        "failure_wait_seconds": 60,
+        "exception_wait_seconds": 30
     },
     "dropbox": {
         "types": {
@@ -39,5 +41,39 @@
         "device_tmp_dir": "/data/local/tmp",
         "device_blacklist_path": "/sdcard/blacklist.txt",
         "process_name": "com.android.commands.monkey"
+    },
+    "platform": {
+        "sprd": {
+            "sources": [
+                {"name": "uniview",         "device_path": "/data/ylog/uniview_exception", "dest_folder": "uniview", "wrap": "uniview"},
+                {"name": "anr_traces",      "device_path": "/data/anr",        "dest_folder": "data_anr",         "wrap": "anr"},
+                {"name": "tombstones",      "device_path": "/data/tombstones", "dest_folder": "sys_native_crash", "wrap": "tombstone"},
+                {"name": "crash_dump_log",  "device_path": "/sdcard/crash-dump.log", "dest_folder": "ylog", "wrap": "raw", "single_file": true},
+                {"name": "ylog_lastkernel", "device_path": "/data/ylog/lastkernel.log", "dest_folder": "ylog", "wrap": "raw", "single_file": true},
+                {"name": "ylog_dmesg",      "device_path": "/data/ylog/dmesg.log",     "dest_folder": "ylog", "wrap": "raw", "single_file": true},
+                {"name": "ylog_fwreboot",   "device_path": "/data/ylog/fwreboot",     "dest_folder": "ylog/fwreboot", "wrap": "raw", "recursive": true},
+                {"name": "sysdump",         "device_path": "/data/ylog/ap/SYSDUMP",   "dest_folder": "ylog/sysdump",   "wrap": "raw", "recursive": true},
+                {"name": "modem_log",       "device_path": "/data/ylog/modem",        "dest_folder": "ylog/modem",     "wrap": "raw", "recursive": true}
+            ]
+        }
+    },
+    "events": {
+        "bugreport_cooldown_minutes": 10,
+        "bugreport_cooldown_event_types": ["ANR", "CRASH"],
+        "meminfo_snapshot": true,
+        "correlated_ap_segments": 2,
+        "scene_map": {
+            "ANR": ["_anr", "anr_traces", "103000005"],
+            "FC": ["_crash", "tombstones", "crash_dump_log", "103000004"],
+            "System_Server": ["system_server", "103100003"],
+            "KP": ["KERNEL_PANIC", "ylog_lastkernel"],
+            "MSP": ["MODEM_SILENT_PANIC", "modem_log"],
+            "SSP": ["SUBSYS_SILENT_PANIC"],
+            "SR": ["SYSTEM_RESTART", "SYSTEM_BOOT", "ylog_fwreboot", "103000002"],
+            "SWT": ["103000006", "watchdog"],
+            "Jank": ["102200004", "Jank"],
+            "Assert": ["109000001", "Assert"],
+            "WCN": ["109000003", "WCN"]
+        }
     }
 }
