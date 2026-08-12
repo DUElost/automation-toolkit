@@ -37,9 +37,13 @@ python scan_result.py -d <第一阶段保存根目录> [--threshold 0.9]
 
 - 前置：ExpClass + Package 相同
 - **NE**：CausedBy 提取 pc 地址指纹，同 pc 才合并（不同 pc 的 backtrace 首帧相似度高会被误并，实测修复）
-- 其他类型：difflib `SequenceMatcher` 比较 CausedBy（阈值默认 0.9）
+- 其他类型：difflib `SequenceMatcher` 比较 CausedBy（**比较前清洗：去数字/0x 地址/@ 符号**，对齐 MTK
+  `get_str_similar(format_str)`——阻塞秒数/行号等动态值不干扰归并）
 - 空 CausedBy：同秒视为同一事件（uniview + dropbox 双写）
+- SWT 无阻塞详情（仅 Searching 行/压力统计）：CausedBy 走 MTK 兜底（随机串，各自保留不误并）
 - 组内保留 ExpTime 最早的代表条目，`Count` = 组内条数；`DeviceCount` = 组内设备数
+- **跨设备归并**：同根因问题跨设备合并为 1 条（DeviceCount>1），Rom_Ram 组内多配置以 `/` 拼接
+  （如 `64GB+4GB/128GB+4GB`）
 
 ## 测试
 
@@ -47,7 +51,13 @@ python scan_result.py -d <第一阶段保存根目录> [--threshold 0.9]
 python -m pytest test/ -v
 ```
 
-21 passed（classify/collect/dedup/export）。
+23 passed（classify/collect/dedup/export）。
+
+## 验证状态（真机 Z2581/MyOS16，2026-08 验收）
+
+- 单设备 + 多设备（两版本）+ 多版本验证通过；跨设备归并 DeviceCount=2 实测确认
+- Detail 全统一 Device_id 模板（37 行无残留）；CausedBy 空 0；Rom_Ram `/` 0
+- 手动触发数据集（JE/NE/FATAL.NE/SWT/ANR/Reboot）报表核对通过
 
 ## 目录结构
 
@@ -56,7 +66,7 @@ scan_result.py            # 主入口（-d 输出）
 config.json               # ExpClass 映射 / 去重阈值 / 输出配置（15 列 / 文件名模板）
 modules/collect.py        # 问题包扫描 + 字段提取（MTK Detail 模板 / pid / Rom_Ram）
 modules/classify.py       # ExpClass 映射
-modules/dedup.py          # pc 指纹 + SequenceMatcher 去重
+modules/dedup.py          # pc 指纹 + 清洗 SequenceMatcher 去重
 modules/export.py         # xlwt .xls 导出（MTK 样式/列宽）
 test/                     # pytest
 docs/superpowers/         # spec 与实施计划
