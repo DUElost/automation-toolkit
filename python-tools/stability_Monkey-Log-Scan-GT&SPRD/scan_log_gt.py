@@ -59,6 +59,7 @@ class ScanLogGT:
     def collect_device_rom_ram(self, device, folderpath):
         """采集设备 ROM/RAM 落盘 {version}/{device}/rom_ram.json（SN 对应）。
 
+        启动（首次扫描）时执行一次：单台设备 Rom/Ram 不变，后续轮次复用。
         RAM：getprop ro.boot.ddrsize（如 4096M -> 4GB SKU）；
         ROM：/sys/block/mmcblk0/size（块数*512 字节 -> SKU）。
         幂等：已存在且非空则跳过；解析失败保持已有值。
@@ -112,7 +113,9 @@ class ScanLogGT:
     def run_scan(self, device, folderpath):
         state_file = self._state_file(folderpath, device)
         is_first_scan = not os.path.exists(state_file)
-        self.collect_device_rom_ram(device, folderpath)
+        # Rom_Ram 启动时采集一次（单设备不变，后续轮次复用；仅文件缺失时执行 adb）
+        if not os.path.exists(os.path.join(folderpath, device, "rom_ram.json")):
+            self.collect_device_rom_ram(device, folderpath)
         old_counts = self._load_state(state_file)
         new_counts = self.get_problem_counts(device)
         self._save_state(state_file, new_counts)
