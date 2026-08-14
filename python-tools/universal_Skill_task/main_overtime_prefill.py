@@ -123,9 +123,14 @@ def main() -> int:
 
                 if allow_submit:
                     submit_overtime_form(ehr_page)
-                    print(f"[OK] submitted {target.isoformat()}")
-                    submitted += 1
                     _screenshot(ehr_page, f"submitted_{target.strftime('%Y%m%d')}")
+                    saved = read_existing_overtime(ehr_page, target)
+                    if saved is None:
+                        print(f"[FAIL] {target.isoformat()} not found in 加班查询 after submit")
+                        _wait_enter("[INFO] Press Enter to close browser...")
+                        return 1
+                    print(f"[OK] submitted {target.isoformat()} verified={saved}")
+                    submitted += 1
                 else:
                     print("[INFO] no --ALLOW — did not click submit")
                     _wait_enter(

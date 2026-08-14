@@ -114,9 +114,27 @@ def prefill_overtime_form(page: Page, decision: Decision, reason: Optional[str] 
 
 
 def submit_overtime_form(page: Page) -> None:
-    """Click the form Submit button. Caller must have passed --ALLOW."""
+    """Click Submit and accept the confirm dialog. Caller must have passed --ALLOW.
+
+    Playwright dismisses dialogs by default, which makes the page cancel its own
+    submit, so the handler is attached for the duration of the click.
+    """
     frame = _find_frame_with_selector(page, SEL_SUBMIT)
     loc = frame.locator(SEL_SUBMIT).first
     loc.wait_for(state="visible", timeout=15_000)
-    loc.click()
-    page.wait_for_timeout(3_000)
+
+    accepted: List[str] = []
+
+    def accept(dialog):
+        accepted.append(dialog.message)
+        dialog.accept()
+
+    page.on("dialog", accept)
+    try:
+        loc.click()
+        page.wait_for_timeout(5_000)
+    finally:
+        page.remove_listener("dialog", accept)
+
+    for message in accepted:
+        print(f"[INFO] accepted dialog: {message}", flush=True)
