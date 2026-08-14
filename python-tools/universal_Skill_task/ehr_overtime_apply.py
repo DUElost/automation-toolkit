@@ -74,10 +74,29 @@ def _find_frame_with_selector(page: Page, selector: str) -> Frame:
     raise OvertimeApplyError(f"Selector not found in any frame: {selector}")
 
 
+_SET_READONLY_VALUE = """
+(el, value) => {
+  el.value = value;
+  for (const type of ['input', 'change', 'blur']) {
+    el.dispatchEvent(new Event(type, { bubbles: true }));
+  }
+  return el.value;
+}
+"""
+
+
 def _fill_first(frame: Frame, selector: str, value: str) -> None:
+    """Fill a field, or drive its own handlers when the date/time picker marks it readonly."""
     loc = frame.locator(selector).first
     loc.wait_for(state="visible", timeout=15_000)
-    loc.fill(value)
+    if loc.evaluate("el => el.readOnly === true"):
+        loc.evaluate(_SET_READONLY_VALUE, value)
+    else:
+        loc.fill(value)
+
+    actual = loc.input_value()
+    if actual != value:
+        raise OvertimeApplyError(f"Field {selector} kept {actual!r} instead of {value!r}")
 
 
 def prefill_overtime_form(page: Page, decision: Decision) -> None:
