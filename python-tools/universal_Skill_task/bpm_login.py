@@ -50,6 +50,7 @@ def login_bpm(page: Page, cfg: AppConfig) -> None:
     is confirmed in the background while the first navigation runs.
     """
     _thread, stop_confirming = confirm_in_background(deadline_s=90)
+    print("[INFO] If a certificate dialog appears, click the Chrome window and press Enter once.", flush=True)
     try:
         page.goto(cfg.bpm_url, wait_until="commit", timeout=90_000)
         page.wait_for_load_state("domcontentloaded", timeout=60_000)

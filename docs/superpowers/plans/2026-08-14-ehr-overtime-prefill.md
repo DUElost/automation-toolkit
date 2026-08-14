@@ -630,7 +630,7 @@ git commit -m "docs(universal_Skill_task): document overtime prefill entrypoint"
 
 **Files:** 可能微调 `ehr_overtime_apply.py` 选择器
 
-- [ ] **Step 1: 全量单测**
+- [x] **Step 1: 全量单测**
 
 ```powershell
 cd F:\automation-toolkit\.worktrees\bpm-ehr-login\python-tools\universal_Skill_task
@@ -639,7 +639,7 @@ python -m pytest tests -q
 
 Expected: 全部 PASS
 
-- [ ] **Step 2: 实机运行**
+- [x] **Step 2: 实机运行**
 
 ```powershell
 python main_overtime_prefill.py
@@ -660,19 +660,38 @@ proposed_end=21:00
 
 人工核对浏览器：
 
-- 类别 = 平日加班（或周末对应）
-- 开始/结束日期时间与决策一致
+- ~~类别 = 平日加班（或周末对应）~~（实测表单无可见类别字段，已从设计中移除）
+- 加班日期 / 开始 / 结束时间与决策一致
 - 事由 = 待确认
 - 未出现提交成功/流程已送审提示
 
-- [ ] **Step 3: 若选择器需微调，改完再测再 commit**
+- [x] **Step 3: 若选择器需微调，改完再测再 commit**
 
-```powershell
-git add python-tools/universal_Skill_task/ehr_overtime_apply.py
-git commit -m "fix(universal_Skill_task): tune overtime apply form selectors"
-```
+实测修正（已提交）：
 
-- [ ] **Step 4: 在本 plan 文件勾选完成项，并在文末追加「Task 8 实测结果」短节（日期、决策、是否预填成功、未提交确认）**
+- `OT_TYPE` 隐藏不可选 → 跳过类别
+- `FROM_DATE` 为 My97 `readonly` → JS 写值并派发 change/blur
+- 相关 commit：`53c0889` / `149961c` / `4289c6d`
+
+- [x] **Step 4: 在本 plan 文件勾选完成项，并在文末追加「Task 8 实测结果」短节（日期、决策、是否预填成功、未提交确认）**
+
+---
+
+## Task 8 实测结果（2026-08-14）
+
+| 项 | 结果 |
+|----|------|
+| 入口 | `python main_overtime_prefill.py` |
+| 目标日 | `2026-08-13`（weekday） |
+| 打卡 | `08:59`, `21:10` |
+| 已有申请 | none |
+| 决策 | `APPLY` / `19:00`–`21:00` / 事由「待确认」 |
+| 预填 | 成功；截图 `artifacts/overtime_prefill_20260814_220554_filled.png` |
+| 表单核对 | 加班日期 `13/08/2026`；开始 `19:00`；结束 `21:00`；时数系统算出 `2.00`；事由「待确认」；主管默认未改 |
+| 提交 | **未点击**；`ALLOW_SUBMIT_OVERTIME=False` |
+| 决策日志 | `artifacts/overtime_decision_20260814_220545.log` |
+
+结论：预填阶段验收通过。真实提交需另开需求与设计。
 
 ---
 
@@ -682,11 +701,12 @@ git commit -m "fix(universal_Skill_task): tune overtime apply form selectors"
 |-----------|------|
 | 独立入口 + `ehr_overtime_apply` | 5, 6 |
 | 仅 APPLY 预填 | 6 |
-| 类别平日/周末 | 2, 5 |
+| ~~类别平日/周末~~（实测取消） | — |
+| 可见字段：日期/起止/事由 | 5, 8 |
 | 事由待确认 | 5, 6 |
-| 禁止提交 / `ALLOW_SUBMIT_OVERTIME=False` | 2, 5, 6 |
+| 禁止提交 / `ALLOW_SUBMIT_OVERTIME=False` | 2, 5, 6, 8 |
 | 经首页导航 | 3, 5 |
-| Enter 等待核对 + 截图 | 6 |
+| Enter 等待核对 + 截图 | 6, 8 |
 | 探针定选择器 | 4, 5, 8 |
 | README | 7 |
 | 解析器前置修正 | 1 |
@@ -698,3 +718,4 @@ git commit -m "fix(universal_Skill_task): tune overtime apply form selectors"
 - 无 TBD 步骤；Task 5 的选择器明确要求先跑 Task 4 替换占位常量
 - 不实现 submit API；黑名单单测锁定
 - 与 dry-run 入口分离，不改 `main_overtime_dry_run.py` 语义
+- 实测后取消「加班类别」预填（表单无可见控件）
