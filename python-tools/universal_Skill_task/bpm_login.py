@@ -49,9 +49,10 @@ def login_bpm(page: Page, cfg: AppConfig) -> None:
     The site requires a personal digital certificate, so the native certificate prompt
     is confirmed in the background while the first navigation runs.
     """
-    _thread, stop_confirming = confirm_in_background(deadline_s=45)
+    _thread, stop_confirming = confirm_in_background(deadline_s=90)
     try:
-        page.goto(cfg.bpm_url, wait_until="domcontentloaded", timeout=60_000)
+        page.goto(cfg.bpm_url, wait_until="commit", timeout=90_000)
+        page.wait_for_load_state("domcontentloaded", timeout=60_000)
     except PlaywrightTimeoutError as exc:
         raise LoginError(
             f"Could not open {cfg.bpm_url}. The certificate prompt may still be waiting, "

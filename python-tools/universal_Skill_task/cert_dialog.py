@@ -2,8 +2,8 @@
 """Auto-confirm the Chromium client-certificate prompt on Windows.
 
 Company policy blocks the AutoSelectCertificateForUrls registry key, and the prompt
-is a browser-native dialog Playwright cannot reach, so it is confirmed by sending
-ENTER to the browser window.
+is a browser-native dialog Playwright cannot reach, so it is confirmed by focusing the
+Playwright Chromium window and sending ENTER (also PostMessage as a fallback).
 """
 
 from __future__ import annotations
@@ -22,8 +22,13 @@ _EnumWindowsProc = ctypes.WINFUNCTYPE(wt.BOOL, wt.HWND, wt.LPARAM)
 VK_RETURN = 0x0D
 KEYEVENTF_KEYUP = 0x0002
 SW_RESTORE = 9
+WM_KEYDOWN = 0x0100
+WM_KEYUP = 0x0101
+WM_ACTIVATE = 0x0006
+WA_ACTIVE = 1
 
-BROWSER_TITLE_HINTS = ("Chrome for Testing", "Chromium")
+# Only match Playwright's Chromium — never RDP / other apps' #32770 dialogs.
+BROWSER_TITLE_HINTS = ("Chrome for Testing",)
 
 
 def _window_title(hwnd) -> str:
@@ -42,13 +47,14 @@ def _window_class(hwnd) -> str:
 
 
 def find_browser_window():
-    """Return hwnd of the visible headed-Chromium window, or None."""
+    """Return hwnd of the visible Playwright Chromium window, or None."""
     match = []
 
     def callback(hwnd, _lparam):
         if not user32.IsWindowVisible(hwnd):
             return True
-        if not _window_class(hwnd).startswith("Chrome_WidgetWin"):
+        cls = _window_class(hwnd)
+        if cls != "Chrome_WidgetWin_1":
             return True
         title = _window_title(hwnd)
         if any(hint in title for hint in BROWSER_TITLE_HINTS):
@@ -75,19 +81,19 @@ def _press_enter() -> None:
     user32.keybd_event(VK_RETURN, 0, KEYEVENTF_KEYUP, 0)
 
 
+def _post_enter(hwnd) -> None:
+    user32.PostMessageW(hwnd, WM_ACTIVATE, WA_ACTIVE, 0)
+    user32.PostMessageW(hwnd, WM_KEYDOWN, VK_RETURN, 0)
+    user32.PostMessageW(hwnd, WM_KEYUP, VK_RETURN, 0)
+
+
 def auto_confirm_cert_dialog(
     stop_event: Optional[threading.Event] = None,
-    deadline_s: float = 45.0,
-    initial_delay_s: float = 3.5,
-    interval_s: float = 3.0,
+    deadline_s: float = 60.0,
+    initial_delay_s: float = 1.0,
+    interval_s: float = 1.5,
 ) -> None:
-    """Repeatedly confirm the certificate prompt until stopped or the deadline passes.
-
-    Intended to run in a daemon thread while the main thread navigates. Retries because
-    the prompt may appear again for other tinno.com hosts during SSO redirects. The
-    caller should set stop_event once navigation returns, so stray ENTER keystrokes
-    never reach page content.
-    """
+    """Repeatedly confirm the certificate prompt until stopped or the deadline passes."""
     stop = stop_event or threading.Event()
     if stop.wait(initial_delay_s):
         return
@@ -98,7 +104,8 @@ def auto_confirm_cert_dialog(
         if hwnd:
             try:
                 _focus(hwnd)
-                time.sleep(0.5)
+                time.sleep(0.2)
+                _post_enter(hwnd)
                 _press_enter()
             except OSError:
                 pass
@@ -106,12 +113,12 @@ def auto_confirm_cert_dialog(
             return
 
 
-def confirm_in_background(deadline_s: float = 45.0) -> tuple[threading.Thread, threading.Event]:
+def confirm_in_background(deadline_s: float = 60.0) -> tuple[threading.Thread, threading.Event]:
     """Start the confirm loop in a daemon thread; caller sets the event to stop it."""
     stop = threading.Event()
     thread = threading.Thread(
         target=auto_confirm_cert_dialog,
-        kwargs={"stop_event": stop, "deadline_s": deadline_s},
+        kwargs={"stop_event": stop, "deadline_s": deadline_s, "initial_delay_s": 1.0, "interval_s": 1.5},
         daemon=True,
     )
     thread.start()

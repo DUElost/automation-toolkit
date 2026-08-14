@@ -13,7 +13,7 @@ from browser import launch_page
 from bpm_login import LoginError, login_bpm
 from config import ConfigError, load_config
 from ehr_attendance import read_punches_for_day
-from ehr_nav import EhrNavError
+from ehr_nav import EhrNavError, wait_ehr_home_ready
 from ehr_overtime_query import read_existing_overtime
 from navigate_ehr import NavigateEhrError, open_ehr
 from overtime_decision import ALLOW_SUBMIT_OVERTIME, build_decision, format_decision
@@ -61,6 +61,8 @@ def main() -> int:
             print(f"[OK] BPM login url={page.url}")
             ehr_page = open_ehr(page, context)
             print(f"[OK] EHR opened url={ehr_page.url}")
+            wait_ehr_home_ready(ehr_page)
+            print("[OK] EHR home ready")
 
             punches = read_punches_for_day(ehr_page, target)
             print(f"[OK] punches={punches}")
