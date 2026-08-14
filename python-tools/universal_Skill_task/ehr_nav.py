@@ -11,6 +11,7 @@ from playwright.sync_api import Locator, Page
 HOME_TEXTS = ["首页"]
 ATTENDANCE_TEXTS = ["我的考勤"]
 OVERTIME_QUERY_TEXTS = ["加班查询"]
+OVERTIME_APPLY_TEXTS = ["加班申请"]
 
 
 class EhrNavError(RuntimeError):
@@ -79,6 +80,12 @@ def open_overtime_query(page: Page) -> None:
     go_home(page)
     page.wait_for_timeout(1_000)
     _click_by_texts(page, OVERTIME_QUERY_TEXTS, "加班查询")
+
+
+def open_overtime_apply(page: Page) -> None:
+    go_home(page)
+    page.wait_for_timeout(1_000)
+    _click_by_texts(page, OVERTIME_APPLY_TEXTS, "加班申请")
 
 
 HOME_READY_TEXTS = ["我的考勤", "加班查询", "加班申请"]
