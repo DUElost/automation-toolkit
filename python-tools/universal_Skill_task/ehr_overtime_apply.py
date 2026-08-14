@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from collections import OrderedDict
 from datetime import date, time
 from typing import List
 
@@ -21,7 +22,9 @@ FORBIDDEN_CLICK_TEXTS: List[str] = [
     "同意提交",
 ]
 
-# Real selectors from artifacts/probe_overtime_apply.txt frame[3] (ATT_S_OT_APP)
+# Real selectors from artifacts/probe_overtime_apply.txt frame[3] (ATT_S_OT_APP).
+# The live form only shows 加班日期 / 开始时间 / 结束时间 / 加班原因; OT_TYPE and
+# TO_DATE are hidden inputs the server derives from 加班日期.
 SEL_CATEGORY = "select[name='OT_TYPE']"
 SEL_START_DATE = "input[name='FROM_DATE']"
 SEL_END_DATE = "input[name='TO_DATE']"
@@ -55,6 +58,21 @@ def is_forbidden_click_text(text: str) -> bool:
     return any(bad in s for bad in FORBIDDEN_CLICK_TEXTS)
 
 
+def plan_prefill_values(decision: Decision) -> "OrderedDict[str, str]":
+    """Map an APPLY decision onto the selectors of the visible form fields."""
+    if decision.action != Action.APPLY:
+        raise OvertimeApplyError(f"Refuse to prefill when action={decision.action.value}")
+    if decision.proposed_start is None or decision.proposed_end is None:
+        raise OvertimeApplyError("APPLY decision missing proposed start/end")
+
+    values: "OrderedDict[str, str]" = OrderedDict()
+    values[SEL_START_DATE] = format_ehr_date(decision.target_date)
+    values[SEL_START_TIME] = format_ehr_time(decision.proposed_start)
+    values[SEL_END_TIME] = format_ehr_time(decision.proposed_end)
+    values[SEL_REASON] = decision.reason or "待确认"
+    return values
+
+
 def _find_frame_with_selector(page: Page, selector: str) -> Frame:
     for frame in page.frames:
         try:
@@ -72,33 +90,12 @@ def _fill_first(frame: Frame, selector: str, value: str) -> None:
 
 
 def prefill_overtime_form(page: Page, decision: Decision) -> None:
-    if decision.action != Action.APPLY:
-        raise OvertimeApplyError(f"Refuse to prefill when action={decision.action.value}")
-    if decision.proposed_start is None or decision.proposed_end is None:
-        raise OvertimeApplyError("APPLY decision missing proposed start/end")
+    values = plan_prefill_values(decision)
 
     open_overtime_apply(page)
     page.wait_for_timeout(3_000)
 
-    category = category_for_day_kind(decision.day_kind)
-    start_date = format_ehr_date(decision.target_date)
-    end_date = format_ehr_date(decision.target_date)
-    start_time = format_ehr_time(decision.proposed_start)
-    end_time = format_ehr_time(decision.proposed_end)
-    reason = decision.reason or "待确认"
-
-    frame = _find_frame_with_selector(page, SEL_CATEGORY)
-    cat = frame.locator(SEL_CATEGORY).first
-    tag = cat.evaluate("el => el.tagName")
-    if tag == "SELECT":
-        cat.select_option(label=category)
-    else:
-        frame.get_by_text(category, exact=True).first.click()
-
-    _fill_first(_find_frame_with_selector(page, SEL_START_DATE), SEL_START_DATE, start_date)
-    _fill_first(_find_frame_with_selector(page, SEL_START_TIME), SEL_START_TIME, start_time)
-    _fill_first(_find_frame_with_selector(page, SEL_END_DATE), SEL_END_DATE, end_date)
-    _fill_first(_find_frame_with_selector(page, SEL_END_TIME), SEL_END_TIME, end_time)
-    _fill_first(_find_frame_with_selector(page, SEL_REASON), SEL_REASON, reason)
+    for selector, value in values.items():
+        _fill_first(_find_frame_with_selector(page, selector), selector, value)
 
     # Safety: never click Submit or any forbidden control. No submit function exists.

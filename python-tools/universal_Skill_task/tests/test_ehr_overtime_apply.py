@@ -8,11 +8,18 @@ sys.path.insert(0, str(ROOT))
 
 from ehr_overtime_apply import (
     FORBIDDEN_CLICK_TEXTS,
+    OvertimeApplyError,
+    SEL_END_TIME,
+    SEL_REASON,
+    SEL_START_DATE,
+    SEL_START_TIME,
     category_for_day_kind,
     format_ehr_date,
     format_ehr_time,
     is_forbidden_click_text,
+    plan_prefill_values,
 )
+from overtime_decision import build_decision
 
 
 def test_category_for_day_kind():
@@ -40,3 +47,26 @@ def test_is_forbidden_click_text():
     assert is_forbidden_click_text("保存申请") is True
     assert is_forbidden_click_text("加班申请") is False
     assert is_forbidden_click_text("首页") is False
+
+
+def _apply_decision():
+    return build_decision(date(2026, 8, 13), [time(8, 59), time(21, 10)], None)
+
+
+def test_plan_prefill_values_covers_visible_form_fields():
+    values = plan_prefill_values(_apply_decision())
+    assert values == {
+        SEL_START_DATE: "13/08/2026",
+        SEL_START_TIME: "19:00",
+        SEL_END_TIME: "21:00",
+        SEL_REASON: "待确认",
+    }
+
+
+def test_plan_prefill_values_rejects_non_apply():
+    skip = build_decision(date(2026, 8, 13), [], None)
+    try:
+        plan_prefill_values(skip)
+    except OvertimeApplyError:
+        return
+    raise AssertionError("expected OvertimeApplyError for non-APPLY decision")
