@@ -18,6 +18,7 @@ from overtime_rules import (
     is_weekend,
     propose_weekday,
     propose_weekend,
+    target_days_last_week,
     target_yesterday,
 )
 
@@ -27,6 +28,22 @@ BJ = timezone(timedelta(hours=8))
 def test_target_yesterday_beijing():
     now = datetime(2026, 8, 14, 16, 0, tzinfo=BJ)
     assert target_yesterday(now) == date(2026, 8, 13)
+
+
+def test_target_days_last_week_excludes_today():
+    now = datetime(2026, 8, 14, 22, 0, tzinfo=BJ)
+    days = target_days_last_week(now)
+    assert days == [
+        date(2026, 8, 7),
+        date(2026, 8, 8),
+        date(2026, 8, 9),
+        date(2026, 8, 10),
+        date(2026, 8, 11),
+        date(2026, 8, 12),
+        date(2026, 8, 13),
+    ]
+    assert date(2026, 8, 14) not in days
+    assert len(days) == 7
 
 
 def test_floor_half_hour_examples():

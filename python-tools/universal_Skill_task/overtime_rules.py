@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta, timezone
 from enum import Enum
-from typing import Iterable, Optional, Sequence, Tuple
+from typing import Iterable, List, Optional, Sequence, Tuple
 
 BEIJING = timezone(timedelta(hours=8))
 
@@ -39,6 +39,15 @@ def target_yesterday(now: Optional[datetime] = None) -> date:
     else:
         now = now.astimezone(BEIJING)
     return (now - timedelta(days=1)).date()
+
+
+def target_days_last_week(now: Optional[datetime] = None) -> List[date]:
+    """Return the last 7 calendar days before today (Beijing), oldest first.
+
+    Today itself is excluded. Example: 2026-08-14 → 08-07 … 08-13.
+    """
+    end = target_yesterday(now)
+    return [end - timedelta(days=offset) for offset in range(6, -1, -1)]
 
 
 def is_weekend(day: date) -> bool:

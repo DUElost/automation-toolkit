@@ -65,15 +65,16 @@ python main_overtime_dry_run.py
 ## 加班预填（不提交）
 
 ```powershell
-python main_overtime_prefill.py
+python main_overtime_prefill.py --reason "V552AA项目稳定性挂测"
 ```
 
 行为：
 
-1. 与 dry-run 相同：登录 → 读考勤/加班查询 → 写决策日志
-2. 仅当 `action=APPLY` 时打开「加班申请」并预填加班日期、起止时间、事由（表单无可见类别字段，不填）
-   - 事由默认「待确认」，可用参数传入：`python main_overtime_prefill.py --reason "V552AA项目稳定性挂测"`
-3. **不会**点击提交/保存；`ALLOW_SUBMIT_OVERTIME` 必须为 `False`
-4. 预填后浏览器保持打开，终端按 Enter 后退出
+1. 登录后处理**最近 7 个自然日（不含今天）**，从早到晚逐日决策
+2. 仅当某日 `action=APPLY` 时打开「加班申请」并预填加班日期、起止时间、事由
+   - 事由默认「待确认」，可用 `--reason "..."` 传入
+3. `SKIP_*` 只写日志，自动进入下一天
+4. **不会**点击提交/保存；`ALLOW_SUBMIT_OVERTIME` 必须为 `False`
+5. 每次预填后浏览器保持打开，终端按 Enter 后处理下一天
 
-人工核对截图：`artifacts/overtime_prefill_*.png`
+人工核对截图：`artifacts/overtime_prefill_*_filled_YYYYMMDD.png`

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""BPM → EHR → decide → prefill overtime apply (never submit)."""
+"""BPM → EHR → decide last 7 days → prefill APPLY days (never submit)."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ from ehr_overtime_apply import OvertimeApplyError, prefill_overtime_form
 from ehr_overtime_query import read_existing_overtime
 from navigate_ehr import NavigateEhrError, open_ehr
 from overtime_decision import ALLOW_SUBMIT_OVERTIME, build_decision, format_decision
-from overtime_rules import Action, target_yesterday
+from overtime_rules import Action, target_days_last_week
 
 ROOT = Path(__file__).resolve().parent
 ARTIFACTS = ROOT / "artifacts"
@@ -71,8 +71,12 @@ def main() -> int:
         print(f"[FAIL] config: {exc}")
         return 2
 
-    target = target_yesterday()
-    print(f"[INFO] target_date(Beijing yesterday)={target.isoformat()}")
+    days = target_days_last_week()
+    print(
+        f"[INFO] target_days(Beijing last 7 excl. today)="
+        f"{days[0].isoformat()}..{days[-1].isoformat()} ({len(days)} days)",
+        flush=True,
+    )
 
     with launch_page() as (_pw, _browser, context, page):
         ehr_page = page
@@ -84,27 +88,39 @@ def main() -> int:
             wait_ehr_home_ready(ehr_page)
             print("[OK] EHR home ready")
 
-            punches = read_punches_for_day(ehr_page, target)
-            print(f"[OK] punches={punches}")
-            existing = read_existing_overtime(ehr_page, target)
-            print(f"[OK] existing={existing}")
+            applied = 0
+            skipped = 0
+            for i, target in enumerate(days, start=1):
+                print(f"[INFO] === day {i}/{len(days)} {target.isoformat()} ===", flush=True)
+                punches = read_punches_for_day(ehr_page, target)
+                print(f"[OK] punches={punches}")
+                existing = read_existing_overtime(ehr_page, target)
+                print(f"[OK] existing={existing}")
 
-            decision = build_decision(target, punches, existing)
-            text = format_decision(decision)
-            print("[DECISION]")
-            print(text)
-            print(f"[INFO] decision_log={_write_log(text)}")
+                decision = build_decision(target, punches, existing)
+                text = format_decision(decision)
+                print("[DECISION]")
+                print(text)
+                print(f"[INFO] decision_log={_write_log(text)}")
 
-            if decision.action != Action.APPLY:
-                print(f"[INFO] skip prefill because action={decision.action.value}")
+                if decision.action != Action.APPLY:
+                    print(f"[INFO] skip prefill because action={decision.action.value}")
+                    skipped += 1
+                    continue
+
+                prefill_overtime_form(ehr_page, decision, reason)
+                shot = _screenshot(ehr_page, f"filled_{target.strftime('%Y%m%d')}")
+                print(f"[OK] prefilled; screenshot={shot}")
+                print("[INFO] ALLOW_SUBMIT_OVERTIME=False — did not click submit")
+                _wait_enter(
+                    f"[INFO] Review {target.isoformat()}, then press Enter for next day "
+                    f"(or close after last)..."
+                )
+                applied += 1
+
+            print(f"[INFO] done: applied={applied} skipped={skipped}")
+            if applied == 0:
                 _wait_enter("[INFO] Press Enter to close browser...")
-                return 0
-
-            prefill_overtime_form(ehr_page, decision, reason)
-            shot = _screenshot(ehr_page, "filled")
-            print(f"[OK] prefilled; screenshot={shot}")
-            print("[INFO] ALLOW_SUBMIT_OVERTIME=False — did not click submit")
-            _wait_enter("[INFO] Review the form, then press Enter to close browser...")
             return 0
         except (LoginError, NavigateEhrError, EhrNavError, OvertimeApplyError) as exc:
             print(f"[FAIL] {exc}")
