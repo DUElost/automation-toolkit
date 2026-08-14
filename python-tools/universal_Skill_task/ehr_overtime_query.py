@@ -15,6 +15,12 @@ from overtime_rules import ExistingOvertime
 
 _TIME_RE = re.compile(r"\b([01]?\d|2[0-3]):([0-5]\d)\b")
 _DATE_RE = re.compile(r"(20\d{2})[-/](\d{1,2})[-/](\d{1,2})")
+_REAL_ROW_RE = re.compile(
+    r"(?P<d1>\d{1,2})/(?P<m1>\d{1,2})/(?P<y1>20\d{2})\s+"
+    r"(?P<h1>[01]?\d|2[0-3]):(?P<min1>[0-5]\d)\s+"
+    r"(?P<d2>\d{1,2})/(?P<m2>\d{1,2})/(?P<y2>20\d{2})\s+"
+    r"(?P<h2>[01]?\d|2[0-3]):(?P<min2>[0-5]\d)"
+)
 
 
 def parse_existing_overtime_from_text(text: str, target: date) -> Optional[ExistingOvertime]:
@@ -23,6 +29,17 @@ def parse_existing_overtime_from_text(text: str, target: date) -> Optional[Exist
         line = raw.strip()
         if not line:
             continue
+
+        real = _REAL_ROW_RE.search(line)
+        if real:
+            start_date = date(int(real["y1"]), int(real["m1"]), int(real["d1"]))
+            if start_date == target:
+                return ExistingOvertime(
+                    time(int(real["h1"]), int(real["min1"])),
+                    time(int(real["h2"]), int(real["min2"])),
+                )
+            continue
+
         m = _DATE_RE.search(line)
         if not m:
             continue
