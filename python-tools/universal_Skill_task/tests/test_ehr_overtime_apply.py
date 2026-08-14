@@ -13,18 +13,12 @@ from ehr_overtime_apply import (
     SEL_REASON,
     SEL_START_DATE,
     SEL_START_TIME,
-    category_for_day_kind,
     format_ehr_date,
     format_ehr_time,
     is_forbidden_click_text,
     plan_prefill_values,
 )
 from overtime_decision import build_decision
-
-
-def test_category_for_day_kind():
-    assert category_for_day_kind("weekday") == "平日加班"
-    assert category_for_day_kind("weekend") == "周末加班"
 
 
 def test_format_ehr_date_dmy():

@@ -22,12 +22,9 @@ FORBIDDEN_CLICK_TEXTS: List[str] = [
     "同意提交",
 ]
 
-# Real selectors from artifacts/probe_overtime_apply.txt frame[3] (ATT_S_OT_APP).
-# The live form only shows 加班日期 / 开始时间 / 结束时间 / 加班原因; OT_TYPE and
-# TO_DATE are hidden inputs the server derives from 加班日期.
-SEL_CATEGORY = "select[name='OT_TYPE']"
+# Visible fields on ATT_S_OT_APP. OT_TYPE / TO_DATE exist but are hidden and
+# derived by the server from 加班日期 — do not fill them.
 SEL_START_DATE = "input[name='FROM_DATE']"
-SEL_END_DATE = "input[name='TO_DATE']"
 SEL_START_TIME = "input[name='FROM_TIME']"
 SEL_END_TIME = "input[name='TO_TIME']"
 SEL_REASON = "textarea[name='REMARK']"
@@ -35,12 +32,6 @@ SEL_REASON = "textarea[name='REMARK']"
 
 class OvertimeApplyError(RuntimeError):
     """Failed to open or prefill overtime apply form."""
-
-
-def category_for_day_kind(day_kind: str) -> str:
-    if day_kind == "weekend":
-        return "周末加班"
-    return "平日加班"
 
 
 def format_ehr_date(d: date) -> str:

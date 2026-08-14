@@ -2,7 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 在 dry-run 决策为 `APPLY` 时打开 EHR「加班申请」并预填类别/起止/事由，浏览器停住供人工核对，全程禁止提交。
+**Goal:** 在 dry-run 决策为 `APPLY` 时打开 EHR「加班申请」并预填加班日期/起止时间/事由，浏览器停住供人工核对，全程禁止提交。
+
+> **实测修正（2026-08-14）：** 真实表单无可见「加班类别」；`OT_TYPE` 隐藏且不可 `select_option`。预填仅写 `FROM_DATE` / `FROM_TIME` / `TO_TIME` / `REMARK`。下文 Task 2/5 中的类别步骤已作废，以设计文档与代码为准。
 
 **Architecture:** 独立入口 `main_overtime_prefill.py` 复用登录与决策链路；`ehr_overtime_apply.py` 只负责经首页打开申请页并填写白名单控件；提交类操作由黑名单 + `ALLOW_SUBMIT_OVERTIME=False` 启动校验双重禁止。选择器以实现时探针为准。
 
