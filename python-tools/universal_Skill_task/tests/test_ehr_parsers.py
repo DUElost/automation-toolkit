@@ -32,6 +32,17 @@ REAL_OVERTIME = """
 平日加班	10/08/2026	19:00	10/08/2026	23:00	4.00	0.00	4.00	原因
 """
 
+# Rest day: 卡钟记录 is empty and the only times sit inside the 班值 label.
+REAL_REST_DAY = """
+日期	申诉	班值	上班	下班	时长	卡钟记录
+09/08/2026		定班-南昌-休息(09:00-18:00)			 		签卡		休假	
+"""
+
+# Clock-out only: 卡钟记录 holds a single punch.
+REAL_SINGLE_PUNCH = """
+26/07/2026		定班-南昌-休息(09:00-18:00)		20:06	 	20:06 	签卡		休假	
+"""
+
 
 def test_parse_punches_for_day():
     punches = parse_punches_from_text(SAMPLE_ATTENDANCE, date(2026, 8, 13))
@@ -41,6 +52,14 @@ def test_parse_punches_for_day():
 def test_parse_real_attendance_card_clock_record_only():
     punches = parse_punches_from_text(REAL_ATTENDANCE, date(2026, 8, 13))
     assert punches == [time(8, 59), time(21, 10)]
+
+
+def test_rest_day_shift_label_is_not_a_punch():
+    assert parse_punches_from_text(REAL_REST_DAY, date(2026, 8, 9)) == []
+
+
+def test_single_punch_row_reads_card_clock_only():
+    assert parse_punches_from_text(REAL_SINGLE_PUNCH, date(2026, 7, 26)) == [time(20, 6)]
 
 
 def test_looks_like_attendance_page_rejects_blank_render():

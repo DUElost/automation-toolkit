@@ -16,6 +16,7 @@ class AttendanceReadError(RuntimeError):
 
 
 _TIME_RE = re.compile(r"\b([01]?\d|2[0-3]):([0-5]\d)\b")
+_PURE_TIMES_RE = re.compile(r"^(?:[01]?\d|2[0-3]):[0-5]\d(?:\s+(?:[01]?\d|2[0-3]):[0-5]\d)*$")
 _DATE_RE = re.compile(r"(20\d{2})[-/](\d{1,2})[-/](\d{1,2})")
 _DMY_DATE_RE = re.compile(r"(\d{1,2})/(\d{1,2})/(20\d{2})")
 
@@ -38,15 +39,18 @@ def parse_punches_from_text(text: str, target: date) -> List[time]:
         if not line or not _line_matches_date(line, target):
             continue
 
-        # In the real EHR row, 卡钟记录 is the last time-bearing tab cell
-        # before 签卡. Earlier cells also contain shift hours and duration.
+        # In the real EHR row, 卡钟记录 is the last cell before 签卡 that holds
+        # nothing but times. Requiring a pure-time cell keeps the 班值 label
+        # (e.g. 定班-南昌-休息(09:00-18:00)) out of the punch list on rest days.
         if "签卡" in line and "\t" in line:
             fields = line.split("签卡", 1)[0].split("\t")
             for field in reversed(fields):
-                times = _TIME_RE.findall(field)
-                if times:
-                    punches.extend(time(int(h), int(mi)) for h, mi in times)
-                    break
+                if not _PURE_TIMES_RE.match(field.strip()):
+                    continue
+                punches.extend(
+                    time(int(h), int(mi)) for h, mi in _TIME_RE.findall(field)
+                )
+                break
             continue
 
         for hm in _TIME_RE.findall(line):
