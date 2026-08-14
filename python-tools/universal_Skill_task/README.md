@@ -51,3 +51,13 @@ reg add "HKLM\SOFTWARE\Policies\Chromium\AutoSelectCertificateForUrls" /v 1 /t R
 
 - 真实密码只放本地 `.env`，勿提交 git
 - 本仓库 `.gitignore` 已忽略 `.env` 与 `artifacts/*`
+
+## 加班只读决策（dry-run）
+
+```powershell
+python main_overtime_dry_run.py
+```
+
+流程：登录 BPM → 进 EHR → 我的考勤（昨日打卡）→ 首页 → 加班查询 → 输出决策日志到控制台与 `artifacts/overtime_decision_*.log`。
+
+**禁止提交加班申请。** 代码内 `ALLOW_SUBMIT_OVERTIME=False`。
