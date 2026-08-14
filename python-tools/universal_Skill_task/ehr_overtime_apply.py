@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Open EHR 加班申请 and prefill fields. Never submit."""
+"""Open EHR 加班申请, prefill fields, and optionally submit when caller asks."""
 
 from __future__ import annotations
 
@@ -28,10 +28,11 @@ SEL_START_DATE = "input[name='FROM_DATE']"
 SEL_START_TIME = "input[name='FROM_TIME']"
 SEL_END_TIME = "input[name='TO_TIME']"
 SEL_REASON = "textarea[name='REMARK']"
+SEL_SUBMIT = "input[type='submit'][name='Submit']"
 
 
 class OvertimeApplyError(RuntimeError):
-    """Failed to open or prefill overtime apply form."""
+    """Failed to open, prefill, or submit overtime apply form."""
 
 
 def format_ehr_date(d: date) -> str:
@@ -111,4 +112,11 @@ def prefill_overtime_form(page: Page, decision: Decision, reason: Optional[str] 
     for selector, value in values.items():
         _fill_first(_find_frame_with_selector(page, selector), selector, value)
 
-    # Safety: never click Submit or any forbidden control. No submit function exists.
+
+def submit_overtime_form(page: Page) -> None:
+    """Click the form Submit button. Caller must have passed --ALLOW."""
+    frame = _find_frame_with_selector(page, SEL_SUBMIT)
+    loc = frame.locator(SEL_SUBMIT).first
+    loc.wait_for(state="visible", timeout=15_000)
+    loc.click()
+    page.wait_for_timeout(3_000)

@@ -62,6 +62,17 @@ def test_plan_prefill_values_uses_reason_override():
     assert values[SEL_REASON] == "V552AA 稳定性挂测"
 
 
+def test_parse_cli_flags_allow_and_reason():
+    from main_overtime_prefill import parse_cli_flags
+
+    reason, allow = parse_cli_flags(["--reason", "hello", "--ALLOW"])
+    assert reason == "hello"
+    assert allow is True
+    reason, allow = parse_cli_flags([])
+    assert reason is None
+    assert allow is False
+
+
 def test_plan_prefill_values_rejects_non_apply():
     skip = build_decision(date(2026, 8, 13), [], None)
     try:

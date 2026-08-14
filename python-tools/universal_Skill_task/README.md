@@ -62,19 +62,22 @@ python main_overtime_dry_run.py
 
 **禁止提交加班申请。** 代码内 `ALLOW_SUBMIT_OVERTIME=False`。
 
-## 加班预填（不提交）
+## 加班预填（不提交） / 带 `--ALLOW` 直接提交
 
 ```powershell
+# 只预填，人工核对后按 Enter（默认）
 python main_overtime_prefill.py --reason "V552AA项目稳定性挂测"
+
+# 预填后直接点「提交」（--ALLOW = 同意提交）
+python main_overtime_prefill.py --reason "V552AA项目稳定性挂测" --ALLOW
 ```
 
 行为：
 
 1. 登录后处理**最近 7 个自然日（不含今天）**，从早到晚逐日决策
 2. 仅当某日 `action=APPLY` 时打开「加班申请」并预填加班日期、起止时间、事由
-   - 事由默认「待确认」，可用 `--reason "..."` 传入
 3. `SKIP_*` 只写日志，自动进入下一天
-4. **不会**点击提交/保存；`ALLOW_SUBMIT_OVERTIME` 必须为 `False`
-5. 每次预填后浏览器保持打开，终端按 Enter 后处理下一天
+4. **无 `--ALLOW`**：不点提交，预填后停住等 Enter
+5. **有 `--ALLOW`**：预填后立即点击「提交」，再处理下一天
 
-人工核对截图：`artifacts/overtime_prefill_*_filled_YYYYMMDD.png`
+人工核对截图：`artifacts/overtime_prefill_*_filled_YYYYMMDD.png`（提交后另有 `*_submitted_*`）
