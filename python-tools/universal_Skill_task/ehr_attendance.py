@@ -41,8 +41,18 @@ def parse_punches_from_text(text: str, target: date) -> List[time]:
     return punches
 
 
+def collect_page_text(page: Page) -> str:
+    """Concatenate body text of the page and every frame (tables often live in iframes)."""
+    chunks = []
+    for frame in page.frames:
+        try:
+            chunks.append(frame.inner_text("body"))
+        except Exception:
+            continue
+    return "\n".join(chunks)
+
+
 def read_punches_for_day(page: Page, target: date) -> List[time]:
     open_my_attendance(page)
-    page.wait_for_timeout(2_000)
-    text = page.inner_text("body")
-    return parse_punches_from_text(text, target)
+    page.wait_for_timeout(3_000)
+    return parse_punches_from_text(collect_page_text(page), target)

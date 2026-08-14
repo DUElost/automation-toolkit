@@ -3,9 +3,10 @@
 
 from __future__ import annotations
 
+import time
 from typing import List, Optional, Tuple
 
-from playwright.sync_api import Locator, Page, TimeoutError as PlaywrightTimeoutError
+from playwright.sync_api import Locator, Page
 
 HOME_TEXTS = ["首页"]
 ATTENDANCE_TEXTS = ["我的考勤"]
@@ -80,25 +81,15 @@ def open_overtime_query(page: Page) -> None:
     _click_by_texts(page, OVERTIME_QUERY_TEXTS, "加班查询")
 
 
+HOME_READY_TEXTS = ["我的考勤", "加班查询", "加班申请"]
+
+
 def wait_ehr_home_ready(page: Page, timeout_ms: int = 60_000) -> None:
-    """Wait until a known home shortcut label is visible."""
-    deadline_selectors = [
-        'text="我的考勤"',
-        'text="加班查询"',
-        'text="加班申请"',
-    ]
-    last_exc: Optional[BaseException] = None
-    per = max(5_000, timeout_ms // max(1, len(deadline_selectors)))
-    for root in _iter_roots(page):
-        for sel in deadline_selectors:
-            try:
-                root.locator(sel).first.wait_for(state="visible", timeout=per)
+    """Poll until any home shortcut label shows, so a slow SSO load isn't a long stall."""
+    deadline = time.monotonic() + timeout_ms / 1000.0
+    while time.monotonic() < deadline:
+        for text in HOME_READY_TEXTS:
+            if _visible_matches(page, text):
                 return
-            except PlaywrightTimeoutError as exc:
-                last_exc = exc
-                continue
-            except Exception as exc:  # noqa: BLE001
-                last_exc = exc
-                continue
-    if last_exc:
-        page.wait_for_timeout(3_000)
+        page.wait_for_timeout(500)
+    raise EhrNavError(f"EHR home shortcuts never appeared. url={page.url}")
