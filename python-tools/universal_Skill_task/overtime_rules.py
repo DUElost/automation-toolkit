@@ -13,10 +13,10 @@ LUNCH_SPAN_NOTE = "12:00-13:00 lunch break excluded from overtime span"
 
 
 class Action(Enum):
-    APPLY = "apply"
-    SKIP_NO_NEED = "skip_no_need"
-    SKIP_ALREADY_SAME = "skip_already_same"
-    SKIP_DIFF_MANUAL = "skip_diff_manual"
+    APPLY = "APPLY"
+    SKIP_NO_NEED = "SKIP_NO_NEED"
+    SKIP_ALREADY_SAME = "SKIP_ALREADY_SAME"
+    SKIP_DIFF_MANUAL = "SKIP_DIFF_MANUAL"
 
 
 @dataclass(frozen=True)
