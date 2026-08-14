@@ -12,7 +12,7 @@ from typing import List, Optional, Tuple
 from browser import launch_page
 from bpm_login import LoginError, login_bpm
 from config import ConfigError, load_config
-from ehr_attendance import read_punches_for_day
+from ehr_attendance import AttendanceReadError, read_punches_for_day
 from ehr_nav import EhrNavError, wait_ehr_home_ready
 from ehr_overtime_apply import OvertimeApplyError, prefill_overtime_form, submit_overtime_form
 from ehr_overtime_query import read_existing_overtime
@@ -142,7 +142,13 @@ def main() -> int:
             if applied == 0 or allow_submit:
                 _wait_enter("[INFO] Press Enter to close browser...")
             return 0
-        except (LoginError, NavigateEhrError, EhrNavError, OvertimeApplyError) as exc:
+        except (
+            LoginError,
+            NavigateEhrError,
+            EhrNavError,
+            OvertimeApplyError,
+            AttendanceReadError,
+        ) as exc:
             print(f"[FAIL] {exc}")
             try:
                 print(f"[INFO] screenshot={_screenshot(ehr_page, 'fail')}")

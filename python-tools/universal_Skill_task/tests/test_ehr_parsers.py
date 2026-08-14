@@ -6,7 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from ehr_attendance import parse_punches_from_text
+from ehr_attendance import looks_like_attendance_page, parse_punches_from_text
 from ehr_overtime_query import parse_existing_overtime_from_text
 
 
@@ -41,6 +41,12 @@ def test_parse_punches_for_day():
 def test_parse_real_attendance_card_clock_record_only():
     punches = parse_punches_from_text(REAL_ATTENDANCE, date(2026, 8, 13))
     assert punches == [time(8, 59), time(21, 10)]
+
+
+def test_looks_like_attendance_page_rejects_blank_render():
+    assert looks_like_attendance_page(REAL_ATTENDANCE) is True
+    assert looks_like_attendance_page("") is False
+    assert looks_like_attendance_page("首页 我的考勤 加班查询") is False
 
 
 def test_parse_existing_overtime():

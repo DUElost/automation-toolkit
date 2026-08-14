@@ -51,18 +51,32 @@ def _visible_matches(page: Page, text: str) -> List[Tuple[float, Locator]]:
     return found
 
 
-def _click_by_texts(page: Page, texts: List[str], what: str) -> None:
+def _try_click_by_texts(page: Page, texts: List[str]) -> Optional[BaseException]:
+    """Click the smallest visible exact-text match; return the last error on failure."""
     last_exc: Optional[BaseException] = None
     for text in texts:
-        matches = _visible_matches(page, text)
-        for _area, item in matches:
+        for _area, item in _visible_matches(page, text):
             try:
                 item.click(timeout=10_000)
                 page.wait_for_timeout(2_500)
-                return
+                return None
             except Exception as exc:  # noqa: BLE001
                 last_exc = exc
                 continue
+    return last_exc or EhrNavError("no visible match")
+
+
+def _click_by_texts(page: Page, texts: List[str], what: str) -> None:
+    if _try_click_by_texts(page, texts) is None:
+        return
+
+    # After many in-app navigations the EHR shell sometimes renders a blank body;
+    # reloading restores the shortcuts.
+    page.reload(wait_until="domcontentloaded")
+    page.wait_for_timeout(3_000)
+    last_exc = _try_click_by_texts(page, texts)
+    if last_exc is None:
+        return
     raise EhrNavError(f"Cannot click {what}. last_error={last_exc} url={page.url}")
 
 

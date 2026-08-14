@@ -11,6 +11,10 @@ from playwright.sync_api import Page
 
 from ehr_nav import open_my_attendance
 
+class AttendanceReadError(RuntimeError):
+    """Attendance page did not render, so punches cannot be trusted."""
+
+
 _TIME_RE = re.compile(r"\b([01]?\d|2[0-3]):([0-5]\d)\b")
 _DATE_RE = re.compile(r"(20\d{2})[-/](\d{1,2})[-/](\d{1,2})")
 _DMY_DATE_RE = re.compile(r"(\d{1,2})/(\d{1,2})/(20\d{2})")
@@ -50,6 +54,15 @@ def parse_punches_from_text(text: str, target: date) -> List[time]:
     return punches
 
 
+def looks_like_attendance_page(text: str) -> bool:
+    """True when the attendance table actually rendered.
+
+    A blank EHR render also yields zero punches, which must not be read as
+    "no punches that day".
+    """
+    return bool(_DMY_DATE_RE.search(text) or _DATE_RE.search(text))
+
+
 def collect_page_text(page: Page) -> str:
     """Concatenate body text of the page and every frame (tables often live in iframes)."""
     chunks = []
@@ -64,4 +77,7 @@ def collect_page_text(page: Page) -> str:
 def read_punches_for_day(page: Page, target: date) -> List[time]:
     open_my_attendance(page)
     page.wait_for_timeout(3_000)
-    return parse_punches_from_text(collect_page_text(page), target)
+    text = collect_page_text(page)
+    if not looks_like_attendance_page(text):
+        raise AttendanceReadError(f"我的考勤 did not render any dates. url={page.url}")
+    return parse_punches_from_text(text, target)
