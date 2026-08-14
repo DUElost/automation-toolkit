@@ -7,6 +7,7 @@ import sys
 import traceback
 from datetime import datetime
 from pathlib import Path
+from typing import List, Optional
 
 from browser import launch_page
 from bpm_login import LoginError, login_bpm
@@ -48,7 +49,18 @@ def _wait_enter(msg: str) -> None:
         pass
 
 
+def _parse_reason(argv: List[str]) -> Optional[str]:
+    """Read --reason "..." (or --reason=...) from the command line."""
+    for i, arg in enumerate(argv):
+        if arg == "--reason" and i + 1 < len(argv):
+            return argv[i + 1]
+        if arg.startswith("--reason="):
+            return arg.split("=", 1)[1]
+    return None
+
+
 def main() -> int:
+    reason = _parse_reason(sys.argv[1:])
     if ALLOW_SUBMIT_OVERTIME:
         print("[FAIL] ALLOW_SUBMIT_OVERTIME must stay False in prefill phase")
         return 3
@@ -88,7 +100,7 @@ def main() -> int:
                 _wait_enter("[INFO] Press Enter to close browser...")
                 return 0
 
-            prefill_overtime_form(ehr_page, decision)
+            prefill_overtime_form(ehr_page, decision, reason)
             shot = _screenshot(ehr_page, "filled")
             print(f"[OK] prefilled; screenshot={shot}")
             print("[INFO] ALLOW_SUBMIT_OVERTIME=False — did not click submit")

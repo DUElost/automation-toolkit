@@ -57,6 +57,11 @@ def test_plan_prefill_values_covers_visible_form_fields():
     }
 
 
+def test_plan_prefill_values_uses_reason_override():
+    values = plan_prefill_values(_apply_decision(), reason="V552AA 稳定性挂测")
+    assert values[SEL_REASON] == "V552AA 稳定性挂测"
+
+
 def test_plan_prefill_values_rejects_non_apply():
     skip = build_decision(date(2026, 8, 13), [], None)
     try:

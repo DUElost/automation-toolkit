@@ -71,7 +71,8 @@ python main_overtime_prefill.py
 行为：
 
 1. 与 dry-run 相同：登录 → 读考勤/加班查询 → 写决策日志
-2. 仅当 `action=APPLY` 时打开「加班申请」并预填加班日期、起止时间、事由「待确认」（表单无可见类别字段，不填）
+2. 仅当 `action=APPLY` 时打开「加班申请」并预填加班日期、起止时间、事由（表单无可见类别字段，不填）
+   - 事由默认「待确认」，可用参数传入：`python main_overtime_prefill.py --reason "V552AA项目稳定性挂测"`
 3. **不会**点击提交/保存；`ALLOW_SUBMIT_OVERTIME` 必须为 `False`
 4. 预填后浏览器保持打开，终端按 Enter 后退出
 

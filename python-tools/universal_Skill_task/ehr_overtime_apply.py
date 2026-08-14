@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from collections import OrderedDict
 from datetime import date, time
-from typing import List
+from typing import List, Optional
 
 from playwright.sync_api import Frame, Page
 
@@ -49,7 +49,10 @@ def is_forbidden_click_text(text: str) -> bool:
     return any(bad in s for bad in FORBIDDEN_CLICK_TEXTS)
 
 
-def plan_prefill_values(decision: Decision) -> "OrderedDict[str, str]":
+def plan_prefill_values(
+    decision: Decision,
+    reason: Optional[str] = None,
+) -> "OrderedDict[str, str]":
     """Map an APPLY decision onto the selectors of the visible form fields."""
     if decision.action != Action.APPLY:
         raise OvertimeApplyError(f"Refuse to prefill when action={decision.action.value}")
@@ -60,7 +63,7 @@ def plan_prefill_values(decision: Decision) -> "OrderedDict[str, str]":
     values[SEL_START_DATE] = format_ehr_date(decision.target_date)
     values[SEL_START_TIME] = format_ehr_time(decision.proposed_start)
     values[SEL_END_TIME] = format_ehr_time(decision.proposed_end)
-    values[SEL_REASON] = decision.reason or "待确认"
+    values[SEL_REASON] = (reason or "").strip() or decision.reason or "待确认"
     return values
 
 
@@ -99,8 +102,8 @@ def _fill_first(frame: Frame, selector: str, value: str) -> None:
         raise OvertimeApplyError(f"Field {selector} kept {actual!r} instead of {value!r}")
 
 
-def prefill_overtime_form(page: Page, decision: Decision) -> None:
-    values = plan_prefill_values(decision)
+def prefill_overtime_form(page: Page, decision: Decision, reason: Optional[str] = None) -> None:
+    values = plan_prefill_values(decision, reason)
 
     open_overtime_apply(page)
     page.wait_for_timeout(3_000)
