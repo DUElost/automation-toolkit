@@ -63,14 +63,23 @@ def test_plan_prefill_values_uses_reason_override():
 
 
 def test_parse_cli_flags_allow_and_reason():
-    from main_overtime_prefill import parse_cli_flags
+    from account_config import parse_run_options
 
-    reason, allow = parse_cli_flags(["--reason", "hello", "--ALLOW"])
-    assert reason == "hello"
-    assert allow is True
-    reason, allow = parse_cli_flags([])
-    assert reason is None
-    assert allow is False
+    opts = parse_run_options([
+        "--reason", "hello",
+        "--ALLOW",
+        "--no-prompt",
+        "--decisions-only",
+        "--reason", "rin:专用事由",
+    ])
+    assert opts.global_reason == "hello"
+    assert opts.allow_submit is True
+    assert opts.no_prompt is True
+    assert opts.decisions_only is True
+    assert dict(opts.reason_by_id)["rin"] == "专用事由"
+    opts = parse_run_options([])
+    assert opts.global_reason is None
+    assert opts.allow_submit is False
 
 
 def test_plan_prefill_values_rejects_non_apply():

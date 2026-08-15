@@ -6,8 +6,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from ehr_attendance import looks_like_attendance_page, parse_punches_from_text
-from ehr_overtime_query import parse_existing_overtime_from_text
+from ehr_attendance import looks_like_attendance_page, parse_punches_from_text, parse_punches_map_from_text
+from ehr_overtime_query import (
+    parse_existing_overtime_from_text,
+    parse_existing_overtime_map_from_text,
+)
 
 
 SAMPLE_ATTENDANCE = """
@@ -80,3 +83,19 @@ def test_parse_real_overtime_day_month_year():
     assert existing is not None
     assert existing.start == time(19, 0)
     assert existing.end == time(23, 0)
+
+
+def test_parse_punches_map_batch():
+    targets = [date(2026, 8, 12), date(2026, 8, 13)]
+    result = parse_punches_map_from_text(SAMPLE_ATTENDANCE, targets)
+    assert result[date(2026, 8, 13)] == [time(9, 56), time(12, 2), time(18, 1), time(21, 3)]
+    assert result[date(2026, 8, 12)] == [time(9, 1), time(18, 20)]
+
+
+def test_parse_existing_overtime_map_batch():
+    text = REAL_OVERTIME + "\n" + SAMPLE_OVERTIME
+    targets = [date(2026, 8, 10), date(2026, 8, 13), date(2026, 8, 14)]
+    result = parse_existing_overtime_map_from_text(text, targets)
+    assert result[date(2026, 8, 10)].start == time(19, 0)
+    assert result[date(2026, 8, 13)].start == time(10, 0)
+    assert result[date(2026, 8, 14)].start == time(19, 0)

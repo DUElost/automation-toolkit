@@ -81,3 +81,81 @@ python main_overtime_prefill.py --reason "V552AA项目稳定性挂测" --ALLOW
 5. **有 `--ALLOW`**：预填后立即点击「提交」，再处理下一天
 
 人工核对截图：`artifacts/overtime_prefill_*_filled_YYYYMMDD.png`（提交后另有 `*_submitted_*`）
+
+## 飞书汇总通知
+
+在 `.env` 中配置群机器人 Webhook（飞书群 → 设置 → 群机器人 → 自定义机器人）：
+
+```env
+FEISHU_WEBHOOK_URL=https://open.feishu.cn/open-apis/bot/v2/hook/xxxx
+FEISHU_SECRET=          # 可选，开启签名校验时填写
+```
+
+`main_overtime_prefill.py` 跑完后发送一条飞书卡片：触发时间、各账号决策明细、汇总结果。
+
+## 多账号（一个任务串行执行）
+
+每个账号独立启动浏览器 → 登录 BPM → 读 EHR → 关闭浏览器，再处理下一个账号。全部完成后**只发一条飞书卡片**。
+
+```powershell
+copy accounts.yaml.example accounts.yaml
+# 编辑 accounts.yaml，填写各账号 id / username / password
+
+python main_overtime_prefill.py --no-prompt --decisions-only `
+  --accounts-file accounts.yaml `
+  --reason account1:"V552AA项目挂测" `
+  --reason account2:"XX项目挂测"
+```
+
+开发阶段可用同一账号跑两遍验证串行流程：
+
+```powershell
+copy accounts.dev.yaml.example accounts.yaml
+# 两个 id 填相同 username/password，事由用 --reason account1:... --reason account2:...
+```
+
+- `--reason <id>:事由` 与 `accounts.yaml` 中的 `id` 对应；也可用 `--reason "统一事由"`（单账号或作默认值）
+- 未配置 `--accounts-file` 时，仍使用 `.env` 单账号（飞书卡片显示邮箱，不再出现 `default`）
+
+## 每天 10:00 定时 + 飞书通知
+
+推荐在仓库根目录用自带 `taskmgr` 注册（需 10:00 时电脑已开机且已登录）：
+
+```powershell
+cd F:\automation-toolkit
+taskmgr add ehr-overtime-daily
+# 调度方式: 1（每天）
+# Hour: 10
+# Minute: 0
+# 启动命令:
+#   python .\python-tools\universal_Skill_task\main_overtime_prefill.py --decisions-only --no-prompt
+# 工作目录请选: python-tools\universal_Skill_task（或在命令里写全路径）
+```
+
+说明：
+
+- `--decisions-only`：只读考勤/加班并决策，**不预填、不提交**（适合每日早报）
+- `--no-prompt`：无人值守，不等待 Enter
+- 若要预填但不提交，去掉 `--decisions-only`，仍保留 `--no-prompt`
+- **不要**在定时任务里加 `--ALLOW`，自动提交需人工确认后再手动执行
+
+管理：
+
+```powershell
+taskmgr list
+taskmgr start ehr-overtime-daily    # 立即试跑
+taskmgr log ehr-overtime-daily      # 查看调度日志
+taskmgr remove ehr-overtime-daily   # 删除任务
+```
+
+也可用底层脚本注册（等价）：
+
+```powershell
+.\windows-scheduler\Register-ScheduledTool.ps1 `
+  -TaskName "ehr-overtime-daily" `
+  -FilePath "python" `
+  -Arguments ".\python-tools\universal_Skill_task\main_overtime_prefill.py --decisions-only --no-prompt" `
+  -WorkDir ".\python-tools\universal_Skill_task" `
+  -DailyAt "10:00" `
+  -ReplaceExisting
+```

@@ -1,0 +1,8 @@
+# 开发用：同一 BPM 账号串行跑两次，验证多账号流程（复制为 accounts.yaml 后填入真实密码）
+accounts:
+  - id: account1
+    username: your.name@tinno.com
+    password: "your-password"
+  - id: account2
+    username: your.name@tinno.com
+    password: "your-password"

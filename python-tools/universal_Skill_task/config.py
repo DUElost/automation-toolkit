@@ -23,6 +23,8 @@ class AppConfig:
     username: str
     password: str
     keep_open_seconds: int
+    feishu_webhook_url: Optional[str] = None
+    feishu_secret: Optional[str] = None
 
 
 def load_config(env_file: Optional[PathLike] = None) -> AppConfig:
@@ -35,6 +37,8 @@ def load_config(env_file: Optional[PathLike] = None) -> AppConfig:
     username = (os.getenv("BPM_USERNAME") or "").strip()
     password = os.getenv("BPM_PASSWORD") or ""
     keep_raw = (os.getenv("KEEP_OPEN_SECONDS") or "15").strip()
+    feishu_webhook_url = (os.getenv("FEISHU_WEBHOOK_URL") or "").strip() or None
+    feishu_secret = (os.getenv("FEISHU_SECRET") or "").strip() or None
 
     if not username or not password:
         raise ConfigError("BPM_USERNAME and BPM_PASSWORD are required (set in .env or environment).")
@@ -49,4 +53,6 @@ def load_config(env_file: Optional[PathLike] = None) -> AppConfig:
         username=username,
         password=password,
         keep_open_seconds=keep_open_seconds,
+        feishu_webhook_url=feishu_webhook_url,
+        feishu_secret=feishu_secret,
     )

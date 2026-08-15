@@ -1,0 +1,7 @@
+accounts:
+  - id: rin
+    username: your.name@tinno.com
+    password: "your-password"
+  - id: zhangsan
+    username: zhang.san@tinno.com
+    password: "another-password"
