@@ -364,3 +364,58 @@ def test_uniview_chain_crash_not_stuck(tmp_path):
     # 无 tar 且无现场/无 ylog 的空壳事件包被舍弃
     assert not os.path.isdir(os.path.join(
         str(tmp_path), "SN1", "native-crash_2026-07-01-121724"))
+
+
+def test_snapshot_meminfo_skips_missing_package(tmp_path):
+    """问题包不存在时 meminfo 不新建空壳目录。"""
+    class Adb:
+        def _run_argv(self, *a, **k):
+            return ["MemTotal: 1"]
+
+    ps = PlatformSources("sn1", str(tmp_path), "sprd", _fake_config(), adb=Adb())
+    assert ps.snapshot_meminfo("data-app-crash_2026-08-13-011405") is None
+    assert not os.path.isdir(os.path.join(
+        str(tmp_path), "sn1", "data-app-crash_2026-08-13-011405"))
+
+
+def test_snapshot_meminfo_writes_existing_package(tmp_path):
+    """已建问题包内可写入 meminfo。"""
+    class Adb:
+        def _run_argv(self, *a, **k):
+            return ["MemTotal: 1"]
+
+    pkg = os.path.join(str(tmp_path), "sn1", "data-app-crash_2026-08-13-011405")
+    os.makedirs(pkg)
+    ps = PlatformSources("sn1", str(tmp_path), "sprd", _fake_config(), adb=Adb())
+    dest = ps.snapshot_meminfo("data-app-crash_2026-08-13-011405")
+    assert dest and os.path.isfile(dest)
+    assert "MemTotal" in open(dest, encoding="utf-8").read()
+
+
+def test_export_correlated_ap_skips_missing_package(tmp_path):
+    """问题包不存在时 ap 关联不新建空壳。"""
+    class Adb:
+        def run_command(self, *a, **k):
+            raise AssertionError("should not list ap when package missing")
+
+        def _run_argv(self, *a, **k):
+            raise AssertionError("should not pull")
+
+    ps = PlatformSources("sn1", str(tmp_path), "sprd", _fake_config(), adb=Adb())
+    assert ps.export_correlated_ap("2026-08-13 01:14:05",
+                                   "data-app-crash_2026-08-13-011405") == []
+    assert not os.path.isdir(os.path.join(
+        str(tmp_path), "sn1", "data-app-crash_2026-08-13-011405"))
+
+
+def test_snapshot_bugreport_skips_missing_package(tmp_path):
+    """问题包不存在时 bugreport 不新建空壳。"""
+    ps = PlatformSources("sn1", str(tmp_path), "sprd", {
+        **_fake_config(),
+        "events": {"bugreport_cooldown_minutes": 0,
+                   "bugreport_cooldown_event_types": [],
+                   "scene_map": {}},
+    }, adb=object())
+    assert ps.snapshot_bugreport("data-app-crash_2026-08-13-011405") is None
+    assert not os.path.isdir(os.path.join(
+        str(tmp_path), "sn1", "data-app-crash_2026-08-13-011405"))

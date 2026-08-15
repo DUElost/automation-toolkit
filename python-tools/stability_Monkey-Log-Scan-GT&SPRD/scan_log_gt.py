@@ -122,6 +122,7 @@ class ScanLogGT:
         new_types = [t for t in self.types if new_counts.get(t, 0) > old_counts.get(t, 0)]
         # 平台源（uniview）先扫：以 uniview 事件为实体先建包，dropbox 条目随后补充
         new_platform_sources = self._scan_platform_sources(device, folderpath)
+        success_infos = []
         for type_name, type_config in self.types.items():
             old_count = old_counts.get(type_name, 0)
             new_count = new_counts.get(type_name, 0)
@@ -131,9 +132,11 @@ class ScanLogGT:
             infos = monitor.analyse(old_count, new_count)
             for info in infos:
                 self._build_problem_summary(device, folderpath, info)
+                success_infos.append(info)
         # 冷启动（首次部署）只拉存量不触发场景动作，避免误报
         if not is_first_scan:
-            self._handle_events(device, folderpath, new_types, new_platform_sources)
+            self._handle_events(device, folderpath, new_types, new_platform_sources,
+                                success_infos)
 
     def _build_problem_summary(self, device, folderpath, info):
         """为单个报错生成汇总 txt（基础信息 + 堆栈 + 关键信息），落问题包内。"""
@@ -187,7 +190,8 @@ class ScanLogGT:
                     scenes.append(scene)
         return scenes
 
-    def _handle_events(self, device, folderpath, new_dropbox_types, new_platform_sources):
+    def _handle_events(self, device, folderpath, new_dropbox_types, new_platform_sources,
+                       success_infos=None):
         """事件驱动按需采集：场景命中 -> bugreport（冷却）+ meminfo 快照。"""
         signals = list(new_dropbox_types) + list(new_platform_sources)
         if not signals:
@@ -211,7 +215,8 @@ class ScanLogGT:
             import threading
             t = threading.Thread(
                 target=self._event_snapshot_thread,
-                args=(device, folderpath, signals, sources, events_cfg),
+                args=(device, folderpath, signals, sources, events_cfg,
+                      success_infos or []),
                 daemon=True,
             )
             t.start()
@@ -230,27 +235,33 @@ class ScanLogGT:
         except OSError:
             return None
 
-    def _event_snapshot_thread(self, device, folderpath, signals, sources, events_cfg):
-        """后台执行事件快照：bugreport（条目关联命名 + 冷却白名单）+ meminfo + ap 时间窗。"""
-        # 条目标识：取信号中第一个 dropbox 类型 + 最新条目时间戳（若有）
-        # 包名规范与 dropbox 问题包一致：{type连字符}_{ts}
-        prefix = None
-        entry_ts = None
+    def _resolve_snapshot_target(self, device, folderpath, signals, success_infos):
+        """快照落点：只返回已成功建包目录名，绝不按 dropbox 列表时间新建空壳。
+
+        返回 (prefix, entry_ts)；无可写包时 (None, None)。
+        - 本轮 dropbox 成功建包：落最新一条成功包（package_dir  basename）
+        - 仅平台源触发：落已存在的最新问题包
+        - dropbox 有增量但本轮均未建包：跳过（避免空壳 / 误挂旧包）
+        """
+        success_infos = success_infos or []
         dropbox_signals = [s for s in signals if s in self.types]
-        if dropbox_signals:
-            type_name = dropbox_signals[0]
-            entries = self.adb.get_dropbox_entries(device, type_name)
-            if entries:
-                parts = entries[-1].split(" ")
-                if len(parts) >= 2:
-                    entry_ts = f"{parts[0]} {parts[1]}"
-            ts_tag = entry_ts.replace(" ", "-").replace(":", "") if entry_ts else "event"
-            prefix = f"{type_name.replace('_', '-')}_{ts_tag}"
-        else:
-            # 仅平台源（uniview）触发的场景：快照落最新问题包
+        if success_infos:
+            info = success_infos[-1]
+            prefix = os.path.basename(info["package_dir"])
+            return prefix, info.get("ts")
+        if not dropbox_signals:
             latest = self._latest_package_dir(device, folderpath)
-            if latest:
-                prefix = latest
+            return (latest, None) if latest else (None, None)
+        return None, None
+
+    def _event_snapshot_thread(self, device, folderpath, signals, sources, events_cfg,
+                               success_infos=None):
+        """后台执行事件快照：bugreport + meminfo + ap 时间窗（仅写入已建问题包）。"""
+        prefix, entry_ts = self._resolve_snapshot_target(
+            device, folderpath, signals, success_infos or [])
+        if not prefix:
+            TEST_LOGGER.info(f"事件快照跳过 {device}: 无已建问题包可写入")
+            return
         try:
             dest = sources.snapshot_bugreport(prefix)
             if dest:

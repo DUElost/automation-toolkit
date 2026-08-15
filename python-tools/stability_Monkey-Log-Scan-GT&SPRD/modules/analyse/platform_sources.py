@@ -512,10 +512,10 @@ class PlatformSources:
         return dest
 
     def snapshot_bugreport(self, prefix=None):
-        """事件驱动：按需抓取 bugreport（关联条目命名 + 冷却白名单）。
+        """事件驱动：按需抓取 bugreport（关联已建问题包 + 冷却白名单）。
 
-        prefix: 关联条目标识（如 data_app_crash_2026-08-05-110144），
-                命名 {device}_{prefix}_bugreport.zip（参照 MTK correlated_bugreports）。
+        prefix: 已建问题包目录名（如 data-app-crash_2026-08-05-110144）；
+                目录不存在时跳过，不新建空壳包。
         冷却：events.bugreport_cooldown_minutes + cooldown_event_types 白名单
               （白名单内类型受冷却限制；白名单外每次触发都导）。
         """
@@ -541,7 +541,9 @@ class PlatformSources:
             return None
 
         package_dir = self._problem_package_dir(prefix or "event", "")
-        os.makedirs(package_dir, exist_ok=True)
+        if not os.path.isdir(package_dir):
+            TEST_LOGGER.info(f"bugreport 跳过：问题包不存在 {package_dir}")
+            return None
         final_path = os.path.join(package_dir, "bugreport.zip")
         if os.path.exists(final_path):
             return final_path
@@ -575,10 +577,15 @@ class PlatformSources:
         """事件驱动：ylog ap 分段按时间窗定位导出（参照 MTK correlated_mobilelogs）。
 
         解析 ap 分段名 {seq}-{start}--{end}.ylog，找异常时间后第一个段，
-        导出其前后各 2 段到问题包 ylog_ap/ 目录。
+        导出其前后各 2 段到已建问题包 ylog_ap/ 目录；包目录不存在则跳过。
         """
         import datetime as _dt
         import re as _re
+
+        package_dir = self._problem_package_dir(prefix or "event", "")
+        if not os.path.isdir(package_dir):
+            TEST_LOGGER.info(f"ap 关联跳过：问题包不存在 {package_dir}")
+            return []
 
         files = self.adb.run_command(
             f'adb -s {self.device} shell "ls /data/ylog/ap/"')
@@ -613,7 +620,7 @@ class PlatformSources:
         target = next((i for i, f in enumerate(infos) if f["start"] > aee_dt), len(infos))
         start_idx = max(0, target - 2)
         end_idx = min(len(infos), target + 2)
-        dest_dir = os.path.join(self._problem_package_dir(prefix or "event", ""), "ylog_ap")
+        dest_dir = os.path.join(package_dir, "ylog_ap")
         os.makedirs(dest_dir, exist_ok=True)
         pulled = []
         for info in infos[start_idx:end_idx]:
@@ -628,13 +635,15 @@ class PlatformSources:
         return pulled
 
     def snapshot_meminfo(self, prefix=None):
-        """事件驱动：dumpsys meminfo 快照，落问题包内。"""
+        """事件驱动：dumpsys meminfo 快照，落已建问题包内；包不存在则跳过。"""
+        package_dir = self._problem_package_dir(prefix or "event", "")
+        if not os.path.isdir(package_dir):
+            TEST_LOGGER.info(f"meminfo 跳过：问题包不存在 {package_dir}")
+            return None
         lines = self.adb._run_argv(
             ["adb", "-s", self.device, "shell", "dumpsys meminfo"], timeout=120)
         if not lines:
             return None
-        package_dir = self._problem_package_dir(prefix or "event", "")
-        os.makedirs(package_dir, exist_ok=True)
         dest = os.path.join(package_dir, "meminfo.txt")
         with open(dest, "w", encoding="utf-8", errors="replace") as f:
             f.write("\n".join(lines))
