@@ -1,6 +1,7 @@
 import argparse
 import json
 import os
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
@@ -27,6 +28,17 @@ class ScanLogGT:
         self.adb = AdbClient()
         self.types = config["dropbox"]["types"]
         self.poll_interval = config["general"]["polling_interval_seconds"]
+        self._stop = threading.Event()
+
+    def request_stop(self):
+        """请求所有设备扫描循环退出（Ctrl+C / 外部停止）。"""
+        self._stop.set()
+
+    def _wait(self, seconds):
+        """可中断等待；已请求停止时返回 True。"""
+        if seconds is None or seconds <= 0:
+            return self._stop.is_set()
+        return self._stop.wait(timeout=seconds)
 
     # ---- 输出目录（仅建设备目录；问题包/ylog 在设备目录下按需创建）----
     def _prepare_output_dir(self, device):
@@ -288,19 +300,24 @@ class ScanLogGT:
     def monitor_device(self, device):
         TEST_LOGGER.info(device)
         folderpath = self._prepare_output_dir(device)
+        if self._stop.is_set():
+            return
         self.run_scan(device, folderpath)
-        time.sleep(self.poll_interval)
+        if self._wait(self.poll_interval):
+            TEST_LOGGER.info(f"设备扫描已停止 {device}")
+            return
         max_failures = self.config["general"].get("max_consecutive_failures", 5)
         failure_wait = self.config["general"].get("failure_wait_seconds", 60)
         exception_wait = self.config["general"].get("exception_wait_seconds", 30)
         consecutive_failures = 0
-        while True:
+        while not self._stop.is_set():
             loop_start = time.time()
             try:
                 TEST_LOGGER.info(datetime.now().strftime("%Y-%m-%d %H:%M:%S") + " 开始扫描log_" + device)
                 if not self.adb.is_device_online(device):
                     TEST_LOGGER.warn(f"设备离线 {device}，等待下一轮")
-                    time.sleep(self.poll_interval)
+                    if self._wait(self.poll_interval):
+                        break
                     continue
                 self.run_scan(device, folderpath)
                 consecutive_failures = 0
@@ -309,16 +326,19 @@ class ScanLogGT:
                 consecutive_failures += 1
                 if consecutive_failures >= max_failures:
                     TEST_LOGGER.warn(f"连续失败 {consecutive_failures} 次，等待 {failure_wait}s 恢复")
-                    time.sleep(failure_wait)
+                    if self._wait(failure_wait):
+                        break
                     consecutive_failures = 0
                     continue
-                time.sleep(exception_wait)
+                if self._wait(exception_wait):
+                    break
                 continue
             # 补齐到轮询间隔（避免频繁轮询影响稳定性）
             loop_duration = time.time() - loop_start
             sleep_time = self.poll_interval - loop_duration
-            if sleep_time > 0:
-                time.sleep(sleep_time)
+            if sleep_time > 0 and self._wait(sleep_time):
+                break
+        TEST_LOGGER.info(f"设备扫描已停止 {device}")
 
 
 def main():
@@ -340,9 +360,21 @@ def main():
         return
     # 限制并行采集数，避免多设备同时扫描负载过高（对齐 MTK max_workers<=4）
     max_workers = min(config["general"].get("max_thread_pool_workers", 4), len(devices))
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+    executor = ThreadPoolExecutor(max_workers=max_workers)
+    futures = []
+    try:
         for device in devices:
-            executor.submit(scan_log.monitor_device, device)
+            futures.append(executor.submit(scan_log.monitor_device, device))
+        # 主线程可响应 Ctrl+C；工作线程通过 stop Event 退出
+        while any(not f.done() for f in futures):
+            time.sleep(0.5)
+    except KeyboardInterrupt:
+        TEST_LOGGER.info("收到中断信号 (Ctrl+C)，正在停止扫描...")
+        scan_log.request_stop()
+    finally:
+        scan_log.request_stop()
+        executor.shutdown(wait=True)
+        TEST_LOGGER.info("扫描已全部停止")
 
 
 if __name__ == '__main__':
