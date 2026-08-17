@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut android:icon="@drawable/ic_shortcut" android:enabled="true" android:shortcutId="record" android:shortcutShortLabel="@string/shortcut_short_label" android:shortcutLongLabel="@string/shortcut_long_label" android:shortcutDisabledMessage="@string/shortcut_disabled_message">
+        <intent android:targetPackage="com.orpheusdroid.screenrecorder" android:action="com.orpheusdroid.screenrecorder.RECORD" android:targetClass="com.orpheusdroid.screenrecorder.MainActivity" />
+    </shortcut>
+</shortcuts>

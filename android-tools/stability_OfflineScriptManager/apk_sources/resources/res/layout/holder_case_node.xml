@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto" android:background="?android:attr/selectableItemBackground" android:paddingLeft="10dp" android:layout_width="match_parent" android:layout_height="match_parent" android:minHeight="48dp">
+    <CheckBox android:id="@+id/node_selector" android:visibility="invisible" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_centerVertical="true" android:layout_marginStart="23dp"/>
+    <LinearLayout android:orientation="vertical" android:id="@+id/picture_wrapper" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginLeft="5dp" android:layout_toRightOf="@+id/node_selector" android:layout_centerHorizontal="true" android:layout_centerVertical="true" android:layout_alignWithParentIfMissing="true">
+        <View android:layout_gravity="center_horizontal" android:id="@+id/top_line" android:background="#12558c" android:layout_width="1dp" android:layout_height="16dp"/>
+        <com.github.johnkil.print.PrintView android:layout_width="wrap_content" android:layout_height="wrap_content" app:iconColor="#12558c" app:iconFont="fonts/material-icon-font.ttf" app:iconSize="14dp" app:iconText="@string/ic_check_circle_blank"/>
+        <View android:layout_gravity="center_horizontal" android:id="@+id/bot_line" android:background="#12558c" android:layout_width="1dp" android:layout_height="16dp"/>
+    </LinearLayout>
+    <TextView android:textSize="14sp" android:id="@+id/node_value" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginLeft="10dp" android:layout_toRightOf="@+id/picture_wrapper" android:layout_centerVertical="true"/>
+</RelativeLayout>

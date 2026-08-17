@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" android:sharedUserId="android.uid.system" android:versionCode="10202" android:versionName="1.2.2" android:compileSdkVersion="30" android:compileSdkVersionCodename="11" package="com.ape.offlinescriptmanager" platformBuildVersionCode="30" platformBuildVersionName="11">
+    <uses-sdk android:minSdkVersion="25" android:targetSdkVersion="30"/>
+    <uses-feature android:name="android.hardware.camera"/>
+    <uses-feature android:name="android.hardware.camera.autofocus"/>
+    <uses-permission android:name="android.permission.ACCESS_ALL_EXTERNAL_STORAGE"/>
+    <uses-permission android:name="android.permission.MOUNT_UNMOUNT_FILESYSTEMS"/>
+    <uses-permission android:name="android.permission.FORCE_STOP_PACKAGES"/>
+    <uses-permission android:name="android.permission.BATTERY_STATS"/>
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <uses-permission android:name="android.permission.VIBRATE"/>
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"/>
+    <uses-permission android:name="android.permission.CALL_PHONE"/>
+    <uses-permission android:name="android.permission.READ_PHONE_STATE"/>
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
+    <uses-permission android:name="android.permission.ACCESS_DOWNLOAD_MANAGER"/>
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <application android:theme="@style/AppTheme" android:label="@string/app_name_string" android:icon="@mipmap/ic_launcher" android:name="com.ape.offlinescriptmanager.utils.MyApplication" android:persistent="true" android:allowBackup="true" android:supportsRtl="true" android:extractNativeLibs="false" android:appComponentFactory="androidx.core.app.CoreComponentFactory" android:requestLegacyExternalStorage="true">
+        <activity android:name="com.ape.offlinescriptmanager.view.MainActivity" android:enabled="true" android:exported="true"/>
+        <activity android:label="@string/app_name_string" android:name="com.ape.offlinescriptmanager.batterytool.BatteryActivity" android:screenOrientation="portrait" android:windowSoftInputMode="adjustPan|stateAlwaysHidden">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+        <activity android:name="com.ape.offlinescriptmanager.view.testpoint.TaskDetailActivity"/>
+        <activity android:name="com.ape.offlinescriptmanager.view.TestPointEditActivity"/>
+        <activity android:name="com.ape.offlinescriptmanager.view.testcase.TestCaseEditActivity" android:windowSoftInputMode="adjustPan"/>
+        <activity android:name="com.ape.offlinescriptmanager.batterytool.HopDataShowActivity" android:screenOrientation="portrait"/>
+        <activity android:name="org.achartengine.GraphicalActivity"/>
+        <activity android:name="com.ape.offlinescriptmanager.view.AboutActivity"/>
+        <activity android:name="com.ape.offlinescriptmanager.view.UploadActivity"/>
+        <activity android:name="com.ape.offlinescriptmanager.crashlistener.CrashListenerActivity" android:screenOrientation="portrait" android:configChanges="screenSize|orientation|keyboardHidden">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.autotesttool"/>
+            </intent-filter>
+        </activity>
+        <activity android:name="com.ape.offlinescriptmanager.screenrecorder.ScreenRecorderActivity" android:screenOrientation="portrait" android:configChanges="screenSize|orientation|keyboardHidden">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.autotesttool"/>
+            </intent-filter>
+            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcut"/>
+        </activity>
+        <service android:name="com.ape.offlinescriptmanager.screenrecorder.RecorderService" android:exported="true"/>
+        <service android:name="com.ape.offlinescriptmanager.screenrecorder.FloatingControlService" android:exported="false"/>
+        <activity android:name="com.ape.offlinescriptmanager.screenrecorder.AboutActivity"/>
+        <activity android:name="com.ape.offlinescriptmanager.screenrecorder.DeepLinkActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <data android:scheme="od" android:host="screenrecording"/>
+                <data android:scheme="https" android:host="screenrecord.orpheusdroid.com"/>
+                <data android:scheme="http" android:host="screenrecord.orpheusdroid.com"/>
+            </intent-filter>
+        </activity>
+        <activity android:label="Privacy Policy" android:name="com.ape.offlinescriptmanager.screenrecorder.PrivacyPolicy"/>
+        <activity android:name="com.ape.offlinescriptmanager.screenrecorder.EditVideoActivity"/>
+        <service android:name="com.ape.offlinescriptmanager.crashlistener.CrashListenerService" android:enabled="true" android:exported="true" android:foregroundServiceType="mediaProjection"/>
+        <service android:name="com.ape.offlinescriptmanager.batterytool.UpdateDataService"/>
+        <service android:name="com.ape.offlinescriptmanager.view.RunTaskService" android:enabled="true" android:exported="true"/>
+        <receiver android:name="com.ape.offlinescriptmanager.batterytool.BatteryChangeBroadcastReceiver"/>
+        <provider android:name="com.ape.offlinescriptmanager.database.CommonProvider" android:exported="false" android:authorities="com.ape.offlinescriptmanager.database"/>
+        <provider android:name="androidx.core.content.FileProvider" android:exported="false" android:authorities="com.ape.offlinescriptmanager.fileprovider" android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths"/>
+        </provider>
+        <activity android:theme="@style/LibraryAppTheme" android:name="com.leon.lfilepickerlibrary.ui.LFilePickerActivity"/>
+    </application>
+</manifest>

@@ -23,7 +23,9 @@ automation-toolkit/
 ├── linux-tools/                           # Linux 专属工具
 │   └── system_Task-Scheduler/            # systemd 定时任务管理器
 ├── windows-scheduler/                     # Windows 定时任务管理器
-├── android-tools/                         # Android 工具集（规划中）
+├── android-tools/                         # Android 工具集
+│   ├── vendor/                            # apktool / jadx / APK 签名工具
+│   └── stability_OfflineScriptManager/    # MTBF 离线老化 APK 自编译与部署
 ├── java-platforms/                        # Java 平台（规划中）
 ├── node-scripts/                          # Node.js 脚本（规划中）
 └── shared/                                # 共享资源
@@ -65,6 +67,13 @@ automation-toolkit/
 | 工具名称 | 说明 |
 |---------|------|
 | [windows-scheduler](windows-scheduler/) | 任务计划程序定时任务管理器 |
+
+### Android 工具
+
+| 工具名称 | 说明 |
+|---------|------|
+| [stability_OfflineScriptManager](android-tools/stability_OfflineScriptManager/) | MTBF 离线老化 OfflineScriptManager 自编译与系统签名部署 |
+| [stability_MTBF-Test](android-tools/stability_MTBF-Test/) | MTBF 离线老化执行包（APK + XML + 一键 deploy/run） |
 
 ## 快速开始
 

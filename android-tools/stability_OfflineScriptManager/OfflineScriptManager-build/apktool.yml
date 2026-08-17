@@ -1,0 +1,48 @@
+version: 2.9.3
+apkFileName: OfflineScriptManager.apk
+isFrameworkApk: false
+usesFramework:
+  ids:
+  - 1
+  tag: null
+sdkInfo:
+  minSdkVersion: 25
+  targetSdkVersion: 30
+packageInfo:
+  forcedPackageId: 127
+  renameManifestPackage: null
+versionInfo:
+  versionCode: 10203
+  versionName: 1.2.2-patched
+resourcesAreCompressed: false
+sharedLibrary: false
+sparseResources: false
+unknownFiles:
+  functions_fr.properties: 8
+  functions_da.properties: 8
+  mailcap.default: 8
+  builddef.lst: 8
+  version.txt: 8
+  functions.properties: 8
+  functions_en.properties: 8
+  functions_es.properties: 8
+  functions_nl.properties: 8
+  mimetypes.default: 8
+  isoparser-default.properties: 8
+  functions_de.properties: 8
+  org/achartengine/image/zoom_in.png: 8
+  org/achartengine/image/zoom_out.png: 8
+  org/achartengine/image/zoom-1.png: 8
+doNotCompress:
+- resources.arsc
+- png
+- lib/arm64-v8a/libxcrash.so
+- lib/arm64-v8a/libxcrash_dumper.so
+- lib/x86/libxcrash_dumper.so
+- lib/x86/libxcrash.so
+- lib/armeabi/libxcrash_dumper.so
+- lib/armeabi/libxcrash.so
+- lib/armeabi-v7a/libxcrash_dumper.so
+- lib/armeabi-v7a/libxcrash.so
+- lib/x86_64/libxcrash.so
+- lib/x86_64/libxcrash_dumper.so

@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:keepScreenOn="true">
+    <LinearLayout android:orientation="vertical" android:paddingLeft="15dp" android:paddingRight="15dp" android:paddingBottom="15dp" android:layout_width="match_parent" android:layout_height="wrap_content">
+        <LinearLayout android:layout_gravity="center" android:orientation="horizontal" android:id="@+id/control_circle_layout" android:padding="8dp" android:layout_width="match_parent" android:layout_height="wrap_content">
+            <TextView android:textStyle="italic|bold" android:textColor="@android:color/holo_purple" android:paddingLeft="1dp" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/circle_on_off" android:layout_weight="1"/>
+            <Switch android:id="@+id/control_circle_onoff" android:paddingRight="5dp" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_weight="1"/>
+        </LinearLayout>
+        <TextView android:paddingTop="5dp" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/str_input_msg"/>
+        <TextView android:textStyle="bold" android:id="@+id/call_longtime_str" android:paddingTop="5dp" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/str_call"/>
+        <LinearLayout android:orientation="horizontal" android:id="@+id/call_longtime_layout" android:layout_width="match_parent" android:layout_height="wrap_content">
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="2.32">
+                <CheckBox android:id="@+id/check_call" android:layout_width="wrap_content" android:layout_height="wrap_content" android:checked="true"/>
+                <EditText android:textColor="@android:color/black" android:id="@+id/call_number" android:background="@android:drawable/edit_text" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/str_dial_number_10086" android:hint="@string/str_call_number" android:inputType="number" android:textCursorDrawable="@null"/>
+            </LinearLayout>
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1">
+                <CheckBox android:visibility="gone" android:layout_width="wrap_content" android:layout_height="wrap_content" android:checked="true"/>
+                <EditText android:textColor="@android:color/black" android:id="@+id/call_time" android:background="@android:drawable/edit_text" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/str_time_t" android:hint="@string/str_time" android:inputType="number" android:textCursorDrawable="@null"/>
+            </LinearLayout>
+        </LinearLayout>
+        <TextView android:textStyle="bold" android:paddingTop="10dp" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/str_call_times"/>
+        <LinearLayout android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="wrap_content">
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="2.32">
+                <CheckBox android:id="@+id/check_call_times" android:layout_width="wrap_content" android:layout_height="wrap_content" android:checked="true"/>
+                <EditText android:textColor="@android:color/black" android:id="@+id/call_number_times" android:background="@android:drawable/edit_text" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/str_dial_number_10086" android:hint="@string/str_call_number" android:inputType="number" android:textCursorDrawable="@null"/>
+            </LinearLayout>
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1">
+                <CheckBox android:visibility="gone" android:layout_width="wrap_content" android:layout_height="wrap_content" android:checked="true"/>
+                <EditText android:textColor="@android:color/black" android:id="@+id/call_times" android:background="@android:drawable/edit_text" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/str_time_t_low" android:hint="@string/str_time_low" android:inputType="number" android:textCursorDrawable="@null"/>
+            </LinearLayout>
+        </LinearLayout>
+        <TextView android:textStyle="bold" android:paddingTop="5dp" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/str_browse_web"/>
+        <LinearLayout android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="wrap_content">
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="2.3">
+                <CheckBox android:id="@+id/check_web" android:layout_width="wrap_content" android:layout_height="wrap_content" android:checked="true"/>
+                <EditText android:textColor="@android:color/black" android:id="@+id/web_addr" android:background="@android:drawable/edit_text" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="@string/str_web_addr" android:maxLines="1" android:singleLine="true" android:editable="false" android:layout_weight="0.93" android:textCursorDrawable="@null"/>
+            </LinearLayout>
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1">
+                <CheckBox android:visibility="gone" android:layout_width="wrap_content" android:layout_height="wrap_content" android:checked="true"/>
+                <EditText android:textColor="@android:color/black" android:id="@+id/browse_web_time" android:background="@android:drawable/edit_text" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/str_time_t" android:hint="@string/str_web_addr_time" android:inputType="number" android:textCursorDrawable="@null"/>
+            </LinearLayout>
+        </LinearLayout>
+        <TextView android:textStyle="bold" android:id="@+id/play_Video_textview" android:paddingTop="5dp" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/str_play_video"/>
+        <LinearLayout android:orientation="horizontal" android:id="@+id/play_video_linearlayout" android:layout_width="match_parent" android:layout_height="wrap_content">
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="2.3">
+                <CheckBox android:id="@+id/check_play_video" android:layout_width="wrap_content" android:layout_height="wrap_content" android:checked="true"/>
+                <EditText android:textColor="@android:color/black" android:id="@+id/video_addr" android:background="@android:drawable/edit_text" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="@string/str_video_addr" android:maxLines="1" android:singleLine="true" android:editable="false" android:layout_weight="0.93" android:textCursorDrawable="@null"/>
+            </LinearLayout>
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1">
+                <CheckBox android:visibility="gone" android:layout_width="wrap_content" android:layout_height="wrap_content" android:checked="true"/>
+                <EditText android:textColor="@android:color/black" android:id="@+id/play_video_time" android:background="@android:drawable/edit_text" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/str_time_t" android:hint="@string/str_video_addr_time" android:inputType="number" android:textCursorDrawable="@null"/>
+            </LinearLayout>
+        </LinearLayout>
+        <TextView android:textStyle="bold" android:paddingTop="5dp" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/str_downLoad"/>
+        <LinearLayout android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="wrap_content">
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="2.3">
+                <CheckBox android:id="@+id/check_downLoad" android:layout_width="wrap_content" android:layout_height="wrap_content" android:checked="true"/>
+                <EditText android:textColor="@android:color/black" android:id="@+id/downLoad_addr" android:background="@android:drawable/edit_text" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="@string/str_downLoad_addr" android:maxLines="1" android:singleLine="true" android:editable="false" android:layout_weight="0.93" android:textCursorDrawable="@null"/>
+            </LinearLayout>
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1">
+                <CheckBox android:visibility="gone" android:layout_width="wrap_content" android:layout_height="wrap_content" android:checked="true"/>
+                <EditText android:textColor="@android:color/black" android:id="@+id/downLoad_time" android:background="@android:drawable/edit_text" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/str_time_t" android:hint="@string/str_downLoad_time" android:inputType="number" android:textCursorDrawable="@null"/>
+            </LinearLayout>
+        </LinearLayout>
+        <LinearLayout android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="wrap_content">
+            <TextView android:textStyle="bold" android:paddingTop="5dp" android:layout_width="0dp" android:layout_height="wrap_content" android:text="@string/str_tdgame" android:layout_weight="1"/>
+            <TextView android:textStyle="bold" android:paddingTop="5dp" android:layout_width="0dp" android:layout_height="wrap_content" android:text="@string/str_video" android:layout_weight="1"/>
+        </LinearLayout>
+        <LinearLayout android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="wrap_content">
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1">
+                <CheckBox android:id="@+id/check_threeDGame" android:layout_width="wrap_content" android:layout_height="wrap_content" android:checked="true"/>
+                <EditText android:textColor="@android:color/black" android:id="@+id/threed_time" android:background="@android:drawable/edit_text" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/str_time_s" android:hint="@string/str_time" android:inputType="number" android:textCursorDrawable="@null"/>
+            </LinearLayout>
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1">
+                <CheckBox android:id="@+id/check_video" android:layout_width="wrap_content" android:layout_height="wrap_content" android:checked="true"/>
+                <EditText android:textColor="@android:color/black" android:id="@+id/video_time" android:background="@android:drawable/edit_text" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/str_time_s" android:hint="@string/str_time" android:inputType="number" android:textCursorDrawable="@null"/>
+            </LinearLayout>
+        </LinearLayout>
+        <LinearLayout android:orientation="horizontal" android:id="@+id/camera_musicebook_str_layout" android:layout_width="match_parent" android:layout_height="wrap_content">
+            <TextView android:textStyle="bold" android:paddingTop="5dp" android:layout_width="0dp" android:layout_height="wrap_content" android:text="@string/str_camera" android:layout_weight="1"/>
+            <TextView android:textStyle="bold" android:paddingTop="5dp" android:layout_width="0dp" android:layout_height="wrap_content" android:text="@string/str_ebook" android:layout_weight="1"/>
+        </LinearLayout>
+        <LinearLayout android:orientation="horizontal" android:id="@+id/camera_musicebook_layout" android:layout_width="match_parent" android:layout_height="wrap_content">
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1">
+                <CheckBox android:id="@+id/check_camera" android:layout_width="wrap_content" android:layout_height="wrap_content" android:checked="true"/>
+                <EditText android:textColor="@android:color/black" android:id="@+id/camera_time" android:background="@android:drawable/edit_text" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/str_time_s" android:hint="@string/str_time" android:inputType="number" android:textCursorDrawable="@null"/>
+            </LinearLayout>
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1">
+                <CheckBox android:id="@+id/check_music" android:layout_width="wrap_content" android:layout_height="wrap_content" android:checked="true"/>
+                <EditText android:textColor="@android:color/black" android:id="@+id/music_time" android:background="@android:drawable/edit_text" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/str_time_n" android:hint="@string/str_time" android:inputType="number" android:textCursorDrawable="@null"/>
+            </LinearLayout>
+        </LinearLayout>
+        <LinearLayout android:orientation="horizontal" android:id="@+id/music_videocamera_str_layout" android:layout_width="match_parent" android:layout_height="wrap_content">
+            <TextView android:textStyle="bold" android:paddingTop="5dp" android:layout_width="0dp" android:layout_height="wrap_content" android:text="@string/str_music_low" android:layout_weight="1"/>
+            <TextView android:textStyle="bold" android:paddingTop="5dp" android:layout_width="0dp" android:layout_height="wrap_content" android:text="@string/str_videotape_low" android:layout_weight="1"/>
+        </LinearLayout>
+        <LinearLayout android:orientation="horizontal" android:id="@+id/music_videocamera_layout" android:layout_width="match_parent" android:layout_height="wrap_content">
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1">
+                <CheckBox android:id="@+id/check_music_low" android:layout_width="wrap_content" android:layout_height="wrap_content" android:checked="true"/>
+                <EditText android:textColor="@android:color/black" android:id="@+id/music_time_low" android:background="@android:drawable/edit_text" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/str_time_n" android:hint="@string/str_time" android:inputType="number" android:textCursorDrawable="@null"/>
+            </LinearLayout>
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1">
+                <CheckBox android:id="@+id/check_videotape_low" android:layout_width="wrap_content" android:layout_height="wrap_content" android:checked="true"/>
+                <EditText android:textColor="@android:color/black" android:id="@+id/videotape_time_low" android:background="@android:drawable/edit_text" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/str_time_s" android:hint="@string/str_time" android:inputType="number" android:textCursorDrawable="@null"/>
+            </LinearLayout>
+        </LinearLayout>
+        <LinearLayout android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="wrap_content">
+            <Button android:textColor="@android:color/black" android:gravity="center" android:id="@+id/btn_start_test" android:background="@android:drawable/btn_default" android:layout_width="0dp" android:layout_height="wrap_content" android:text="@string/str_start_test" android:layout_weight="1"/>
+            <Button android:textColor="@android:color/black" android:gravity="center" android:id="@+id/btn_end_test" android:background="@android:drawable/btn_default" android:layout_width="0dp" android:layout_height="wrap_content" android:text="@string/str_stop_test" android:layout_weight="1"/>
+        </LinearLayout>
+    </LinearLayout>
+</ScrollView>

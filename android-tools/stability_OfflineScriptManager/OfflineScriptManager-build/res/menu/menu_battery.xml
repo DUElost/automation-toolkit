@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:id="@id/battery_menu_crash_listen" android:orderInCategory="100" android:title="@string/menu_crash_listen" android:showAsAction="never" />
+    <item android:id="@id/battery_menu_clear" android:orderInCategory="100" android:title="@string/menu_clear" android:showAsAction="never" />
+    <item android:id="@id/battery_menu_export" android:orderInCategory="100" android:title="@string/menu_export_data" android:showAsAction="never" />
+    <item android:id="@id/battery_menu_hop" android:orderInCategory="100" android:title="@string/menu_hop_data" android:showAsAction="never" />
+    <item android:id="@id/result_upload" android:orderInCategory="100" android:title="@string/menu_result_upload" android:showAsAction="never" />
+    <item android:id="@id/about" android:orderInCategory="100" android:title="@string/menu_about" android:showAsAction="never" />
+</menu>

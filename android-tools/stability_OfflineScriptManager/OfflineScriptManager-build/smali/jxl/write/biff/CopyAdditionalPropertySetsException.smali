@@ -1,0 +1,15 @@
+.class public Ljxl/write/biff/CopyAdditionalPropertySetsException;
+.super Ljxl/write/biff/JxlWriteException;
+.source ""
+
+
+# direct methods
+.method public constructor <init>()V
+    .locals 1
+
+    sget-object v0, Ljxl/write/biff/JxlWriteException;->copyPropertySets:Ljxl/write/biff/JxlWriteException$WriteMessage;
+
+    invoke-direct {p0, v0}, Ljxl/write/biff/JxlWriteException;-><init>(Ljxl/write/biff/JxlWriteException$WriteMessage;)V
+
+    return-void
+.end method

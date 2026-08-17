@@ -1,0 +1,13 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<TestSet name="UiAutomatorTestData" TakeScreenshot="true">
+  <SIM wifiName="JXTL-ST" />
+  <SIM wifiPWD="tinno&#64;st" />
+  <SIM number="13625645898" />
+  <SIM googleAccount="Super233886&#64;gmail.com" />
+  <SIM googlePWD="tinno&#64;851427" />
+  <TestPackage appPackageName="com.tinno.reliabilityuiautomatortest.test.cases.honor" runner="androidx.test.runner.AndroidJUnitRunner">
+    <TestCase name="ImitationRM_AgeingTest">
+      <TestMethod name="test_Reliability0138_SetLock" />
+    </TestCase>
+  </TestPackage>
+</TestSet>

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:orientation="vertical" android:layout_width="match_parent" android:layout_height="wrap_content">
+    <LinearLayout android:orientation="horizontal" android:id="@+id/dialog_case_edit_type_layout" android:layout_width="match_parent" android:layout_height="wrap_content">
+        <TextView android:textSize="@dimen/customTitle" android:textColor="#000000" android:id="@+id/dialog_case_edit_type_tv" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/type"/>
+        <Spinner android:id="@+id/dialog_case_edit_type_sp" android:paddingLeft="5dp" android:layout_width="match_parent" android:layout_height="wrap_content"/>
+    </LinearLayout>
+    <LinearLayout android:orientation="horizontal" android:id="@+id/dialog_case_edit_times_layout" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp">
+        <TextView android:textSize="@dimen/customTitle" android:textColor="#000000" android:id="@+id/dialog_case_edit_times_tv" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/times"/>
+        <EditText android:textSize="@dimen/customTitle" android:textColor="#000000" android:id="@+id/dialog_case_edit_times_et" android:layout_width="80dp" android:layout_height="wrap_content" android:inputType="number"/>
+        <TextView android:textSize="@dimen/customTitle" android:textColor="#000000" android:id="@+id/dialog_case_edit_is_checked" android:paddingLeft="30dp" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/id_checked"/>
+        <CheckBox android:id="@+id/dialog_case_edit_selecter" android:paddingLeft="10dp" android:layout_width="wrap_content" android:layout_height="wrap_content" android:scaleX="0.8" android:scaleY="0.8"/>
+    </LinearLayout>
+    <LinearLayout android:orientation="horizontal" android:id="@+id/dialog_case_edit_apk_layout" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp">
+        <TextView android:textSize="@dimen/customTitle" android:textColor="#000000" android:id="@+id/dialog_case_edit_apk_tv" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/apk"/>
+        <Spinner android:id="@+id/dialog_case_edit_apk_sp" android:paddingLeft="5dp" android:layout_width="match_parent" android:layout_height="wrap_content"/>
+    </LinearLayout>
+    <LinearLayout android:orientation="horizontal" android:id="@+id/dialog_case_edit_class_layout" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp">
+        <TextView android:textSize="@dimen/customTitle" android:textColor="#000000" android:id="@+id/dialog_case_edit_class_tv" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/cls"/>
+        <Spinner android:id="@+id/dialog_case_edit_class_sp" android:paddingLeft="5dp" android:layout_width="match_parent" android:layout_height="wrap_content"/>
+    </LinearLayout>
+    <LinearLayout android:orientation="horizontal" android:id="@+id/dialog_case_edit_method_layout" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp">
+        <TextView android:textSize="@dimen/customTitle" android:textColor="#000000" android:id="@+id/dialog_case_edit_method_tv" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/method"/>
+        <Spinner android:id="@+id/dialog_case_edit_method_sp" android:paddingLeft="5dp" android:layout_width="match_parent" android:layout_height="wrap_content"/>
+    </LinearLayout>
+    <LinearLayout android:orientation="horizontal" android:id="@+id/dialog_case_edit_desc_layout" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp">
+        <TextView android:textSize="@dimen/customTitle" android:textColor="#000000" android:id="@+id/dialog_case_edit_desc_tv" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/description"/>
+        <EditText android:textSize="@dimen/customTitle" android:textColor="#000000" android:id="@+id/dialog_case_edit_desc_et" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="text"/>
+    </LinearLayout>
+    <com.jude.easyrecyclerview.EasyRecyclerView android:id="@+id/dialog_case_edit_args_list" android:layout_width="match_parent" android:layout_height="wrap_content"/>
+</LinearLayout>

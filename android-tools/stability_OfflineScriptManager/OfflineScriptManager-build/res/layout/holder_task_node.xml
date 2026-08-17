@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout android:background="?android:selectableItemBackground" android:layout_width="fill_parent" android:layout_height="fill_parent" android:minHeight="56.0dip" android:paddingStart="10.0dip"
+  xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto">
+    <com.github.johnkil.print.PrintView android:id="@id/icon" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_alignParentLeft="true" android:layout_centerHorizontal="true" android:layout_centerVertical="true" app:iconColor="#ff0099cc" app:iconFont="fonts/material-icon-font.ttf" app:iconSize="36.0dip" />
+    <TextView android:textSize="19.0sp" android:id="@id/node_text" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginLeft="10.0dip" android:layout_toRightOf="@id/icon" android:layout_centerVertical="true" />
+    <LinearLayout android:gravity="right" android:id="@id/ll_long_click_menu" android:visibility="invisible" android:layout_width="fill_parent" android:layout_height="wrap_content" android:layout_toRightOf="@id/node_text" android:layout_centerVertical="true" android:paddingEnd="10.0dip">
+        <com.github.johnkil.print.PrintButton android:id="@id/btn_select_all" android:layout_width="wrap_content" android:layout_height="wrap_content" app:iconColor="#ff12558c" app:iconFont="fonts/material-icon-font.ttf" app:iconSize="28.0dip" app:iconText="@string/ic_check_box_outline" />
+        <com.github.johnkil.print.PrintButton android:id="@id/btn_select_none" android:layout_width="wrap_content" android:layout_height="wrap_content" app:iconColor="#ff12558c" app:iconFont="fonts/material-icon-font.ttf" app:iconSize="28.0dip" app:iconText="@string/ic_check_box_outline_blank" />
+        <com.github.johnkil.print.PrintButton android:id="@id/btn_cancel" android:layout_width="wrap_content" android:layout_height="wrap_content" app:iconColor="#ff12558c" app:iconFont="fonts/material-icon-font.ttf" app:iconSize="28.0dip" app:iconText="@string/ic_close" />
+        <com.github.johnkil.print.PrintButton android:id="@id/btn_save" android:visibility="gone" android:layout_width="wrap_content" android:layout_height="wrap_content" app:iconColor="#ff12558c" app:iconFont="fonts/material-icon-font.ttf" app:iconSize="28.0dip" app:iconText="@string/ic_save" />
+    </LinearLayout>
+</RelativeLayout>

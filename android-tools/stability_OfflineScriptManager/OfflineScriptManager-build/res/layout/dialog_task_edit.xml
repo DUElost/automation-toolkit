@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout android:orientation="vertical" android:layout_width="fill_parent" android:layout_height="wrap_content"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <LinearLayout android:orientation="horizontal" android:layout_width="fill_parent" android:layout_height="wrap_content" android:layout_marginTop="13.0dip">
+        <TextView android:textSize="@dimen/customTitle" android:textColor="#ff000000" android:id="@id/dialog_task_ia_checked_tv" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/id_checked" />
+        <CheckBox android:id="@id/dialog_task_edit_selecter" android:paddingLeft="10.0dip" android:layout_width="wrap_content" android:layout_height="wrap_content" android:checked="false" />
+    </LinearLayout>
+    <TextView android:textSize="@dimen/customTitle" android:textColor="#ff000000" android:id="@id/dialog_task_edit_name_tv" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="13.0dip" android:text="@string/name" />
+    <EditText android:textSize="@dimen/customEntry" android:textColor="#ff000000" android:id="@id/dialog_task_edit_name_et" android:layout_width="fill_parent" android:layout_height="wrap_content" android:layout_marginTop="4.0dip" android:inputType="text" />
+    <TextView android:textSize="@dimen/customTitle" android:textColor="#ff000000" android:id="@id/dialog_task_edit_times_tv" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="13.0dip" android:text="@string/times" />
+    <EditText android:textSize="@dimen/customEntry" android:textColor="#ff000000" android:id="@id/dialog_task_edit_times_et" android:layout_width="fill_parent" android:layout_height="wrap_content" android:layout_marginTop="4.0dip" android:inputType="number" />
+</LinearLayout>

@@ -1,0 +1,42 @@
+package jxl.format;
+/* loaded from: classes.dex */
+public final class ScriptStyle {
+    private String string;
+    private int value;
+    private static ScriptStyle[] styles = new ScriptStyle[0];
+    public static final ScriptStyle NORMAL_SCRIPT = new ScriptStyle(0, "normal");
+    public static final ScriptStyle SUPERSCRIPT = new ScriptStyle(1, "super");
+    public static final ScriptStyle SUBSCRIPT = new ScriptStyle(2, "sub");
+
+    protected ScriptStyle(int i, String str) {
+        this.value = i;
+        this.string = str;
+        ScriptStyle[] scriptStyleArr = styles;
+        ScriptStyle[] scriptStyleArr2 = new ScriptStyle[scriptStyleArr.length + 1];
+        styles = scriptStyleArr2;
+        System.arraycopy(scriptStyleArr, 0, scriptStyleArr2, 0, scriptStyleArr.length);
+        styles[scriptStyleArr.length] = this;
+    }
+
+    public static ScriptStyle getStyle(int i) {
+        int i2 = 0;
+        while (true) {
+            ScriptStyle[] scriptStyleArr = styles;
+            if (i2 >= scriptStyleArr.length) {
+                return NORMAL_SCRIPT;
+            }
+            if (scriptStyleArr[i2].getValue() == i) {
+                return styles[i2];
+            }
+            i2++;
+        }
+    }
+
+    public String getDescription() {
+        return this.string;
+    }
+
+    public int getValue() {
+        return this.value;
+    }
+}

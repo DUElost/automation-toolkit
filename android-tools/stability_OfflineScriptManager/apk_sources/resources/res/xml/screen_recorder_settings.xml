@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+    <PreferenceCategory android:title="@string/prefs_category_video_settings_title">
+        <ListPreference android:entries="@array/resolutionValues" android:title="@string/preference_resolution_title" android:key="@string/res_key" android:summary="@string/preference_resolution_summary" android:defaultValue="1440x2560" android:entryValues="@array/resolutionValues"/>
+        <ListPreference android:entries="@array/fpsArray" android:title="@string/preference_fps_title" android:key="@string/fps_key" android:summary="@string/preference_fps_summary" android:defaultValue="30" android:entryValues="@array/fpsArray"/>
+        <ListPreference android:entries="@array/bitrateArray" android:title="@string/preference_bit_title" android:key="@string/bitrate_key" android:summary="@string/preference_bit_summary" android:defaultValue="7130317" android:entryValues="@array/bitratesValue"/>
+    </PreferenceCategory>
+    <PreferenceCategory android:title="@string/prefs_category_audio_settings_title">
+        <CheckBoxPreference android:title="@string/preference_audio_record_title" android:key="@string/audiorec_key" android:summary="@string/preference_audio_record_summary" android:defaultValue="false"/>
+    </PreferenceCategory>
+    <PreferenceCategory android:title="@string/prefs_category_save_options_title">
+        <com.ape.offlinescriptmanager.screenrecorder.folderpicker.FolderChooser android:title="@string/preference_save_location_title" android:key="@string/savelocation_key" android:positiveButtonText="@android:string/ok" android:negativeButtonText="@android:string/cancel"/>
+        <ListPreference android:entries="@array/filename" android:title="@string/preference_filename_format_title" android:key="@string/filename_key" android:defaultValue="yyyyMMdd_hhmmss" android:entryValues="@array/filename"/>
+        <EditTextPreference android:title="@string/preference_filename_prefix_title" android:key="@string/fileprefix_key" android:summary="Enter a prefix for the saved file name" android:defaultValue="recording"/>
+    </PreferenceCategory>
+    <PreferenceCategory android:title="@string/prefs_category_misc_title">
+        <CheckBoxPreference android:title="@string/preference_floating_control_title" android:key="@string/preference_floating_control_key" android:summary="@string/preference_floating_control_summary" android:defaultValue="false"/>
+        <com.ape.offlinescriptmanager.screenrecorder.SeekBarPreference android:persistent="true" android:max="200" android:text=" DP" android:title="@string/preference_floating_control_size_title" android:key="@string/preference_floating_control_size_key" android:summary="@string/preference_floating_control_size_summary" android:defaultValue="100"/>
+        <Preference android:visibility="invisible" android:title="" android:summary=""/>
+    </PreferenceCategory>
+</PreferenceScreen>

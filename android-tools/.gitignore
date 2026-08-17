@@ -1,0 +1,8 @@
+# Generated signing artifacts (keys live outside repo; see app-config.properties)
+vendor/platform-sign/
+
+# apktool build output
+stability_OfflineScriptManager/dist/
+
+# Local temp
+*.tmp

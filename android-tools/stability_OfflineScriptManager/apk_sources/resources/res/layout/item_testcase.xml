@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_margin="6dp" app:cardCornerRadius="15dp" app:elevation="200dp">
+    <LinearLayout android:orientation="vertical" android:layout_width="match_parent" android:layout_height="match_parent">
+        <RelativeLayout android:orientation="horizontal" android:id="@+id/times_layout" android:padding="5dp" android:layout_width="match_parent" android:layout_height="wrap_content">
+            <TextView android:textSize="18dp" android:textColor="@android:color/black" android:id="@+id/times" android:paddingRight="6dp" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/times"/>
+            <TextView android:textSize="18dp" android:textColor="@android:color/black" android:id="@+id/testcase_times" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_toRightOf="@+id/times" android:textIsSelectable="true"/>
+            <CheckBox android:id="@+id/testcase_selecter" android:paddingRight="15dp" android:layout_width="wrap_content" android:layout_height="18dp" android:layout_alignParentEnd="true"/>
+        </RelativeLayout>
+        <LinearLayout android:orientation="horizontal" android:id="@+id/type_layout" android:padding="5dp" android:layout_width="match_parent" android:layout_height="wrap_content">
+            <TextView android:textSize="18dp" android:textColor="@android:color/black" android:id="@+id/type" android:paddingRight="6dp" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/type"/>
+            <TextView android:textSize="18dp" android:textColor="@android:color/black" android:id="@+id/type_name" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textIsSelectable="true"/>
+        </LinearLayout>
+        <LinearLayout android:orientation="horizontal" android:id="@+id/apk_layout" android:padding="5dp" android:layout_width="match_parent" android:layout_height="wrap_content">
+            <TextView android:textSize="18dp" android:textColor="@android:color/black" android:id="@+id/apk" android:paddingRight="6dp" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/apk"/>
+            <TextView android:textSize="18dp" android:textColor="@android:color/black" android:id="@+id/apk_name" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textIsSelectable="true"/>
+        </LinearLayout>
+        <LinearLayout android:orientation="horizontal" android:id="@+id/package_layout" android:padding="5dp" android:layout_width="match_parent" android:layout_height="wrap_content">
+            <TextView android:textSize="18dp" android:textColor="@android:color/black" android:id="@+id/pkg" android:paddingRight="6dp" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/pkg"/>
+            <TextView android:textSize="18dp" android:textColor="@android:color/black" android:id="@+id/pkg_name" android:paddingRight="6dp" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+        </LinearLayout>
+        <LinearLayout android:orientation="horizontal" android:id="@+id/class_layout" android:padding="5dp" android:layout_width="match_parent" android:layout_height="wrap_content">
+            <TextView android:textSize="18dp" android:textColor="@android:color/black" android:id="@+id/cls" android:paddingRight="6dp" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/cls"/>
+            <TextView android:textSize="18dp" android:textColor="@android:color/black" android:id="@+id/class_name" android:paddingRight="6dp" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+        </LinearLayout>
+        <LinearLayout android:orientation="horizontal" android:id="@+id/method_layout" android:padding="5dp" android:layout_width="match_parent" android:layout_height="wrap_content">
+            <TextView android:textSize="18dp" android:textColor="@android:color/black" android:id="@+id/method" android:paddingRight="6dp" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/method"/>
+            <TextView android:textSize="18dp" android:textColor="@android:color/black" android:id="@+id/method_name" android:paddingRight="6dp" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+        </LinearLayout>
+        <LinearLayout android:orientation="horizontal" android:id="@+id/description_layout" android:padding="5dp" android:layout_width="match_parent" android:layout_height="wrap_content">
+            <TextView android:textSize="18dp" android:textColor="@android:color/black" android:id="@+id/description" android:paddingRight="6dp" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/description"/>
+            <TextView android:textSize="18dp" android:textColor="@android:color/black" android:id="@+id/description_name" android:paddingRight="6dp" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+        </LinearLayout>
+    </LinearLayout>
+</androidx.cardview.widget.CardView>

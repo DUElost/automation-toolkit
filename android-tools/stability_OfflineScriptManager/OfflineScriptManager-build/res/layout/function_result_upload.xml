@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout android:orientation="vertical" android:layout_width="fill_parent" android:layout_height="fill_parent"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <TextView android:layout_gravity="center_horizontal" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="18.0dip" android:text="@string/str_attention" />
+    <EditText android:textSize="14.0sp" android:background="@android:drawable/editbox_dropdown_light_frame" android:padding="10.0dip" android:layout_width="fill_parent" android:layout_height="wrap_content" android:layout_marginTop="18.0dip" android:text="@string/str_upload_attention" android:maxLines="10" android:minLines="8" android:editable="false" android:layout_marginStart="18.0dip" android:layout_marginEnd="18.0dip" />
+    <LinearLayout android:orientation="horizontal" android:layout_width="fill_parent" android:layout_height="wrap_content" android:layout_margin="20.0dip">
+        <TextView android:layout_width="0.0dip" android:layout_height="wrap_content" android:text="@string/str_select_hint" android:layout_weight="3.0" />
+        <Button android:id="@id/select_file" android:layout_width="0.0dip" android:layout_height="wrap_content" android:text="@string/btn_select_file" android:layout_weight="2.0" />
+    </LinearLayout>
+    <LinearLayout android:orientation="horizontal" android:id="@id/tester" android:layout_width="fill_parent" android:layout_height="wrap_content">
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/task_upload_name" android:layout_weight="1.0" android:layout_marginStart="20.0dip" />
+        <EditText android:textSize="14.0sp" android:textColorHint="@color/red" android:gravity="center" android:id="@id/tester_name" android:layout_width="wrap_content" android:layout_height="wrap_content" android:hint="@string/str_task_tester" android:layout_weight="2.0" android:layout_marginEnd="20.0dip" />
+    </LinearLayout>
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="20.0dip" android:text="@string/str_file_path" android:layout_marginStart="20.0dip" />
+    <EditText android:textSize="14.0sp" android:gravity="center" android:id="@id/upload_file_path" android:layout_width="fill_parent" android:layout_height="wrap_content" android:hint="@string/str_write_path" android:editable="false" android:layout_marginStart="20.0dip" android:layout_marginEnd="20.0dip" />
+    <TextView android:layout_gravity="center_horizontal" android:id="@id/tv_upload_result" android:visibility="invisible" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="20.0dip" android:text="@string/str_upload_result" android:layout_marginStart="20.0dip" />
+    <Button android:layout_gravity="center_horizontal" android:id="@id/upload" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_margin="10.0dip" android:text="@string/upload" />
+</LinearLayout>

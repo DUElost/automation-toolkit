@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <PreferenceCategory android:title="@string/prefs_category_listener_option_title">
+        <EditTextPreference android:title="@string/preference_listener_interval_time_title" android:key="@string/crash_listener_interval_time_key" android:summary="Enter a number for interval time" android:defaultValue="200" android:inputType="number" />
+    </PreferenceCategory>
+    <PreferenceCategory android:title="@string/prefs_category_save_options_title">
+        <com.ape.offlinescriptmanager.screenrecorder.folderpicker.FolderChooser android:title="@string/preference_save_location_title" android:key="@string/crash_save_location_key" android:positiveButtonText="@android:string/ok" android:negativeButtonText="@android:string/cancel" />
+        <ListPreference android:entries="@array/filename" android:title="@string/preference_filename_format_title" android:key="@string/crash_file_name_key" android:defaultValue="@string/crash_listener_filename_default" android:entryValues="@array/filename" />
+        <EditTextPreference android:title="@string/preference_filename_prefix_title" android:key="@string/crash_file_name_prefix_key" android:summary="Enter a prefix for the saved file name" android:defaultValue="@string/crash_listener_prefix_default" />
+    </PreferenceCategory>
+</PreferenceScreen>

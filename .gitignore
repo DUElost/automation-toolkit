@@ -51,6 +51,12 @@ local.properties
 .cxx
 .gradle
 build/
+# android-tools: allow bundled runtime/build binaries
+!android-tools/vendor/apktool/apktool.jar
+!android-tools/vendor/uber-apk-signer.jar
+!android-tools/stability_MTBF-Test/apk/*.apk
+!android-tools/stability_OfflineScriptManager/OfflineScriptManager.apk
+!android-tools/stability_OfflineScriptManager/OfflineScriptManager.apk.original
 
 # Node.js
 node_modules/

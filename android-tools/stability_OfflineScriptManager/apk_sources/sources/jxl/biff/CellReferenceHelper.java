@@ -1,0 +1,151 @@
+package jxl.biff;
+
+import jxl.biff.formula.ExternalSheet;
+import jxl.common.Logger;
+import me.zhanghai.android.materialprogressbar.BuildConfig;
+/* loaded from: classes.dex */
+public final class CellReferenceHelper {
+    static /* synthetic */ Class class$jxl$biff$CellReferenceHelper = null;
+    private static final char fixedInd = '$';
+    private static Logger logger = null;
+    private static final char sheetInd = '!';
+
+    static {
+        Class cls = class$jxl$biff$CellReferenceHelper;
+        if (cls == null) {
+            cls = class$("jxl.biff.CellReferenceHelper");
+            class$jxl$biff$CellReferenceHelper = cls;
+        }
+        logger = Logger.getLogger(cls);
+    }
+
+    private CellReferenceHelper() {
+    }
+
+    static /* synthetic */ Class class$(String str) {
+        try {
+            return Class.forName(str);
+        } catch (ClassNotFoundException e) {
+            throw new NoClassDefFoundError(e.getMessage());
+        }
+    }
+
+    public static String getCellReference(int i, int i2) {
+        StringBuffer stringBuffer = new StringBuffer();
+        getCellReference(i, i2, stringBuffer);
+        return stringBuffer.toString();
+    }
+
+    public static String getCellReference(int i, int i2, int i3, ExternalSheet externalSheet) {
+        StringBuffer stringBuffer = new StringBuffer();
+        getCellReference(i, i2, i3, externalSheet, stringBuffer);
+        return stringBuffer.toString();
+    }
+
+    public static void getCellReference(int i, int i2, int i3, ExternalSheet externalSheet, StringBuffer stringBuffer) {
+        stringBuffer.append(StringHelper.replace(externalSheet.getExternalSheetName(i), "'", "''"));
+        stringBuffer.append(sheetInd);
+        getCellReference(i2, i3, stringBuffer);
+    }
+
+    public static void getCellReference(int i, int i2, StringBuffer stringBuffer) {
+        getColumnReference(i, stringBuffer);
+        stringBuffer.append(Integer.toString(i2 + 1));
+    }
+
+    public static void getCellReference(int i, int i2, boolean z, int i3, boolean z2, ExternalSheet externalSheet, StringBuffer stringBuffer) {
+        stringBuffer.append(externalSheet.getExternalSheetName(i));
+        stringBuffer.append(sheetInd);
+        getCellReference(i2, z, i3, z2, stringBuffer);
+    }
+
+    public static void getCellReference(int i, boolean z, int i2, boolean z2, StringBuffer stringBuffer) {
+        if (z) {
+            stringBuffer.append(fixedInd);
+        }
+        getColumnReference(i, stringBuffer);
+        if (z2) {
+            stringBuffer.append(fixedInd);
+        }
+        stringBuffer.append(Integer.toString(i2 + 1));
+    }
+
+    public static int getColumn(String str) {
+        int numberIndex = getNumberIndex(str);
+        String upperCase = str.toUpperCase();
+        int lastIndexOf = str.lastIndexOf(33) + 1;
+        if (str.charAt(lastIndexOf) == '$') {
+            lastIndexOf++;
+        }
+        if (str.charAt(numberIndex - 1) == '$') {
+            numberIndex--;
+        }
+        int i = 0;
+        for (int i2 = lastIndexOf; i2 < numberIndex; i2++) {
+            if (i2 != lastIndexOf) {
+                i = (i + 1) * 26;
+            }
+            i += upperCase.charAt(i2) - 'A';
+        }
+        return i;
+    }
+
+    public static String getColumnReference(int i) {
+        StringBuffer stringBuffer = new StringBuffer();
+        getColumnReference(i, stringBuffer);
+        return stringBuffer.toString();
+    }
+
+    public static void getColumnReference(int i, StringBuffer stringBuffer) {
+        int i2 = i / 26;
+        int i3 = i % 26;
+        StringBuffer stringBuffer2 = new StringBuffer();
+        while (true) {
+            stringBuffer2.append((char) (i3 + 65));
+            if (i2 == 0) {
+                break;
+            }
+            i3 = (i2 % 26) - 1;
+            i2 /= 26;
+        }
+        for (int length = stringBuffer2.length() - 1; length >= 0; length--) {
+            stringBuffer.append(stringBuffer2.charAt(length));
+        }
+    }
+
+    private static int getNumberIndex(String str) {
+        int lastIndexOf = str.lastIndexOf(33) + 1;
+        boolean z = false;
+        while (!z && lastIndexOf < str.length()) {
+            char charAt = str.charAt(lastIndexOf);
+            if (charAt < '0' || charAt > '9') {
+                lastIndexOf++;
+            } else {
+                z = true;
+            }
+        }
+        return lastIndexOf;
+    }
+
+    public static int getRow(String str) {
+        try {
+            return Integer.parseInt(str.substring(getNumberIndex(str))) - 1;
+        } catch (NumberFormatException e) {
+            logger.warn(e, e);
+            return 65535;
+        }
+    }
+
+    public static String getSheet(String str) {
+        int lastIndexOf = str.lastIndexOf(33);
+        return lastIndexOf == -1 ? BuildConfig.FLAVOR : str.substring(0, lastIndexOf);
+    }
+
+    public static boolean isColumnRelative(String str) {
+        return str.charAt(0) != '$';
+    }
+
+    public static boolean isRowRelative(String str) {
+        return str.charAt(getNumberIndex(str) - 1) != '$';
+    }
+}

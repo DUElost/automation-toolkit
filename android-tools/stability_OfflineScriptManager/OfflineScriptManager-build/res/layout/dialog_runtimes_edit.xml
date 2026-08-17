@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout android:orientation="vertical" android:layout_width="fill_parent" android:layout_height="wrap_content"
+  xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto">
+    <LinearLayout android:orientation="horizontal" android:layout_width="fill_parent" android:layout_height="fill_parent">
+        <TextView android:textSize="@dimen/customTitle" android:textColor="#ff000000" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="13.0dip" android:text="@string/name" />
+        <TextView android:textSize="@dimen/customTitle" android:textColor="#ff000000" android:id="@id/tv_dialog_test_point_name" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="13.0dip" android:layout_marginStart="10.0dip" />
+    </LinearLayout>
+    <LinearLayout android:orientation="horizontal" android:layout_width="fill_parent" android:layout_height="wrap_content" android:layout_marginTop="20.0dip">
+        <TextView android:textSize="@dimen/customTitle" android:textColor="#ff000000" android:id="@id/dialog_task_edit_times_tv" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="13.0dip" android:text="@string/times" />
+        <EditText android:textColor="#ff000000" android:gravity="center" android:layout_gravity="bottom" android:id="@id/dialog_task_edit_times_et" android:layout_width="50.0dip" android:layout_height="wrap_content" android:layout_marginLeft="10.0dip" android:layout_marginTop="13.0dip" android:layout_marginRight="10.0dip" android:text="1" android:layout_marginHorizontal="10.0dip" android:autofillHints=" > 0" />
+        <com.github.johnkil.print.PrintButton android:id="@id/pb_times_up" android:layout_width="80.0dip" android:layout_height="wrap_content" app:iconColor="#ff12558c" app:iconFont="fonts/material-icon-font.ttf" app:iconSize="18.0dip" app:iconText="@string/ic_arrow_drop_up" />
+        <com.github.johnkil.print.PrintButton android:id="@id/pb_times_down" android:layout_width="80.0dip" android:layout_height="wrap_content" app:iconColor="#ff12558c" app:iconFont="fonts/material-icon-font.ttf" app:iconSize="18.0dip" app:iconText="@string/ic_arrow_drop_down" />
+    </LinearLayout>
+    <LinearLayout android:gravity="center" android:layout_width="fill_parent" android:layout_height="wrap_content">
+        <TextView android:textStyle="bold" android:textColor="@color/red" android:layout_width="wrap_content" android:layout_height="fill_parent" android:text="@string/attention_adjustment_runtimes" />
+    </LinearLayout>
+</LinearLayout>

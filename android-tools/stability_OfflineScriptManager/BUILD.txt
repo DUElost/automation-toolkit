@@ -1,0 +1,68 @@
+OfflineScriptManager 自编译说明
+================================
+
+目录结构
+--------
+app-config.properties          <- 改这里：有效期、版本号
+build-offline-apk.bat          <- 双击或命令行运行，重新打包
+deploy-offline-apk.bat         <- 推送 runtask.xml + 安装 APK + 启动
+OfflineScriptManager.apk       <- 构建输出（已替换原过期版本）
+OfflineScriptManager.apk.original  <- 原始 APK 备份
+OfflineScriptManager-build/    <- apktool 工程（smali 级修改）
+offline-apk-src/               <- 可读 Java 源码（对照用）
+apk_sources/                   <- jadx 反编译完整源码
+
+快速修改有效期
+--------------
+1. 编辑 app-config.properties 中的 expiry.date
+   例: expiry.date=2099-12-31 23:59:59
+
+2. 运行 build-offline-apk.bat
+
+3. 运行 deploy-offline-apk.bat 部署到设备
+
+完全跳过过期检查
+----------------
+编辑 app-config.properties:
+  disable.expiry.check=true
+然后重新 build-offline-apk.bat
+
+系统签名模式（方案 B，真离线 instrument）
+------------------------------------------
+app-config.properties 示例:
+  remove.shared.user.id=false
+  sign.mode=platform
+  platform.pk8=.../platform.pk8
+  platform.x509.pem=.../platform.x509.pem
+  version.name=1.2.2-system
+
+构建: build-offline-apk.bat
+部署: deploy-system-offline-apk.bat  （pm install，无需 remount /system）
+
+验证: dumpsys package 应显示 sharedUser=android.uid.system/1000
+      离线跑用例 time 应为数十秒，非 0 毫秒
+
+注意: 本机 erofs 只读，adb remount 不可用；平台签名 + pm install 即可获 system uid。
+      Android 14+ 已为 RunTaskService 添加 foregroundServiceType=dataSync。
+
+修改其他功能
+------------
+- 小改动：直接编辑 OfflineScriptManager-build/smali/ 下对应文件
+- 大改动：参考 offline-apk-src/ 和 apk_sources/ 中的 Java 逻辑
+  改完后同步到 smali，再 build-offline-apk.bat
+
+过期逻辑位置
+------------
+Java: offline-apk-src/.../TimeTips.java (原 k.java)
+Smali: OfflineScriptManager-build/smali/.../utils/k.smali
+入口: BatteryActivity.onResume() 调用 new k(this).b()
+
+依赖工具（位于 android-tools/vendor/）
+------------------------------
+- vendor/apktool/apktool.jar
+- vendor/uber-apk-signer.jar
+- vendor/jadx/  (仅反编译用)
+- vendor/platform-sign/  (构建时由 platform.pk8 生成)
+
+本工具路径:
+  F:\automation-toolkit\android-tools\stability_OfflineScriptManager\
