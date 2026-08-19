@@ -13,7 +13,7 @@
  "native_crash": "NE",
  "system_server_watchdog": "SWT",
         "KERNEL_PANIC": "KE",
-        "FATAL.NE": "KE",
+        "FATAL.NE": "FATAL.NE",
         "SYSTEM_RESTART": "SR",
         "SYSTEM_BOOT": "SR",
         "Reboot": "SR",
@@ -35,5 +35,20 @@
         "output_after": "Result_None_None_MonkeyAEE_SPRD_{ts}.xls",
         "rom_ram": "/",
         "activity": "None"
+    },
+    "ylog_enrich": {
+        "enabled": true,
+        "window_seconds": 120,
+        "max_hits_per_file": 8,
+        "max_file_bytes": 41943040
+    },
+    "caused_by_rules": {
+        "JE": {
+            "am_crash_sources": ["SYS_ANDROID_LOG", "events.log"]
+        },
+        "KE": {
+            "patterns": ["Native hang monitor trigger", "panic", "killed by signal"],
+            "kernel_sources": ["SYS_KERNEL_LOG"]
+        }
     }
 }

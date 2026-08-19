@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """报错汇总 txt 生成器。
 
-每个报错生成一份 {type}_{ts}_summary.txt：
+每个报错生成一份 summary.txt（问题包目录名已含类型与时间）：
   1. 基础信息（类型/时间/设备/进程包/信号源）
   2. 堆栈（按类型摘取：JE 栈 / NE backtrace / ANR 主线程栈 / SWT 栈）
   3. 关键信息（CausedBy / signal / 关联导出文件清单）
@@ -14,6 +14,7 @@ import re
 
 _SEP = "=" * 60
 _SECTION = "-" * 40
+SUMMARY_FILENAME = "summary.txt"
 
 _TS_RE = re.compile(r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})")
 _PROCESS_RE = re.compile(r"Process:\s*(.+)")
@@ -170,8 +171,7 @@ def build_summary(device, type_name, ts, package, scenes, detail_lines,
     text = "\n".join(lines)
     if out_dir:
         os.makedirs(out_dir, exist_ok=True)
-        ts_safe = ts.replace(" ", "-").replace(":", "") if ts else "unknown"
-        path = os.path.join(out_dir, f"{type_name.replace('_', '-')}_{ts_safe}_summary.txt")
+        path = os.path.join(out_dir, SUMMARY_FILENAME)
         with open(path, "w", encoding="utf-8") as f:
             f.write(text + "\n")
         return path

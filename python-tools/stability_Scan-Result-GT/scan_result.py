@@ -17,6 +17,7 @@ from datetime import datetime
 from modules.collect import collect_problems
 from modules.dedup import dedup
 from modules.export import export_xls
+from modules.logger import TEST_LOGGER
 
 CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
 
@@ -33,27 +34,39 @@ def main():
     parser.add_argument("--threshold", type=float, default=None, help="去重相似度阈值（覆盖 config）")
     args = parser.parse_args()
 
+    data_dir = os.path.abspath(args.dir)
+    TEST_LOGGER.info("第二阶段汇总开始")
+    TEST_LOGGER.info("输入目录: %s" % data_dir)
+
     config = load_config()
     if args.threshold is not None:
         config["dedup"]["similarity_threshold"] = args.threshold
+        TEST_LOGGER.info("去重阈值: %s" % args.threshold)
 
-    records = collect_problems(args.dir)
+    records = collect_problems(data_dir, config)
     if not records:
-        print("未找到问题包（需 {version}/{device}/ 结构）")
+        TEST_LOGGER.warn("未找到问题包（需 {version}/{device}/ 结构）")
         return 1
+
+    TEST_LOGGER.info("开始去重（%d 条）" % len(records))
     before, after = dedup(records, config)
+    TEST_LOGGER.info("去重完成: %d -> %d" % (len(before), len(after)))
 
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     exp = config["export"]
     after_name = exp["output_after"].replace("{ts}", ts)
     before_name = exp["output_before"].replace("{ts}", ts)
-    after_path = os.path.join(args.dir, after_name)
-    before_path = os.path.join(args.dir, before_name)
+    after_path = os.path.join(data_dir, after_name)
+    before_path = os.path.join(data_dir, before_name)
+
+    TEST_LOGGER.info("导出 Excel（去重后）: %s" % after_path)
     export_xls(after, after_path, config)
+    TEST_LOGGER.info("导出 Excel（去重前）: %s" % before_path)
     export_xls(before, before_path, config)
-    print(f"汇总: {len(before)} 条（去重前）-> {len(after)} 条（去重后）")
-    print(f"输出: {after_path}")
-    print(f"      {before_path}")
+
+    TEST_LOGGER.info("汇总: %d 条（去重前）-> %d 条（去重后）" % (len(before), len(after)))
+    TEST_LOGGER.info("输出: %s" % after_path)
+    TEST_LOGGER.info("      %s" % before_path)
     return 0
 
 

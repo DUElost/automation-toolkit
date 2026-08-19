@@ -14,7 +14,7 @@
 
 ```
 problems/{device}_{type}_{ts}/
-├─ {device}_{type}_{ts}_summary.txt   # 主输入：基础信息+堆栈+关键信息
+├─ summary.txt                        # 主输入：基础信息+堆栈+关键信息
 ├─ detail.txt                        # dropbox 详情（ExpType/Process 字段来源）
 ├─ anr_trace.txt / tombstone.txt     # CausedBy 提取补充
 └─ uniview/（tar.gz）                 # 可选：解包 exp_main 增强 Detail（本阶段做）

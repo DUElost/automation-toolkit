@@ -23,3 +23,18 @@ def classify(exp_type, expclass_map=None):
     if expclass_map is None:
         expclass_map = load_expclass_map()
     return expclass_map.get(exp_type, exp_type)
+
+
+_NE_FAMILY = frozenset({"NE", "FATAL.NE"})
+
+
+def is_ne_family(expclass):
+    """ExpClass 是否属于 Native 崩溃族（含 uniview FATAL.NE）。"""
+    return expclass in _NE_FAMILY
+
+
+def expclass_family(expclass):
+    """ExpClass → 提取/去重逻辑族（FATAL.NE 与 NE 同族，报表 ExpClass 仍区分）。"""
+    if expclass in _NE_FAMILY:
+        return "NE"
+    return expclass

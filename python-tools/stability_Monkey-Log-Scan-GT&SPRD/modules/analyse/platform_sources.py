@@ -16,6 +16,7 @@ import re
 from datetime import datetime
 from modules.common.adb_client import AdbClient
 from modules.common.logger import TEST_LOGGER
+from modules.analyse.summary_builder import SUMMARY_FILENAME
 
 _SEP = "=" * 40
 
@@ -386,14 +387,15 @@ class PlatformSources:
         # 事件元信息落盘（供第二阶段提取 Package/CausedBy）
         info_path = os.path.join(package_dir, "unievent_info.json")
         if not os.path.exists(info_path):
+            ev_save = dict(ev)
+            if type_dir_name:
+                ev_save["uniview_type_dir"] = type_dir_name
             with open(info_path, "w", encoding="utf-8") as f:
-                f.write(json.dumps(ev, ensure_ascii=False, indent=2))
+                f.write(json.dumps(ev_save, ensure_ascii=False, indent=2))
         # summary 生成（uniview 事件基础信息）
         from modules.analyse.summary_builder import build_summary
         scenes = [ev.get("event_name") or type_dir_name]
-        summary_path = os.path.join(
-            package_dir,
-            f"{os.path.basename(package_dir)}_summary.txt")
+        summary_path = os.path.join(package_dir, SUMMARY_FILENAME)
         if not os.path.exists(summary_path):
             build_summary(
                 device=self.device,
@@ -459,8 +461,7 @@ class PlatformSources:
                 return False
 
             files = os.listdir(package_dir)
-            if any(not (f.endswith("_summary.txt") or f == "unievent_info.json")
-                   for f in files):
+            if any(f not in ("unievent_info.json", SUMMARY_FILENAME) for f in files):
                 return False
             if m:
                 from modules.analyse.dropbox_monitor import export_ap_segment, find_ap_window

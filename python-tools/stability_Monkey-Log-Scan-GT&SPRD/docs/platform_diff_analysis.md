@@ -148,7 +148,7 @@ dropbox 采集同目录，命名规则对齐（`{device}_{pkg}_{tag}_{ts}.txt`�
 
 ### 4.3 每报错汇总 txt（第二阶段输入）
 
-`{device}/summary/{device}_{type}_{ts}_summary.txt`：
+`{device}/{type}_{ts}/summary.txt`：
 - 基础信息（类型/场景/时间/设备/进程包/信号源）
 - 堆栈（按场景：JE 栈 / NE backtrace / ANR 主线程栈 / KP panic / SR 重启）
 - 关键信息（CausedBy/signal/导出文件）

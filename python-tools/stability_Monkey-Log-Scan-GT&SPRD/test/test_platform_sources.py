@@ -11,6 +11,7 @@ from modules.analyse.platform_sources import (
     wrap_anr,
     wrap_tombstone,
 )
+from modules.analyse.summary_builder import SUMMARY_FILENAME
 
 ANR_TRACE = (
     "Subject: Half ANR dump\n"
@@ -105,7 +106,7 @@ def test_scan_pulls_and_dedups(tmp_path):
                            "data-app-anr_2026-08-04-205510")
     files = os.listdir(anr_dir)
     assert "anr_trace.txt" in files
-    assert "data-app-anr_2026-08-04-205510_summary.txt" in files
+    assert SUMMARY_FILENAME in files
     with open(os.path.join(anr_dir, "anr_trace.txt"), encoding="utf-8") as f:
         content = f.read()
     assert "com.zte.mifavor.launcher" in content
@@ -115,7 +116,7 @@ def test_scan_pulls_and_dedups(tmp_path):
                           "SYSTEM-TOMBSTONE_2026-08-05-091227")
     ts_files = os.listdir(ts_dir)
     assert "tombstone.txt" in ts_files
-    assert "SYSTEM-TOMBSTONE_2026-08-05-091227_summary.txt" in ts_files
+    assert SUMMARY_FILENAME in ts_files
 
     ylog_dir = os.path.join(str(tmp_path), "sn1", "ylog")
     assert os.listdir(ylog_dir) == ["lastkernel.log"]

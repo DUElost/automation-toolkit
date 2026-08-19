@@ -12,6 +12,8 @@
 import re
 from difflib import SequenceMatcher
 
+from modules.classify import expclass_family
+
 _PC_RE = re.compile(r"pc\s+[0-9a-fA-F]{6,}")
 
 
@@ -29,7 +31,7 @@ def _clean_for_compare(text):
 def _fingerprint(rec):
     """去重指纹：NE 类取 backtrace 首帧 pc 地址（同崩溃点硬匹配）；其余无指纹走相似度。"""
     caused = rec.get("CausedBy", "") or ""
-    if rec.get("ExpClass") == "NE":
+    if expclass_family(rec.get("ExpClass")) == "NE":
         m = _PC_RE.search(caused)
         return ("pc", m.group(0).lower()) if m else ("raw", caused)
     return ("raw", caused)

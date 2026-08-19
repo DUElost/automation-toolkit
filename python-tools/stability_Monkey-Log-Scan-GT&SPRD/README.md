@@ -18,6 +18,13 @@
 ylog（lastkernel/dmesg/fwreboot/ap 分段）/ **uniview 聚合包**（tar.gz，不解包）/
 bugreport（冷却白名单）/ meminfo 快照 / **Rom_Ram**（设备级 rom_ram.json）。
 
+## 与 LogInsight 的关系
+
+本工具为稳定性流水线**第一阶段**（采集问题包），不运行 ABPS 分析引擎。第二阶段
+[`stability_Scan-Result-GT`](../stability_Scan-Result-GT/) 按 LogInsight ABPS `config.xml` 对齐规则提取字段，
+产出 **MTK 格式 Excel**（非 ABPS HTML 报告）。详见该目录 `README.md` 与
+`docs/abps_collect_migration.md`。
+
 ## 环境要求
 
 - Python 3.9+
@@ -86,7 +93,7 @@ data/                     # 数据集输出（已 gitignore，不入库）
 │   │   ├─ fwreboot/ / sysdump/ / modem/
 │   │   └─ {seq}-{MMdd_HHmmss}....ylog  # ap 分段（事件上下文，多包共享一份；设备端约 5-7 天轮转窗口）
 │   ├─ {type}_{ts}/                   # 一个问题一个文件夹（研发直接访问）
-│   │   ├─ {type}_{ts}_summary.txt    # 基础信息+堆栈+关键信息
+│   │   ├─ summary.txt                  # 基础信息+堆栈+关键信息
 │   │   ├─ {eid}-{ts}.tar.gz          # uniview 聚合包（不解包，30+ 系统状态）
 │   │   ├─ unievent_info.json         # uniview 事件元信息（proc/时间/原因）
 │   │   ├─ detail.txt                 # dropbox 详情（JE/NE 原文）

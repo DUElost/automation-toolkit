@@ -4,7 +4,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from modules.collect import collect_problems, extract_caused_by
+from modules.collect import collect_problems, extract_caused_by, _uniview_info, SUMMARY_FILENAME
 
 VERSION = "MyOS16.0.0_Z2581_GEN_AF"
 DEVICE = "6R0A57SSAE6000218"
@@ -17,8 +17,7 @@ def _make_package(root, type_dash, ts, detail_lines=None, summary=None, anr_trac
         with open(os.path.join(pkg, "detail.txt"), "w", encoding="utf-8") as f:
             f.write("\n".join(detail_lines) + "\n")
     if summary is not None:
-        with open(os.path.join(pkg, f"{type_dash}_{ts}_summary.txt"),
-                  "w", encoding="utf-8") as f:
+        with open(os.path.join(pkg, SUMMARY_FILENAME), "w", encoding="utf-8") as f:
             f.write(summary)
     if anr_trace is not None:
         with open(os.path.join(pkg, "anr_trace.txt"), "w", encoding="utf-8") as f:
@@ -142,6 +141,88 @@ def test_extract_caused_by_ne_tombstone_fallback(tmp_path):
     assert "pc 00000000000ab888" in caused
 
 
+def test_fatal_ne_picks_matching_tombstone_by_pid(tmp_path):
+    """FATAL.NE 多 tombstone：按 unievent pid/时间选本次事件，非 tombstone_00 历史残留。"""
+    import tarfile
+    import io
+    import json as _json
+
+    pkg = os.path.join(str(tmp_path), VERSION, DEVICE, "FATAL.NE_2026-08-12-093004")
+    os.makedirs(pkg, exist_ok=True)
+    with open(os.path.join(pkg, "unievent_info.json"), "w", encoding="utf-8") as f:
+        _json.dump({"kick_datetime": "2026-08-12_09:30:04.605",
+                    "pid": "1568", "proc": "system_server", "tag": "native_crash"}, f)
+    with tarfile.open(os.path.join(pkg, "001-2026-08-12_09-30-04.tar.gz"), "w:gz") as tf:
+        info = tarfile.TarInfo("001-2026-08-12_09-30-04/exp_main.txt")
+        data = b'{"event_name":"Native Crash"}\n'
+        info.size = len(data)
+        tf.addfile(info, io.BytesIO(data))
+        tb_old = (
+            "*** *** ***\n"
+            "Timestamp: 2026-08-12 09:26:25.359+0800\n"
+            "Cmdline: com.android.systemui\n"
+            "pid: 2251, tid: 2251, name: ndroid.systemui\n"
+            "signal 11 (SIGSEGV)\n"
+            "backtrace:\n"
+            "      #00 pc 00000000000dfe08  /apex/com.android.runtime/lib64/bionic/libc.so\n"
+        ).encode()
+        info = tarfile.TarInfo("001-2026-08-12_09-30-04/DATA_TOMBSTONES/tombstone_00")
+        info.size = len(tb_old)
+        tf.addfile(info, io.BytesIO(tb_old))
+        tb_new = (
+            "*** *** ***\n"
+            "Timestamp: 2026-08-12 09:30:02.056+0800\n"
+            "Cmdline: system_server\n"
+            "pid: 1568, tid: 1568, name: system_server\n"
+            "signal 11 (SIGSEGV)\n"
+            "backtrace:\n"
+            "      #00 pc 00000000000ab888  /system/lib64/libutils.so\n"
+        ).encode()
+        info = tarfile.TarInfo("001-2026-08-12_09-30-04/DATA_TOMBSTONES/tombstone_01")
+        info.size = len(tb_new)
+        tf.addfile(info, io.BytesIO(tb_new))
+
+    records = collect_problems(str(tmp_path))
+    assert len(records) == 1
+    r = records[0]
+    assert r["ExpType"] == "FATAL.NE"
+    assert r["ExpClass"] == "FATAL.NE"
+    assert r["Package"] == "system_server"
+    assert "pc 00000000000ab888" in r["CausedBy"]
+    assert "systemui" not in r["Detail"].lower()
+
+
+def test_fatal_ne_single_tombstone_cmdline(tmp_path):
+    """仅一份 tombstone 时仍用其 Cmdline（单 tombstone 场景不变）。"""
+    import tarfile
+    import io
+    import json as _json
+
+    pkg = os.path.join(str(tmp_path), VERSION, DEVICE, "FATAL.NE_2026-08-12-093004")
+    os.makedirs(pkg, exist_ok=True)
+    with open(os.path.join(pkg, "unievent_info.json"), "w", encoding="utf-8") as f:
+        _json.dump({"kick_datetime": "2026-08-12_09:30:04.605",
+                    "pid": "2251", "proc": "com.android.systemui"}, f)
+    with tarfile.open(os.path.join(pkg, "001-2026-08-12_09-30-04.tar.gz"), "w:gz") as tf:
+        tb = (
+            "*** *** ***\n"
+            "Timestamp: 2026-08-12 09:30:02.056+0800\n"
+            "Cmdline: com.android.systemui\n"
+            "pid: 2251, tid: 2251, name: ndroid.systemui\n"
+            "signal 11 (SIGSEGV)\n"
+            "backtrace:\n"
+            "      #00 pc 00000000000dfe08  /apex/com.android.runtime/lib64/bionic/libc.so\n"
+        ).encode()
+        info = tarfile.TarInfo("001-2026-08-12_09-30-04/DATA_TOMBSTONES/tombstone_00")
+        info.size = len(tb)
+        tf.addfile(info, io.BytesIO(tb))
+
+    records = collect_problems(str(tmp_path))
+    r = records[0]
+    assert r["Package"] == "com.android.systemui"
+    assert "pc 00000000000dfe08" in r["CausedBy"]
+
+
 def test_extract_caused_by_ne_tombstone_file(tmp_path):
     """平台源 tombstone 包（无 detail.txt）：CausedBy 从包内 tombstone.txt 提取。"""
     pkg = _make_package(str(tmp_path), "SYSTEM-TOMBSTONE", "2026-07-01-121751",
@@ -259,6 +340,140 @@ def test_detail_ne_tombstone_key(tmp_path):
     assert "#00 pc 00000000000729fc" in r["Detail"]
 
 
+def test_swt_uniview_sys_android_log_blocked_in(tmp_path):
+    """SWT uniview：从 SYS_ANDROID_LOG 提取 Blocked in，不用 event_name 粗兜底。"""
+    import json as _json
+
+    pkg = os.path.join(str(tmp_path), VERSION, DEVICE, "SWT_2026-08-12-092852")
+    inner = os.path.join(pkg, "001-2026-08-12_09-28-52")
+    os.makedirs(inner, exist_ok=True)
+    with open(os.path.join(pkg, "unievent_info.json"), "w", encoding="utf-8") as f:
+        _json.dump({"proc": "system_server", "event_name": "watchdog",
+                    "tag": "system_server_watchdog"}, f)
+    with open(os.path.join(inner, "exp_detail.txt"), "w", encoding="utf-8") as f:
+        f.write("Process: system_server\nCPU usage from 372ms to 11990ms later\n")
+    with open(os.path.join(inner, "SYS_ANDROID_LOG"), "w", encoding="utf-8") as f:
+        f.write("E line I watchdog: Blocked in monitor com.android.server.am.UFwActivityManagerServiceImpl "
+                "on monitor thread (watchdog.monitor) for 105s\n")
+
+    records = collect_problems(str(tmp_path))
+    r = records[0]
+    assert r["ExpClass"] == "SWT"
+    assert r["CausedBy"].startswith("Blocked in monitor com.android.server.am")
+    assert r["extraTag"] == ""
+    assert r["CausedBy"] != "watchdog"
+
+
+def test_anr_subtype_in_detail_not_extratag(tmp_path):
+    """ANR 子类型写入 Detail，extraTag 恒空。"""
+    pkg = _make_package(str(tmp_path), "data-app-anr", "2026-08-04-205510",
+                        detail_lines=["2026-08-04 20:55:10 data_app_anr"],
+                        anr_trace='Cmd line: com.foo\n"main" prio=5 tid=1\n'
+                                  'at android.os.MessageQueue.nativePollOnce(Native method)\n')
+    inner = os.path.join(pkg, "001-2026-08-04_20-55-10")
+    os.makedirs(inner, exist_ok=True)
+    with open(os.path.join(inner, "SYS_ANDROID_LOG"), "w", encoding="utf-8") as f:
+        f.write("E ActivityManager: Input dispatching timed out\n")
+
+    records = collect_problems(str(tmp_path))
+    r = records[0]
+    assert r["ExpClass"] == "ANR"
+    assert r["extraTag"] == ""
+    assert "ANR子类型: InputDispatchTimeout" in r["Detail"]
+
+
+def test_anr_trace_from_data_anr_traces(tmp_path):
+    """ANR：tar 内 DATA_ANR_TRACES 提取 main at 顶帧。"""
+    import tarfile
+    import io
+
+    pkg = os.path.join(str(tmp_path), VERSION, DEVICE, "ANR_2026-08-12-092840")
+    os.makedirs(pkg, exist_ok=True)
+    trace = ('"main" prio=5 tid=1 Native\n'
+             'at com.example.Foo.bar(Foo.java:10)\n').encode()
+    with tarfile.open(os.path.join(pkg, "001-2026-08-12_09-28-40.tar.gz"), "w:gz") as tf:
+        info = tarfile.TarInfo("001-2026-08-12_09-28-40/DATA_ANR_TRACES/anr_001")
+        info.size = len(trace)
+        tf.addfile(info, io.BytesIO(trace))
+    caused = extract_caused_by("ANR", pkg)
+    assert caused == "at com.example.Foo.bar(Foo.java:10)"
+
+
+def test_je_caused_by_sys_android_log(tmp_path):
+    """JE：无 detail 时从 SYS_ANDROID_LOG 提取 FATAL EXCEPTION。"""
+    pkg = os.path.join(str(tmp_path), VERSION, DEVICE, "JE_2026-08-12-091310")
+    inner = os.path.join(pkg, "001-2026-08-12_09-13-10")
+    os.makedirs(inner, exist_ok=True)
+    with open(os.path.join(inner, "SYS_ANDROID_LOG"), "w", encoding="utf-8") as f:
+        f.write("E AndroidRuntime: FATAL EXCEPTION: main\n"
+                "E AndroidRuntime: Process: com.foo, PID: 123\n")
+
+    caused = extract_caused_by("JE", pkg)
+    assert "FATAL EXCEPTION" in caused
+
+
+def test_ke_native_hang_from_dump_report(tmp_path):
+    """KE：dump_report Native hang monitor trigger。"""
+    import tarfile
+    import io
+
+    pkg = _make_package(str(tmp_path), "Reboot", "2026-05-24-155653",
+                        summary="类型: Reboot  场景: KE\n")
+    data = b"Native hang monitor trigger: system_server\n"
+    with tarfile.open(os.path.join(pkg, "001.tar.gz"), "w:gz") as tf:
+        info = tarfile.TarInfo("001/dump_report.txt")
+        info.size = len(data)
+        tf.addfile(info, io.BytesIO(data))
+    # Reboot maps to SR in classify - use KERNEL_PANIC for KE test
+    pkg2 = _make_package(str(tmp_path), "KERNEL-PANIC", "2026-05-24-160000",
+                         summary="类型: KERNEL_PANIC\n")
+    with tarfile.open(os.path.join(pkg2, "001.tar.gz"), "w:gz") as tf:
+        info = tarfile.TarInfo("001/dump_report.txt")
+        info.size = len(data)
+        tf.addfile(info, io.BytesIO(data))
+    caused = extract_caused_by("KE", pkg2)
+    assert "Native hang monitor trigger" in caused
+
+
+def test_native_crash_fatal_ne_from_summary_scene(tmp_path):
+    """native-crash 包名 + FATAL.NE 源目录：summary 场景 FATAL -> ExpClass=FATAL.NE。"""
+    import tarfile
+    import io
+    import json as _json
+
+    pkg = os.path.join(str(tmp_path), VERSION, DEVICE, "native-crash_2026-08-05-091230")
+    os.makedirs(pkg, exist_ok=True)
+    with open(os.path.join(pkg, "unievent_info.json"), "w", encoding="utf-8") as f:
+        _json.dump({"kick_datetime": "2026-08-05_09-12-30.666",
+                    "pid": "1642", "proc": "system_server", "tag": "native_crash"}, f)
+    with open(os.path.join(pkg, SUMMARY_FILENAME), "w", encoding="utf-8") as f:
+        f.write("类型: native_crash  场景: FATAL\n")
+    with tarfile.open(os.path.join(pkg, "001-2026-08-05_09-12-30.tar.gz"), "w:gz") as tf:
+        info = tarfile.TarInfo("001-2026-08-05_09-12-30/exp_main.txt")
+        data = b'{"event_name":"FATAL"}\n'
+        info.size = len(data)
+        tf.addfile(info, io.BytesIO(data))
+        tb = (
+            "*** *** ***\n"
+            "Timestamp: 2026-08-05 09:12:27.104+0800\n"
+            "Cmdline: system_server\n"
+            "pid: 1642, tid: 1642, name: system_server\n"
+            "signal 11 (SIGSEGV)\n"
+            "backtrace:\n"
+            "      #00 pc 00000000000ab888  /system/lib64/libutils.so\n"
+        ).encode()
+        info = tarfile.TarInfo("001-2026-08-05_09-12-30/DATA_TOMBSTONES/tombstone_07")
+        info.size = len(tb)
+        tf.addfile(info, io.BytesIO(tb))
+
+    records = collect_problems(str(tmp_path))
+    assert len(records) == 1
+    r = records[0]
+    assert r["ExpType"] == "FATAL.NE"
+    assert r["ExpClass"] == "FATAL.NE"
+    assert r["Package"] == "system_server"
+
+
 def test_rom_ram_extract(tmp_path):
     """Rom_Ram：SYS_FILE_SYSTEMS /data 分区（ROM）+ SYS_PROPERTIES ddrsize（RAM）。"""
     import tarfile
@@ -280,3 +495,75 @@ def test_rom_ram_extract(tmp_path):
         tf.addfile(info, io.BytesIO(prop))
     from modules.collect import _extract_rom_ram
     assert _extract_rom_ram(pkg) == "64GB+4GB"
+
+
+def test_uniview_info_jsonl_matches_exp_time(tmp_path):
+    """unievent_info.json JSONL：按包 ExpTime 匹配 kick_datetime 对应事件行。"""
+    pkg = os.path.join(str(tmp_path), VERSION, DEVICE, "SWT_2026-08-12-092852")
+    os.makedirs(pkg, exist_ok=True)
+    jsonl = (
+        '{"software_version":"v1","event_count":2}\n'
+        '{"kick_datetime":"2026-08-12_09:30:04.100","proc":"com.wrong.app",'
+        '"reboot_reason":"fatal"}\n'
+        '{"kick_datetime":"2026-08-12_09:28:52.511","proc":"system_server",'
+        '"reboot_reason":"watchdog"}\n'
+    )
+    with open(os.path.join(pkg, "unievent_info.json"), "w", encoding="utf-8") as f:
+        f.write(jsonl)
+    ev = _uniview_info(pkg)
+    assert ev["proc"] == "system_server"
+    assert ev["reboot_reason"] == "watchdog"
+
+
+def test_path_is_absolute_with_relative_root(tmp_path, monkeypatch):
+    """Path 无论 -d 相对/绝对，均输出完整绝对路径。"""
+    _make_package(str(tmp_path), "JE", "2026-08-12-091310",
+                  detail_lines=["Process: com.foo", "PID: 1"])
+    monkeypatch.chdir(tmp_path)
+    records = collect_problems(".")
+    assert len(records) == 1
+    path = records[0]["Path"]
+    assert os.path.isabs(path)
+    assert path.endswith("detail.txt")
+    assert os.path.isfile(path)
+
+
+def test_je_caused_by_am_crash_sys_android_log(tmp_path):
+    """JE：无 FATAL EXCEPTION 时从 SYS_ANDROID_LOG 解析 am_crash 异常类。"""
+    pkg = os.path.join(str(tmp_path), VERSION, DEVICE, "JE_2026-08-12-091310")
+    inner = os.path.join(pkg, "001-2026-08-12_09-13-10")
+    os.makedirs(inner, exist_ok=True)
+    with open(os.path.join(inner, "SYS_ANDROID_LOG"), "w", encoding="utf-8") as f:
+        f.write("I am_crash: [4262,0,com.android.settings,684441157,"
+                "android.app.RemoteServiceException$CrashedByAdbException,"
+                "shell-induced crash,ActivityThread.java,2712,0]\n")
+    from modules.caused_by_rules import set_active_rules
+    set_active_rules()
+    caused = extract_caused_by("JE", pkg)
+    assert caused == "android.app.RemoteServiceException$CrashedByAdbException"
+
+
+def test_je_caused_by_am_crash_events_log(tmp_path):
+    """JE：events.log 中 am_crash 异常类兜底。"""
+    pkg = os.path.join(str(tmp_path), VERSION, DEVICE, "JE_2026-08-12-091311")
+    inner = os.path.join(pkg, "001-2026-08-12_09-13-11")
+    os.makedirs(inner, exist_ok=True)
+    with open(os.path.join(inner, "events.log"), "w", encoding="utf-8") as f:
+        f.write("am_crash: [100,0,com.foo,0,java.lang.NullPointerException,msg,Foo.java,1,0]\n")
+    from modules.caused_by_rules import set_active_rules
+    set_active_rules()
+    caused = extract_caused_by("JE", pkg)
+    assert caused == "java.lang.NullPointerException"
+
+
+def test_ke_killed_by_signal_from_kernel_log(tmp_path):
+    """KE：无 panic 时从 SYS_KERNEL_LOG killed by signal 弱兜底。"""
+    pkg = os.path.join(str(tmp_path), VERSION, DEVICE, "KERNEL-PANIC_2026-05-24-160001")
+    inner = os.path.join(pkg, "001-2026-05-24_16-00-01")
+    os.makedirs(inner, exist_ok=True)
+    with open(os.path.join(inner, "SYS_KERNEL_LOG"), "w", encoding="utf-8") as f:
+        f.write("kernel: foo process 1234 (system_server) killed by signal 9\n")
+    from modules.caused_by_rules import set_active_rules
+    set_active_rules()
+    caused = extract_caused_by("KE", pkg)
+    assert "killed by signal" in caused

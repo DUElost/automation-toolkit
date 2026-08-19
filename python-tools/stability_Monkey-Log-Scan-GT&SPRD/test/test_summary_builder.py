@@ -5,6 +5,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from modules.analyse.summary_builder import (
+    SUMMARY_FILENAME,
     build_summary,
     _extract_java_stack,
     _extract_native_backtrace,
@@ -74,6 +75,7 @@ def test_build_summary_file(tmp_path):
         out_dir=str(tmp_path),
     )
     assert path and os.path.exists(path)
+    assert os.path.basename(path) == SUMMARY_FILENAME
     text = open(path, encoding="utf-8").read()
     assert "报错汇总" in text
     assert "类型: data_app_crash" in text

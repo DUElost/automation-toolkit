@@ -11,8 +11,19 @@ import os
 import random
 import re
 import string
+from datetime import datetime
 
-from modules.classify import classify
+from modules.classify import classify, expclass_family
+from modules.caused_by_rules import (
+    anr_subtypes,
+    cpassert_patterns,
+    get_active_rules,
+    set_active_rules,
+    sysinfo_patterns,
+)
+from modules.logger import TEST_LOGGER
+
+SUMMARY_FILENAME = "summary.txt"
 
 _TS_RE = re.compile(r"(\d{4}-\d{2}-\d{2})-(\d{6})$")
 _SIGNAL_RE = re.compile(r"signal\s+\d+\s*\(([^)]*)\)")
@@ -20,6 +31,10 @@ _JANK_RE = re.compile(r"Jank|focus timeout|102200004", re.IGNORECASE)
 _ASSERT_RE = re.compile(r"Assert|109000001", re.IGNORECASE)
 _WCN_RE = re.compile(r"WCN|109000003", re.IGNORECASE)
 _PACKAGE_RE = re.compile(r"^(.+)[_-](\d{4}-\d{2}-\d{2}-\d{6})$")
+
+# uniview 元信息不作 CausedBy 兜底（event_name 过粗，SWT 会误并）
+_SKIP_UNIVIEW_CAUSE_FALLBACK = frozenset(("SWT", "Jank", "Assert", "WCN", "SR"))
+_AM_CRASH_RE = re.compile(r"am_crash:\s*\[([^]]+)\]")
 
 
 def _find_problem_dirs(root):
@@ -76,6 +91,83 @@ def _find_file(package_dir, names):
     return None
 
 
+def _find_summary(package_dir):
+    """问题包 summary 固定为 summary.txt。"""
+    p = os.path.join(package_dir, SUMMARY_FILENAME)
+    return p if os.path.isfile(p) else None
+
+
+_FATAL_NE_EVENT_ID = "103100003"
+_FATAL_NE_SCENE_RE = re.compile(r"场景:\s*FATAL\b")
+
+
+def _uniview_type_from_tars(package_dir):
+    """从 tar.gz 内路径/exp_main 推断 uniview 源类型目录（如 FATAL.NE）。"""
+    import tarfile
+
+    if not os.path.isdir(package_dir):
+        return None
+    for name in sorted(os.listdir(package_dir)):
+        if not name.endswith(".tar.gz"):
+            continue
+        try:
+            with tarfile.open(os.path.join(package_dir, name), "r:gz") as tf:
+                for member in tf.getmembers():
+                    if "FATAL.NE" in member.name:
+                        return "FATAL.NE"
+                for member in tf.getmembers():
+                    if not member.name.endswith("exp_main.txt"):
+                        continue
+                    f = tf.extractfile(member)
+                    if not f:
+                        continue
+                    text = f.read().decode("utf-8", "replace")
+                    if "FATAL.NE" in text or '"event_id":"103100003"' in text:
+                        return "FATAL.NE"
+                    for line in text.splitlines():
+                        line = line.strip()
+                        if not line.startswith("{"):
+                            continue
+                        try:
+                            obj = json.loads(line)
+                        except (ValueError, json.JSONDecodeError):
+                            continue
+                        eid = str(obj.get("event_id", ""))
+                        if eid == _FATAL_NE_EVENT_ID:
+                            return "FATAL.NE"
+                        en = (obj.get("event_name") or "").strip().upper()
+                        if en in ("FATAL", "FATAL.NE", "FATAL NE"):
+                            return "FATAL.NE"
+        except (OSError, tarfile.TarError, EOFError):
+            continue
+    return None
+
+
+def _resolve_uniview_exp_type(package_dir, exp_type, ev):
+    """uniview 包名可能为 native-crash（tag），实际源目录可能是 FATAL.NE。"""
+    if exp_type in ("FATAL.NE",):
+        return exp_type
+    if exp_type not in ("native_crash", "NE"):
+        return exp_type
+    if ev:
+        if (ev.get("uniview_type_dir") or "").replace("-", "_") == "FATAL.NE":
+            return "FATAL.NE"
+        if str(ev.get("event_id", "")) == _FATAL_NE_EVENT_ID:
+            return "FATAL.NE"
+        en = (ev.get("event_name") or "").strip().upper()
+        if en in ("FATAL", "FATAL.NE", "FATAL NE"):
+            return "FATAL.NE"
+    uv = _uniview_type_from_tars(package_dir)
+    if uv:
+        return uv.replace("-", "_")
+    summary = _find_summary(package_dir)
+    if summary:
+        for line in _read_lines(summary, 30):
+            if _FATAL_NE_SCENE_RE.search(line):
+                return "FATAL.NE"
+    return exp_type
+
+
 def _read_lines(path, max_lines=None):
     try:
         with open(path, encoding="utf-8", errors="replace") as f:
@@ -86,15 +178,54 @@ def _read_lines(path, max_lines=None):
 
 
 def _uniview_info(package_dir):
-    """读取 uniview 事件元信息 json（unievent_info.json，包根）。"""
+    """读取 uniview 事件元信息（unievent_info.json，包根）。
+
+    兼容：单对象 JSON；设备 JSONL 多行（设备信息 + 多事件 kick_datetime 行）。
+    多事件时按问题包 ExpTime 匹配对应 kick_datetime 行。
+    """
     p = os.path.join(package_dir, "unievent_info.json")
     if not os.path.isfile(p):
         return None
     try:
-        import json
-        return json.loads(open(p, encoding="utf-8").read())
-    except (OSError, ValueError):
+        text = open(p, encoding="utf-8").read()
+    except OSError:
         return None
+    try:
+        return json.loads(text)
+    except (ValueError, json.JSONDecodeError):
+        pass
+    _, exp_time = _parse_package_name(package_dir)
+    events = []
+    for line in text.splitlines():
+        line = line.strip()
+        if not line.startswith("{"):
+            continue
+        try:
+            obj = json.loads(line)
+        except (ValueError, json.JSONDecodeError):
+            continue
+        if obj.get("kick_datetime") or obj.get("event_time") or obj.get("reboot_reason"):
+            events.append(obj)
+        elif obj.get("tag") and obj.get("proc"):
+            events.append(obj)
+    if not events:
+        return None
+    if exp_time:
+        for ev in events:
+            kd = ev.get("kick_datetime") or ev.get("event_time") or ""
+            if _kick_matches_exp_time(kd, exp_time):
+                return ev
+    return events[0]
+
+
+def _kick_matches_exp_time(kick_datetime, exp_time):
+    """kick_datetime（2026-08-12_09:28:52.511）与包 ExpTime（2026-08-12-092852）对齐。"""
+    m = re.match(r"^(\d{4}-\d{2}-\d{2})-(\d{6})$", exp_time or "")
+    if not m or not kick_datetime:
+        return False
+    d, t = m.groups()
+    prefix = "%s_%s:%s:%s" % (d, t[0:2], t[2:4], t[4:6])
+    return kick_datetime.startswith(prefix)
 
 
 def _has_crash_signal(lines):
@@ -136,14 +267,10 @@ def _extract_exp_detail(package_dir):
                                     lines = f.read().decode("utf-8", "replace").splitlines()
                                     if target == "exp_detail.txt" or _has_crash_signal(lines):
                                         return lines
-                    # 2) DATA_TOMBSTONES/tombstone_*（backtrace 现场兜底）
-                    for member in tf.getmembers():
-                        base = os.path.basename(member.name)
-                        if ("/DATA_TOMBSTONES/" in member.name
-                                and base.startswith("tombstone")):
-                            f = tf.extractfile(member)
-                            if f:
-                                return f.read().decode("utf-8", "replace").splitlines()
+                    # 2) DATA_TOMBSTONES/tombstone_*（backtrace 现场兜底，多份时按事件匹配）
+                    tb_lines = _pick_tombstone_lines(package_dir, _uniview_info(package_dir))
+                    if tb_lines:
+                        return tb_lines
             else:
                 # Reboot 等类型在设备上即展开目录（名 {seq}-{ts}.tar.gz）
                 for target in ("exp_detail.txt", "exp_main.txt"):
@@ -153,17 +280,10 @@ def _extract_exp_detail(package_dir):
                             lines = f.read().splitlines()
                         if target == "exp_detail.txt" or _has_crash_signal(lines):
                             return lines
-                # DATA_TOMBSTONES/tombstone_* 现场兜底
-                for root, _dirs, files in os.walk(p):
-                    if "DATA_TOMBSTONES" in root:
-                        for f in files:
-                            if f.startswith("tombstone"):
-                                try:
-                                    with open(os.path.join(root, f),
-                                              encoding="utf-8", errors="replace") as fh:
-                                        return fh.read().splitlines()
-                                except OSError:
-                                    continue
+                # DATA_TOMBSTONES/tombstone_* 现场兜底（多份时按事件匹配）
+                tb_lines = _pick_tombstone_lines(package_dir, _uniview_info(package_dir))
+                if tb_lines:
+                    return tb_lines
         except (OSError, tarfile.TarError, EOFError):
             continue
     return []
@@ -174,8 +294,168 @@ def _norm_pkg(p):
     return p.replace("%", "/") if "%" in p else p
 
 
+def _cmdline_from_tombstone(lines):
+    """tombstone 头部 Cmdline: 行 → 包名。"""
+    for line in lines[:80]:
+        if "Cmdline:" in line:
+            return _norm_pkg(line.split("Cmdline:", 1)[1].strip())
+    return ""
+
+
+_TOMBSTONE_TS_RE = re.compile(
+    r"^Timestamp:\s*(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}:\d{2})")
+_TOMBSTONE_PID_RE = re.compile(r"^\s*pid:\s*(\d+)", re.I)
+_KICK_DT_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})_(\d{2}):(\d{2}):(\d{2})")
+
+
+def _parse_exp_time_stamp(exp_time):
+    """包名 ExpTime（2026-08-12-093004）→ datetime。"""
+    m = re.match(r"^(\d{4}-\d{2}-\d{2})-(\d{6})$", exp_time or "")
+    if not m:
+        return None
+    d, t = m.groups()
+    try:
+        return datetime.strptime(
+            "%s %s:%s:%s" % (d, t[0:2], t[2:4], t[4:6]), "%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        return None
+
+
+def _parse_kick_datetime(kick_datetime):
+    """unievent kick_datetime（2026-08-12_09:30:04.605）→ datetime。"""
+    m = _KICK_DT_RE.match(kick_datetime or "")
+    if not m:
+        return None
+    try:
+        return datetime.strptime(
+            "%s %s:%s:%s" % (m.group(1), m.group(2), m.group(3), m.group(4)),
+            "%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        return None
+
+
+def _parse_tombstone_meta(lines):
+    """tombstone 头部元信息：Cmdline、pid、Timestamp。"""
+    meta = {"cmdline": "", "pid": "", "timestamp": None}
+    for line in lines[:80]:
+        if line.startswith("Cmdline:"):
+            meta["cmdline"] = _norm_pkg(line.split("Cmdline:", 1)[1].strip())
+        m = _TOMBSTONE_PID_RE.match(line)
+        if m and not meta["pid"]:
+            meta["pid"] = m.group(1)
+        m = _TOMBSTONE_TS_RE.match(line.strip())
+        if m:
+            try:
+                meta["timestamp"] = datetime.strptime(
+                    "%s %s" % (m.group(1), m.group(2)), "%Y-%m-%d %H:%M:%S")
+            except ValueError:
+                pass
+    return meta
+
+
+def _tombstone_match_score(meta, ev, anchor_dt):
+    """多 tombstone 时按 unievent pid/proc 与事件时间打分。"""
+    score = 0
+    if ev:
+        ev_pid = str(ev.get("pid") or "")
+        if ev_pid and meta.get("pid") == ev_pid:
+            score += 1000
+        ev_proc = (ev.get("proc") or "").strip()
+        cmd = meta.get("cmdline") or ""
+        if ev_proc and (ev_proc == cmd or ev_proc in cmd or cmd.endswith(ev_proc)):
+            score += 100
+    if anchor_dt and meta.get("timestamp"):
+        delta = abs((meta["timestamp"] - anchor_dt).total_seconds())
+        if delta <= 600:
+            score += max(0, 600 - int(delta))
+    return score
+
+
+def _list_tombstones_from_package(package_dir):
+    """收集包内全部 tombstone 内容 [(name, lines), ...]。"""
+    import tarfile
+
+    out = []
+    p = _find_file(package_dir, ("tombstone.txt",))
+    if p:
+        out.append(("tombstone.txt", _read_lines(p)))
+    if not os.path.isdir(package_dir):
+        return out
+    tars = sorted(
+        f for f in os.listdir(package_dir)
+        if f.endswith(".tar.gz")
+        or (re.match(r"^\d+-", f) and os.path.isdir(os.path.join(package_dir, f))))
+    for name in tars:
+        p = os.path.join(package_dir, name)
+        try:
+            if name.endswith(".tar.gz"):
+                with tarfile.open(p, "r:gz") as tf:
+                    members = [
+                        m for m in tf.getmembers()
+                        if "/DATA_TOMBSTONES/" in m.name
+                        and os.path.basename(m.name).startswith("tombstone")]
+                    for member in sorted(members, key=lambda m: m.name):
+                        f = tf.extractfile(member)
+                        if f:
+                            lines = f.read().decode("utf-8", "replace").splitlines()
+                            out.append((member.name, lines))
+            else:
+                for root, _dirs, files in os.walk(p):
+                    if "DATA_TOMBSTONES" in root:
+                        for f in sorted(files):
+                            if f.startswith("tombstone"):
+                                try:
+                                    with open(os.path.join(root, f),
+                                              encoding="utf-8", errors="replace") as fh:
+                                        out.append((os.path.join(root, f),
+                                                    fh.read().splitlines()))
+                                except OSError:
+                                    continue
+        except (OSError, tarfile.TarError, EOFError):
+            continue
+    return out
+
+
+def _pick_tombstone_lines(package_dir, ev=None):
+    """多 tombstone 时选与 unievent/ExpTime 最匹配的一份；单份则直接返回。"""
+    tombstones = _list_tombstones_from_package(package_dir)
+    if not tombstones:
+        return []
+    if len(tombstones) == 1:
+        return tombstones[0][1]
+    _, exp_time = _parse_package_name(package_dir)
+    anchor_dt = None
+    if ev:
+        anchor_dt = _parse_kick_datetime(
+            ev.get("kick_datetime") or ev.get("event_time") or "")
+    if anchor_dt is None:
+        anchor_dt = _parse_exp_time_stamp(exp_time)
+    best_item = tombstones[0]
+    best_score = -1
+    for item in tombstones:
+        score = _tombstone_match_score(_parse_tombstone_meta(item[1]), ev, anchor_dt)
+        if score > best_score:
+            best_score = score
+            best_item = item
+    if best_score <= 0:
+        best_item = max(
+            tombstones,
+            key=lambda item: _parse_tombstone_meta(item[1]).get("timestamp") or datetime.min)
+    return best_item[1]
+
+
+def _extract_tombstone_cmdline(package_dir, ev=None):
+    """从匹配后的 tombstone 提取 Cmdline 包名。"""
+    if ev is None:
+        ev = _uniview_info(package_dir)
+    lines = _pick_tombstone_lines(package_dir, ev)
+    if lines:
+        return _cmdline_from_tombstone(lines)
+    return ""
+
+
 def _extract_package(detail_lines, package_dir):
-    """包名：detail Process: 行；ANR 包用 anr_trace Cmd line:；uniview 包用 unievent_info proc；summary 兜底。"""
+    """包名：detail Process: 行；ANR 包用 anr_trace Cmd line:；tombstone Cmdline:；uniview unievent_info proc；summary 兜底。"""
     for line in detail_lines:
         if "Process:" in line:
             return _norm_pkg(line.split("Process:", 1)[1].strip())
@@ -184,6 +464,9 @@ def _extract_package(detail_lines, package_dir):
         for line in _read_lines(trace, 100):
             if "Cmd line:" in line:
                 return _norm_pkg(line.split("Cmd line:", 1)[1].strip())
+    cmd = _extract_tombstone_cmdline(package_dir)
+    if cmd:
+        return cmd
     ev = _uniview_info(package_dir)
     if ev:
         proc = ev.get("proc") or ev.get("appname") or ""
@@ -194,7 +477,7 @@ def _extract_package(detail_lines, package_dir):
             # appname 形如 ActivityRecord{... com.foo/...} 提取包名
             m = re.search(r"([\w.]+)/", proc)
             return m.group(1) if m else proc[:100]
-    summary = _find_file(package_dir, ("{}_summary.txt".format(os.path.basename(package_dir)),))
+    summary = _find_summary(package_dir)
     if summary:
         for line in _read_lines(summary, 30):
             if "进程/包" in line or "Package" in line:
@@ -341,14 +624,19 @@ def _truncate(text, limit=4000):
 
 
 def _extract_caused_by_swt(lines):
-    """SWT CausedBy：Blocked in 阻塞详情（Subject 行）完整显示，其次 Subject 行。
+    """SWT CausedBy：Blocked in / WATCHDOG KILLING / watchdog: Blocked in。
 
-    完整显示必要性：去重的同类型问题须用相同规则匹配到（MTK 语义）。
-    无阻塞详情（仅压力统计/无 Subject）时返回 ''，走 MTK 兜底（各自保留）。
+    无阻塞详情时返回 ''，走 MTK 兜底（各自保留）。
     """
+    for line in lines:
+        if "WATCHDOG KILLING SYSTEM PROCESS" in line:
+            return line.strip()[:600]
     for line in lines:
         if "Blocked in" in line:
             s = line.strip()
+            m = re.search(r"watchdog:\s*(Blocked in.+)", s, re.IGNORECASE)
+            if m:
+                return m.group(1)[:600]
             if s.startswith("Subject:"):
                 s = s[len("Subject:"):].strip()
             return s[:600]
@@ -356,6 +644,218 @@ def _extract_caused_by_swt(lines):
         if line.strip().startswith("Subject:"):
             return line.strip()[:600]
     return ""
+
+
+def _swt_caused_by_lines(package_dir, primary_lines, extra_lines):
+    """SWT CausedBy 多源：detail/exp_detail → SYS_ANDROID_LOG。"""
+    for src in (primary_lines, extra_lines or ()):
+        if not src:
+            continue
+        caused = _extract_caused_by_swt(src)
+        if caused:
+            return caused
+    alog = _read_uniview_basename(package_dir, "SYS_ANDROID_LOG")
+    return _extract_caused_by_swt(alog)
+
+
+def _read_uniview_basename(package_dir, basename, max_lines=None):
+    """读 uniview 聚合包内具名文件（tar/展开目录/包根）。"""
+    import tarfile
+
+    direct = os.path.join(package_dir, basename)
+    if os.path.isfile(direct):
+        return _read_lines(direct, max_lines)
+    if not os.path.isdir(package_dir):
+        return []
+    for name in os.listdir(package_dir):
+        p = os.path.join(package_dir, name)
+        try:
+            if name.endswith(".tar.gz") and os.path.isfile(p):
+                with tarfile.open(p, "r:gz") as tf:
+                    for member in tf.getmembers():
+                        if (member.name == basename
+                                or member.name.endswith("/" + basename)):
+                            f = tf.extractfile(member)
+                            if f:
+                                lines = f.read().decode("utf-8", "replace").splitlines()
+                                return lines[:max_lines] if max_lines else lines
+            elif os.path.isdir(p) and re.match(r"^\d+-", name):
+                for root, _dirs, files in os.walk(p):
+                    if basename in files:
+                        return _read_lines(os.path.join(root, basename), max_lines)
+        except (OSError, tarfile.TarError, EOFError):
+            continue
+    return []
+
+
+def _read_anr_traces_from_pkg(package_dir):
+    """uniview tar/展开目录内 DATA_ANR_TRACES/* 内容列表。"""
+    import tarfile
+
+    traces = []
+    if not os.path.isdir(package_dir):
+        return traces
+    for name in os.listdir(package_dir):
+        p = os.path.join(package_dir, name)
+        try:
+            if name.endswith(".tar.gz") and os.path.isfile(p):
+                with tarfile.open(p, "r:gz") as tf:
+                    for member in tf.getmembers():
+                        if "/DATA_ANR_TRACES/" in member.name and not member.isdir():
+                            f = tf.extractfile(member)
+                            if f:
+                                traces.append(
+                                    f.read().decode("utf-8", "replace").splitlines())
+            elif os.path.isdir(p) and re.match(r"^\d+-", name):
+                for root, _dirs, files in os.walk(p):
+                    if "DATA_ANR_TRACES" in root:
+                        for fn in files:
+                            try:
+                                with open(os.path.join(root, fn),
+                                          encoding="utf-8", errors="replace") as fh:
+                                    traces.append(fh.read().splitlines())
+                            except OSError:
+                                continue
+        except (OSError, tarfile.TarError, EOFError):
+            continue
+    return traces
+
+
+def _detect_anr_subtype(lines):
+    """ABPS ANR 7 子类型；无匹配返回 ''。"""
+    for tag, pattern in anr_subtypes():
+        for line in lines:
+            if pattern in line:
+                return tag
+    return ""
+
+
+def _lines_for_anr_subtype(package_dir, detail_lines, exp_detail):
+    """ANR 子类型检测用行集合。"""
+    lines = list(detail_lines)
+    if exp_detail:
+        lines.extend(exp_detail)
+    trace = _find_file(package_dir, ("anr_trace.txt",))
+    if trace:
+        lines.extend(_read_lines(trace))
+    for tr in _read_anr_traces_from_pkg(package_dir):
+        lines.extend(tr)
+    lines.extend(_read_uniview_basename(package_dir, "SYS_ANDROID_LOG", max_lines=80000))
+    return lines
+
+
+def _extract_sysinfo_context(package_dir, max_per_kind=3):
+    """ABPS sysinfo 上下文行（lmk/oom/io），写入 Detail 附录。"""
+    found = []
+    seen = set()
+    for kind, pattern, log_name in sysinfo_patterns():
+        if kind in seen:
+            continue
+        count = 0
+        for line in _read_uniview_basename(package_dir, log_name, max_lines=80000):
+            if pattern in line:
+                found.append(line.strip())
+                count += 1
+                if count >= max_per_kind:
+                    seen.add(kind)
+                    break
+    return found
+
+
+def _extract_cpassert_context(package_dir, max_lines=5):
+    """ABPS stab_cpassert 命中行，写入 Detail。"""
+    out = []
+    for line in _read_uniview_basename(package_dir, "SYS_ANDROID_LOG", max_lines=80000):
+        if any(p in line for p in cpassert_patterns()):
+            out.append(line.strip())
+            if len(out) >= max_lines:
+                break
+    return out
+
+
+def _extract_swt_half_note(package_dir):
+    """SWT half（WAITED_HALF）说明，写入 Detail。"""
+    for line in _read_uniview_basename(package_dir, "SYS_ANDROID_LOG", max_lines=80000):
+        if "WAITED_HALF" in line:
+            return "half watchdog (WAITED_HALF)"
+    for line in _read_uniview_basename(package_dir, "exp_detail.txt", max_lines=5000):
+        if "WAITED_HALF" in line:
+            return "half watchdog (WAITED_HALF)"
+    return ""
+
+
+def _je_am_crash_exception(line):
+    """解析 am_crash: [...,Exception,...] 中异常类（ABPS events.log / SYS_ANDROID_LOG）。"""
+    m = _AM_CRASH_RE.search(line)
+    if not m:
+        return ""
+    parts = m.group(1).split(",")
+    if len(parts) < 5:
+        return ""
+    exc = parts[4].strip()
+    if re.match(r"^(android\.|java\.|com\.|dalvik\.)\S*(Exception|Error)\b", exc):
+        return exc
+    if "." in exc and ("Exception" in exc or "Error" in exc):
+        return exc
+    return ""
+
+
+def _je_caused_by_from_am_crash_lines(lines):
+    for line in lines:
+        exc = _je_am_crash_exception(line)
+        if exc:
+            return exc[:200]
+    return ""
+
+
+def _je_caused_by_from_lines(lines):
+    """JE CausedBy：Caused by / FATAL EXCEPTION / Java 异常行 / am_crash 异常类。"""
+    for line in lines:
+        if "Caused by:" in line:
+            return line.strip()[:200]
+    for line in lines:
+        if "FATAL EXCEPTION" in line:
+            return line.strip()[:200]
+    for line in lines:
+        if re.match(r"^\s*(android\.|java\.|com\.|dalvik\.)\S*(Exception|Error)\b", line):
+            return line.strip()[:200]
+    return _je_caused_by_from_am_crash_lines(lines)
+
+
+def _ke_caused_by_from_lines(lines, rules=None):
+    """KE CausedBy：NativeHang 优先，其次 panic，最后 killed by signal（ABPS kernelcommon）。"""
+    ke_rules = (rules or get_active_rules()).get("KE", {})
+    patterns = ke_rules.get("patterns", [
+        "Native hang monitor trigger", "panic", "killed by signal"])
+    for pat in patterns:
+        for line in lines:
+            if pat == "panic":
+                if "panic" in line.lower():
+                    return line.strip()[:200]
+            elif pat in line:
+                return line.strip()[:200]
+    return ""
+
+
+def _detail_appendix(package_dir, expclass, detail_lines, exp_detail):
+    """Detail 类型附加段（ANR 子类型 / SWT half / sysinfo / cpassert）。"""
+    extra = []
+    if expclass == "ANR":
+        subtype = _detect_anr_subtype(_lines_for_anr_subtype(package_dir, detail_lines, exp_detail))
+        if subtype:
+            extra = ["--- ANR 子类型 ---", "ANR子类型: %s" % subtype]
+    elif expclass == "SWT":
+        half = _extract_swt_half_note(package_dir)
+        if half:
+            extra = ["--- SWT 状态 ---", half]
+    sysinfo = _extract_sysinfo_context(package_dir)
+    if sysinfo:
+        extra += ["--- 系统态上下文 ---"] + sysinfo[:12]
+    if expclass in ("Assert", "WCN", "MSP"):
+        cpassert = _extract_cpassert_context(package_dir)
+        if cpassert:
+            extra += ["--- Assert/Modem 现场 ---"] + cpassert
+    return extra
 
 
 def _anr_main_stack_top(tr):
@@ -393,13 +893,18 @@ def extract_caused_by(expclass, package_dir, extra_lines=None):
             top = _anr_main_stack_top(tr)
             if top:
                 return top
+        for tr in _read_anr_traces_from_pkg(package_dir):
+            top = _anr_main_stack_top(tr)
+            if top:
+                return top
         subj = ""
         for line in lines:
             if "Subject:" in line:
                 subj = line.strip()[len("Subject:"):].strip() or subj
         if subj:
             return subj[:200]
-    elif expclass == "NE":
+        return ""
+    elif expclass_family(expclass) == "NE":
         # CausedBy：backtrace 首帧（含 pc + 库），对齐金标准语义
         for i, line in enumerate(lines):
             if line.strip() == "backtrace:":
@@ -435,19 +940,49 @@ def extract_caused_by(expclass, package_dir, extra_lines=None):
                     m = _SIGNAL_RE.search(line)
                     if m:
                         return line.strip()[:200]
+        return ""
     elif expclass == "SWT":
-        return _extract_caused_by_swt(lines)
+        return _swt_caused_by_lines(package_dir, lines, extra_lines)
     elif expclass == "KE":
-        for line in lines:
-            if "panic" in line.lower():
-                return line.strip()[:200]
-    else:  # JE 等：优先 Caused by 行，其次 Java 异常行
-        for line in lines:
-            if "Caused by:" in line:
-                return line.strip()[:200]
-        for line in lines:
-            if re.match(r"^\s*(android\.|java\.|com\.|dalvik\.)\S*(Exception|Error)\b", line):
-                return line.strip()[:200]
+        caused = _ke_caused_by_from_lines(lines)
+        if caused:
+            return caused
+        if extra_lines and lines is not extra_lines:
+            caused = _ke_caused_by_from_lines(extra_lines)
+            if caused:
+                return caused
+        dump = _read_pkg_file(package_dir, "dump_report.txt")
+        caused = _ke_caused_by_from_lines(dump)
+        if caused:
+            return caused
+        for src in get_active_rules().get("KE", {}).get(
+                "kernel_sources", ["SYS_KERNEL_LOG"]):
+            klog = _read_uniview_basename(package_dir, src, max_lines=80000)
+            caused = _ke_caused_by_from_lines(klog)
+            if caused:
+                return caused
+        return ""
+    else:  # JE 等
+        caused = _je_caused_by_from_lines(lines)
+        if caused:
+            return caused
+        if extra_lines and lines is not extra_lines:
+            caused = _je_caused_by_from_lines(extra_lines)
+            if caused:
+                return caused
+        alog = _read_uniview_basename(package_dir, "SYS_ANDROID_LOG", max_lines=80000)
+        caused = _je_caused_by_from_lines(alog)
+        if caused:
+            return caused
+        for src in get_active_rules().get("JE", {}).get(
+                "am_crash_sources", ["SYS_ANDROID_LOG", "events.log"]):
+            if src == "SYS_ANDROID_LOG":
+                continue
+            log_lines = _read_uniview_basename(package_dir, src, max_lines=80000)
+            caused = _je_caused_by_from_am_crash_lines(log_lines)
+            if caused:
+                return caused
+        return ""
     return ""
 
 
@@ -497,7 +1032,7 @@ def _extract_tombstone_key(tb_lines):
 
 def _extract_subject(expclass, lines, ev):
     """Subject（一眼定位行，参照 MTK __exp_main 的 Subject 语义）。"""
-    if expclass == "NE":
+    if expclass_family(expclass) == "NE":
         for line in lines:
             s = line.strip()
             if s.startswith("Abort message:"):
@@ -543,7 +1078,7 @@ def _extract_subject(expclass, lines, ev):
 def _extract_frames(expclass, lines):
     """栈帧（MTK 风格：native 帧带 native: 前缀，Java 帧 at 原样），最多 20 行。"""
     frames = []
-    if expclass == "NE":
+    if expclass_family(expclass) == "NE":
         in_bt = False
         for line in lines:
             s = line.strip()
@@ -610,10 +1145,9 @@ def _build_detail(expclass, package_dir, exp_detail, ev, summary,
         if ev:
             extra += ["--- unievent_info ---",
                       json.dumps(ev, ensure_ascii=False)]
-    elif expclass == "NE" and not lines:
-        tb = _find_file(package_dir, ("tombstone.txt",))
-        if tb:
-            tb_lines = _read_lines(tb)
+    elif expclass_family(expclass) == "NE" and not lines:
+        tb_lines = _pick_tombstone_lines(package_dir, ev)
+        if tb_lines:
             if not subject:
                 subject = _extract_subject(expclass, tb_lines, ev)
             if not frames:
@@ -645,6 +1179,13 @@ def _build_detail(expclass, package_dir, exp_detail, ev, summary,
             if not frames:
                 frames = _extract_frames(expclass, dl)
 
+    appendix = _detail_appendix(package_dir, expclass, detail_lines, exp_detail)
+    if appendix:
+        if extra:
+            extra.extend([""] + appendix)
+        else:
+            extra = appendix
+
     bt = []
     if subject:
         bt.append(subject)
@@ -660,6 +1201,8 @@ def _build_detail(expclass, package_dir, exp_detail, ev, summary,
 def _collect_package(package_dir, version, device):
     type_dash, ts = _parse_package_name(package_dir)
     exp_type = type_dash
+    ev = _uniview_info(package_dir)
+    exp_type = _resolve_uniview_exp_type(package_dir, exp_type, ev)
     expclass = classify(exp_type)
     if expclass == exp_type:
         # uniview 独有类型（Jank/Assert/WCN/Boot Category）在包名里
@@ -674,15 +1217,11 @@ def _collect_package(package_dir, version, device):
     package = _extract_package(detail_lines, package_dir)
     # exp_detail 先取（uniview 包 CausedBy/Detail 兜底，流式解包）
     exp_detail = _extract_exp_detail(package_dir)
-    ev = _uniview_info(package_dir)
     caused_by = extract_caused_by(expclass, package_dir, exp_detail)
-    if not caused_by:
-        # uniview 包：从 unievent_info 的 message/reboot_reason/event_name 提取
+    if not caused_by and expclass not in _SKIP_UNIVIEW_CAUSE_FALLBACK:
+        # uniview：message/reboot_reason 可作弱兜底；不用 event_name（过粗）
         if ev:
-            caused_by = (ev.get("message")
-                         or ev.get("reboot_reason")
-                         or ev.get("event_name") or "")[:200]
-            caused_by = caused_by.strip()
+            caused_by = (ev.get("message") or ev.get("reboot_reason") or "").strip()[:200]
     if expclass in ("Jank", "Assert", "WCN", "SR"):
         # 参照 MTK：特殊类型无法确定进程时，CurProcess/Package 直接填 ExpClass
         package = expclass
@@ -690,8 +1229,7 @@ def _collect_package(package_dir, version, device):
         # MTK 兜底：SR（严重重启）每个问题单独看待；其他类型无根因时防误合并
         caused_by = _fallback_caused_by(expclass, package)
 
-    summary = _find_file(package_dir, (
-        "{}_summary.txt".format(os.path.basename(package_dir)),))
+    summary = _find_summary(package_dir)
     pid = _extract_pid(package_dir, ev, detail_lines)
     rom_ram = _extract_rom_ram(package_dir)
     # Detail 主体：MTK 识别报告模板（Device_id/版本/包名/进程/pid/Backtrace + 现场段）
@@ -700,8 +1238,8 @@ def _collect_package(package_dir, version, device):
     if not detail_text and detail:
         detail_text = "\n".join(detail_lines)[:2000]
 
-    return {
-        "Path": summary or detail or package_dir,
+    rec = {
+        "Path": _abs_path(summary or detail or package_dir),
         "Version": version,
         "ExpTime": ts,
         "ExpType": exp_type,
@@ -714,7 +1252,49 @@ def _collect_package(package_dir, version, device):
         "snNum": device,
         "ExpClass": expclass,
         "Rom_Ram": rom_ram,
+        "_package_dir": package_dir,
     }
+    return rec
+
+
+def _apply_ylog_enrich(records, save_root, config=None):
+    """设备级 ylog/ 方案 B enrich；失败单条不影响整体。"""
+    if not records:
+        return records
+    cfg = (config or {}).get("ylog_enrich", {})
+    if cfg.get("enabled", True) is False:
+        TEST_LOGGER.info("ylog enrich 已关闭，跳过")
+        return records
+    from modules.ylog_enrich import enrich_record
+
+    total = len(records)
+    TEST_LOGGER.info("ylog enrich 开始（%d 条）" % total)
+    out = []
+    for idx, rec in enumerate(records, 1):
+        pkg_dir = rec.pop("_package_dir", None)
+        label = "%s/%s %s" % (
+            rec.get("ExpClass", ""), rec.get("ExpTime", ""),
+            os.path.basename(pkg_dir) if pkg_dir else "?")
+        TEST_LOGGER.info("ylog enrich [%d/%d] %s" % (idx, total, label))
+        if pkg_dir:
+            try:
+                enrich_record(rec, pkg_dir, save_root, config)
+            except Exception as exc:
+                TEST_LOGGER.warn("ylog enrich 失败: %s (%s)" % (label, exc))
+        # SR 等 enrich 后若误补 CausedBy，SR 仍强制兜底
+        if rec.get("ExpClass") == "SR":
+            rec["CausedBy"] = _fallback_caused_by(rec["ExpClass"], rec.get("Package", ""))
+        elif not rec.get("CausedBy"):
+            rec["CausedBy"] = _fallback_caused_by(
+                rec.get("ExpClass", ""), rec.get("Package", ""))
+        out.append(rec)
+    TEST_LOGGER.info("ylog enrich 完成")
+    return out
+
+
+def _abs_path(path):
+    """相对/绝对路径统一为绝对路径；空则返回 ''。"""
+    return os.path.abspath(path) if path else ""
 
 
 def _load_device_rom_ram(root):
@@ -749,21 +1329,31 @@ def _load_device_rom_ram(root):
     return result
 
 
-def collect_problems(root):
+def collect_problems(root, config=None):
     """扫描问题包目录，返回记录列表（12 列 dict，多设备支持）。"""
+    root = os.path.abspath(root)
+    set_active_rules(config)
+    TEST_LOGGER.info("扫描根目录: %s" % root)
     packages = _find_problem_dirs(root)
     if not packages:
+        TEST_LOGGER.warn("未发现问题包目录")
         return []
+    TEST_LOGGER.info("发现问题包: %d" % len(packages))
     device_rom_ram = _load_device_rom_ram(root)
     records = []
-    for pkg in packages:
-        # 设备/版本从路径层级推导：{root}/{version}/{device}/{pkg}
+    total = len(packages)
+    for idx, pkg in enumerate(packages, 1):
         device = os.path.basename(os.path.dirname(pkg))
         version = os.path.basename(os.path.dirname(os.path.dirname(pkg)))
+        pkg_name = os.path.basename(pkg)
+        TEST_LOGGER.info("采集 [%d/%d] %s/%s %s" % (idx, total, version, device, pkg_name))
         rec = _collect_package(pkg, version, device)
-        # 设备级 Rom_Ram 优先（覆盖无聚合包的 dropbox/tombstone/小包）
         if device in device_rom_ram:
             rec["Rom_Ram"] = device_rom_ram[device]
         records.append(rec)
+        TEST_LOGGER.info("  -> ExpClass=%s Package=%s" % (
+            rec.get("ExpClass"), rec.get("Package")))
+    records = _apply_ylog_enrich(records, root, config)
     records.sort(key=lambda r: (r["ExpClass"], r["Package"], r["ExpTime"]))
+    TEST_LOGGER.info("采集完成，共 %d 条记录" % len(records))
     return records

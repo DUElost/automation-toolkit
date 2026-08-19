@@ -22,7 +22,7 @@
 │   └─ meminfo 快照
 └─ 每问题一个文件夹
     {device}/{type}_{ts}/
-    ├─ {type}_{ts}_summary.txt          # 基础信息+堆栈+关键信息
+    ├─ summary.txt                      # 基础信息+堆栈+关键信息
     ├─ detail.txt                     # dropbox 详情
     ├─ {eid}-{ts}.tar.gz / unievent_info.json  # uniview 聚合包（第二阶段解包）+ 事件元信息
     ├─ anr_trace.txt / tombstone.txt   # 平台源原始素材

@@ -114,5 +114,7 @@ python-tools/stability_Jira-Automation/**/log/
 # stability log scan data (datasets/reports, 17GB+)
 python-tools/stability_Monkey-Log-Scan-GT&SPRD/data/
 python-tools/stability_Scan-Result-GT/out/
-
 python-tools/stability_Scan-Result-GT/out*/
+python-tools/stability_Scan-Result-GT/test_run*/
+python-tools/stability_Scan-Result-GT/test_run_local*/
+python-tools/stability_Scan-Result-GT/log/
