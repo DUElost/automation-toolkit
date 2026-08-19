@@ -20,11 +20,14 @@ $runtaskWork = Join-Path $env:TEMP "mtbf-runtask-$PID.xml"
 $cfg = Read-MtbfConfig -Root $root
 if ($TaskTimes -le 0) { $TaskTimes = [int]$cfg["task.times"] }
 if (-not $Tester) { $Tester = $cfg["tester.name"] }
+$autoResume = ($cfg["auto.resume"] -eq "true")
 
 Copy-Item $runtaskSrc $runtaskWork -Force
 if ($TaskTimes -gt 0) {
     Write-MtbfStep "Set task times=$TaskTimes"
     Set-RuntaskTimes -RuntaskPath $runtaskWork -Times $TaskTimes
+} else {
+    Write-MtbfStep "Keep runtask.xml times from config/runtask.xml"
 }
 
 if ($RedeployConfig) {
@@ -33,9 +36,13 @@ if ($RedeployConfig) {
     adb push $runtaskWork /sdcard/runtask.xml
 }
 
-Set-MtbfPrefs -Tester $Tester
+Set-MtbfPrefs -Tester $Tester -AutoResume:$autoResume
 Write-MtbfStep "Start offline MTBF task"
 Start-MtbfTask
 
-Write-Host "`nTask started. Results: /sdcard/results/realresult/" -ForegroundColor Green
+if (Test-RunTaskServiceRunning) {
+    Write-Host "`nTask started. Auto-resume=$autoResume. Results: /sdcard/results/realresult/" -ForegroundColor Green
+} else {
+    Write-Warning "RunTaskService may not be running."
+}
 Write-Host "Stop: adb shell am startservice -n com.ape.offlinescriptmanager/com.ape.offlinescriptmanager.view.RunTaskService -a com.ape.offlinescriptmanager.view.RunTaskService.action.stop"

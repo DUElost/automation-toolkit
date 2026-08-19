@@ -9,7 +9,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $ManagerDir = $PSScriptRoot
-$AndroidToolsRoot = Split-Path $ManagerDir -Parent
+$AndroidToolsRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $VendorDir = Join-Path $AndroidToolsRoot "vendor"
 $TestApkDir = Join-Path $AndroidToolsRoot "stability_PowerCycle-Test\apk"
 $OutputApk = Join-Path $TestApkDir "AutoTestTool.apk"

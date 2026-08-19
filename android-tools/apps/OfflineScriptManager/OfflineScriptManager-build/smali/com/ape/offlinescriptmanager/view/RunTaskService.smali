@@ -292,10 +292,6 @@
 
     invoke-virtual {v2}, Landroid/app/Notification$Builder;->build()Landroid/app/Notification;
 
-    iget-object v2, p0, Lcom/ape/offlinescriptmanager/view/RunTaskService;->h:Landroid/app/Notification$Builder;
-
-    invoke-virtual {v2}, Landroid/app/Notification$Builder;->build()Landroid/app/Notification;
-
     move-result-object v2
 
     const/16 v6, 0x271a
@@ -308,7 +304,20 @@
 
     move-result-object v2
 
+    const/16 v9, 0x22
+
+    if-lt v3, v9, :cond_start_fg_legacy
+
+    const/4 v9, 0x2
+
+    invoke-virtual {p0, v6, v2, v9}, Landroid/app/Service;->startForeground(ILandroid/app/Notification;I)V
+
+    goto :goto_start_fg_done
+
+    :cond_start_fg_legacy
     invoke-virtual {p0, v6, v2}, Landroid/app/Service;->startForeground(ILandroid/app/Notification;)V
+
+    :goto_start_fg_done
 
     if-lt v3, v5, :cond_1
 
@@ -372,6 +381,8 @@
     iput-object v0, p0, Lcom/ape/offlinescriptmanager/view/RunTaskService;->b:Lcom/ape/offlinescriptmanager/utils/l/f;
 
     invoke-virtual {v0}, Ljava/lang/Thread;->start()V
+
+    invoke-static {p0}, Lcom/ape/offlinescriptmanager/receiver/MtbfAutoResumeReceiver;->scheduleKeepAlive(Landroid/content/Context;)V
 
     return-void
 .end method
@@ -1090,6 +1101,20 @@
     invoke-virtual {v0, v1}, Landroid/app/NotificationManager;->createNotificationChannel(Landroid/app/NotificationChannel;)V
 
     :cond_0
+    return-void
+.end method
+
+.method public onTimeout(II)V
+    .locals 2
+
+    sget-object v0, Lcom/ape/offlinescriptmanager/view/RunTaskService;->l:Ljava/lang/String;
+
+    const-string v1, "onTimeout: stopping RunTaskService gracefully"
+
+    invoke-static {v0, v1}, Landroid/util/Log;->w(Ljava/lang/String;Ljava/lang/String;)I
+
+    invoke-direct {p0}, Lcom/ape/offlinescriptmanager/view/RunTaskService;->p()V
+
     return-void
 .end method
 

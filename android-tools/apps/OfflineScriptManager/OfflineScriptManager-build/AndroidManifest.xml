@@ -20,7 +20,7 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
     <application android:allowBackup="true" android:appComponentFactory="androidx.core.app.CoreComponentFactory" android:extractNativeLibs="false" android:icon="@mipmap/ic_launcher" android:label="@string/app_name_string" android:name="com.ape.offlinescriptmanager.utils.MyApplication" android:persistent="true" android:requestLegacyExternalStorage="true" android:supportsRtl="true" android:theme="@style/AppTheme">
         <activity android:enabled="true" android:exported="true" android:name="com.ape.offlinescriptmanager.view.MainActivity"/>
         <activity android:label="@string/app_name_string" android:name="com.ape.offlinescriptmanager.batterytool.BatteryActivity" android:screenOrientation="portrait" android:windowSoftInputMode="stateAlwaysHidden|adjustPan">
@@ -66,7 +66,13 @@
         <activity android:name="com.ape.offlinescriptmanager.screenrecorder.EditVideoActivity"/>
         <service android:enabled="true" android:exported="true" android:foregroundServiceType="mediaProjection" android:name="com.ape.offlinescriptmanager.crashlistener.CrashListenerService"/>
         <service android:name="com.ape.offlinescriptmanager.batterytool.UpdateDataService"/>
-        <service android:enabled="true" android:exported="true" android:foregroundServiceType="dataSync" android:name="com.ape.offlinescriptmanager.view.RunTaskService"/>
+        <service android:enabled="true" android:exported="true" android:foregroundServiceType="mediaPlayback" android:name="com.ape.offlinescriptmanager.view.RunTaskService"/>
+        <receiver android:enabled="true" android:exported="true" android:name="com.ape.offlinescriptmanager.receiver.MtbfAutoResumeReceiver">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="com.ape.offlinescriptmanager.action.MTBF_KEEPALIVE"/>
+            </intent-filter>
+        </receiver>
         <receiver android:name="com.ape.offlinescriptmanager.batterytool.BatteryChangeBroadcastReceiver"/>
         <provider android:authorities="com.ape.offlinescriptmanager.database" android:exported="false" android:name="com.ape.offlinescriptmanager.database.CommonProvider"/>
         <provider android:authorities="com.ape.offlinescriptmanager.fileprovider" android:exported="false" android:grantUriPermissions="true" android:name="androidx.core.content.FileProvider">

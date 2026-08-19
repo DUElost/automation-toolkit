@@ -43,7 +43,8 @@ app-config.properties 示例:
       离线跑用例 time 应为数十秒，非 0 毫秒
 
 注意: 本机 erofs 只读，adb remount 不可用；平台签名 + pm install 即可获 system uid。
-      Android 14+ 已为 RunTaskService 添加 foregroundServiceType=dataSync。
+      RunTaskService 使用 foregroundServiceType=mediaPlayback（Android 16 要求声明类型；无 dataSync 6 小时上限）。
+      勿改回 dataSync。已补丁 onTimeout() 与 MtbfAutoResumeReceiver 看门狗。
 
 修改其他功能
 ------------
@@ -65,4 +66,4 @@ Smali: OfflineScriptManager-build/smali/.../utils/k.smali
 - vendor/platform-sign/  (构建时由 platform.pk8 生成)
 
 本工具路径:
-  F:\automation-toolkit\android-tools\stability_OfflineScriptManager\
+  F:\automation-toolkit\android-tools\apps\OfflineScriptManager\

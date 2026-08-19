@@ -25,7 +25,11 @@ automation-toolkit/
 ├── windows-scheduler/                     # Windows 定时任务管理器
 ├── android-tools/                         # Android 工具集
 │   ├── vendor/                            # apktool / jadx / APK 签名工具
-│   └── stability_OfflineScriptManager/    # MTBF 离线老化 APK 自编译与部署
+│   ├── apps/                              # APK 源码与构建
+│   │   ├── OfflineScriptManager/          # MTBF 离线调度器自编译
+│   │   └── PowerCycleManager/             # 开关机 APK 构建
+│   ├── stability_MTBF-Test/               # MTBF 离线老化执行包
+│   └── stability_PowerCycle-Test/         # 开关机专项执行包
 ├── java-platforms/                        # Java 平台（规划中）
 ├── node-scripts/                          # Node.js 脚本（规划中）
 └── shared/                                # 共享资源
@@ -72,8 +76,10 @@ automation-toolkit/
 
 | 工具名称 | 说明 |
 |---------|------|
-| [stability_OfflineScriptManager](android-tools/stability_OfflineScriptManager/) | MTBF 离线老化 OfflineScriptManager 自编译与系统签名部署 |
+| [apps/OfflineScriptManager](android-tools/apps/OfflineScriptManager/) | MTBF 离线老化 OfflineScriptManager APK 自编译 |
 | [stability_MTBF-Test](android-tools/stability_MTBF-Test/) | MTBF 离线老化执行包（APK + XML + 一键 deploy/run） |
+| [apps/PowerCycleManager](android-tools/apps/PowerCycleManager/) | 开关机测试 APK 构建 |
+| [stability_PowerCycle-Test](android-tools/stability_PowerCycle-Test/) | 开关机专项执行包 |
 
 ## 快速开始
 

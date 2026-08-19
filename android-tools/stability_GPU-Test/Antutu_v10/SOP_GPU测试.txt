@@ -1,0 +1,16 @@
+### Rel_GPU测试
+GPU测试  通过Antutu benchmark 工具执行测试
+工具下载地址: https://www.antutu.com/en/download.htm
+
+### Rel_GPU测试前置条件
+1. 打开飞行模式
+**新项目 参数配置性能是保密内容；安兔兔可能会将参数信息上传到网络；所以需要打开飞行模式，不链接网络**
+
+### GPU测试测试
+#### 操作步骤
+  1. 连接手机双击 installApp.bat 会 安装测试apk，push文件
+  2. 执行【adb shell 】，进入shell命令行
+  3. shell 下执行【cd /sdcard/Auto 】, 将目录切换到/sdcard/Auto路径
+  4. 启动脚本【nohup sh run_stress_gpu.sh &】
+#### 停止脚本运行
+拔出手机插上电源，脚本默认执行500次后停止，中间停止脚本可以杀进程，也可以直接重启手机

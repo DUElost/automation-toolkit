@@ -17,7 +17,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $OfflineDir = $PSScriptRoot
-$AndroidToolsRoot = Split-Path $OfflineDir -Parent
+$AndroidToolsRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $VendorDir = Join-Path $AndroidToolsRoot "vendor"
 $BuildDir = Join-Path $OfflineDir "OfflineScriptManager-build"
 $OutputApk = Join-Path $OfflineDir "OfflineScriptManager.apk"

@@ -1,6 +1,8 @@
-# stability_PowerCycleManager
+# PowerCycleManager
 
 开关机测试 APK 的**构建与源码镜像**（方案 A：基于 ATTS 二次开发）。
+
+测试执行见 [stability_PowerCycle-Test](../../stability_PowerCycle-Test/)。
 
 ## 架构
 
@@ -8,7 +10,7 @@
 D:\Tinno_auto\ATTS                          ← 主开发工程（Gradle）
     └── app/src/.../powercycle/             ← 开关机核心模块（新增）
 
-stability_PowerCycleManager/
+apps/PowerCycleManager/
     ├── app-config.properties               ← 构建参数
     ├── build-powercycle-apk.bat/.ps1       ← 编译 + platform 签名
     └── powercycle-apk-src/                 ← 与 ATTS 同步的 Java 源码镜像
@@ -36,7 +38,7 @@ stability_PowerCycleManager/
 build-powercycle-apk.bat
 ```
 
-产物输出到 `../stability_PowerCycle-Test/apk/AutoTestTool.apk`。
+产物输出到 `../../stability_PowerCycle-Test/apk/AutoTestTool.apk`。
 
 ## 源码同步
 
@@ -44,7 +46,7 @@ build-powercycle-apk.bat
 
 ```bat
 xcopy /E /Y D:\Tinno_auto\ATTS\app\src\main\java\com\mediatek\schpwronoff\powercycle ^
-  F:\automation-toolkit\android-tools\stability_PowerCycleManager\powercycle-apk-src\
+  F:\automation-toolkit\android-tools\apps\PowerCycleManager\powercycle-apk-src\
 ```
 
 ## Manifest 变更摘要
