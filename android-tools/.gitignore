@@ -6,3 +6,8 @@ apps/OfflineScriptManager/dist/
 
 # Local temp
 *.tmp
+
+# MTBF last selected suite / mode / serial (local state)
+stability_MTBF-Test/.last-suite
+stability_MTBF-Test/.last-mode
+stability_MTBF-Test/.last-serial

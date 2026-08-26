@@ -55,6 +55,8 @@ build/
 !android-tools/vendor/apktool/apktool.jar
 !android-tools/vendor/uber-apk-signer.jar
 !android-tools/stability_MTBF-Test/apk/*.apk
+!android-tools/stability_MTBF-Test/shared/apk/*.apk
+!android-tools/stability_MTBF-Test/shared/jar/sevice.jar
 !android-tools/apps/OfflineScriptManager/OfflineScriptManager.apk
 !android-tools/apps/OfflineScriptManager/OfflineScriptManager.apk.original
 

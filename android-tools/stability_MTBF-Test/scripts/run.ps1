@@ -1,48 +1,89 @@
 #Requires -Version 5.1
 param(
+    [string]$Suite = "",
+    [string]$Mode = "",
+    [string]$Serial = "",
     [int]$TaskTimes = 0,
     [string]$Tester = "",
-    [switch]$RedeployConfig
+    [switch]$RedeployConfig,
+    [switch]$NonInteractive
 )
 
 $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "lib.ps1")
 
+Remove-Item Env:ANDROID_SERIAL -ErrorAction SilentlyContinue
+
 if (-not (Get-Command adb -ErrorAction SilentlyContinue)) {
     throw "adb not found in PATH"
 }
 
-$root = Get-MtbfRoot
-$configDir = Join-Path $root "config"
-$runtaskSrc = Join-Path $configDir "runtask.xml"
-$runtaskWork = Join-Path $env:TEMP "mtbf-runtask-$PID.xml"
-
-$cfg = Read-MtbfConfig -Root $root
-if ($TaskTimes -le 0) { $TaskTimes = [int]$cfg["task.times"] }
-if (-not $Tester) { $Tester = $cfg["tester.name"] }
-$autoResume = ($cfg["auto.resume"] -eq "true")
-
-Copy-Item $runtaskSrc $runtaskWork -Force
-if ($TaskTimes -gt 0) {
-    Write-MtbfStep "Set task times=$TaskTimes"
-    Set-RuntaskTimes -RuntaskPath $runtaskWork -Times $TaskTimes
-} else {
-    Write-MtbfStep "Keep runtask.xml times from config/runtask.xml"
+$resolvedMode = $null
+if ($Mode) {
+    $resolvedMode = Normalize-MtbfMode -Mode $Mode
+} elseif ($NonInteractive) {
+    $resolvedMode = Get-MtbfLastMode
+    if (-not $resolvedMode) { $resolvedMode = "apk" }
 }
 
-if ($RedeployConfig) {
-    Push-MtbfConfig -ConfigDir $configDir -RuntaskPath $runtaskWork
+$serials = @()
+$selected = $null
+if ($Suite) {
+    if (-not $resolvedMode) {
+        $resolvedMode = Resolve-MtbfMode -Mode $Mode -Interactive:(-not $NonInteractive)
+        if (-not $resolvedMode) {
+            Write-Host "Cancelled." -ForegroundColor Yellow
+            exit 0
+        }
+    }
+    $serials = @(Resolve-MtbfDevices -Serial $Serial -Interactive:(-not $NonInteractive))
+    $selected = Resolve-MtbfSuite -SuiteId $Suite
+    $selected | Add-Member -NotePropertyName Mode -NotePropertyValue $resolvedMode -Force
+} elseif ($NonInteractive) {
+    $serials = @(Resolve-MtbfDevices -Serial $Serial)
+    $selected = Get-MtbfLastSuite
+    if (-not $selected) {
+        $all = @(Get-MtbfSuites)
+        if ($all.Count -eq 1) {
+            $selected = $all[0]
+        } else {
+            $selected = Resolve-MtbfSuite -SuiteId ""
+        }
+    }
+    $selected | Add-Member -NotePropertyName Mode -NotePropertyValue $resolvedMode -Force
 } else {
-    adb push $runtaskWork /sdcard/runtask.xml
+    $last = Get-MtbfLastSuite
+    if ($last) {
+        $lastMode = if ($resolvedMode) { $resolvedMode } else { Get-MtbfLastMode }
+        Write-Host "Last suite: $($last.DisplayName) [$($last.Id)] mode=$lastMode serial=$(Get-MtbfLastSerial)" -ForegroundColor DarkGray
+        $useLast = Confirm-MtbfAction -Prompt "Use last suite? (Y/N/Q)" -Default "Y"
+        if ($null -eq $useLast) { exit 0 }
+        if ($useLast) {
+            $selected = $last
+            if (-not $resolvedMode) {
+                $resolvedMode = if ($lastMode) { $lastMode } else {
+                    Resolve-MtbfMode -Mode "" -Interactive
+                }
+            }
+            if (-not $resolvedMode) { exit 0 }
+            $serials = @(Resolve-MtbfDevices -Serial $Serial -Interactive)
+            $selected | Add-Member -NotePropertyName Mode -NotePropertyValue $resolvedMode -Force
+        }
+    }
+    if (-not $selected) {
+        $selected = Select-MtbfSuiteInteractive -Mode $resolvedMode -Serial $Serial
+        if (-not $selected) {
+            Write-Host "Cancelled." -ForegroundColor Yellow
+            exit 0
+        }
+        $resolvedMode = $selected.Mode
+        if ($selected.PSObject.Properties.Name -contains "Serials" -and $selected.Serials) {
+            $serials = @($selected.Serials)
+        } else {
+            $serials = @(Resolve-MtbfDevices -Serial $selected.Serial -Interactive)
+        }
+    }
 }
 
-Set-MtbfPrefs -Tester $Tester -AutoResume:$autoResume
-Write-MtbfStep "Start offline MTBF task"
-Start-MtbfTask
-
-if (Test-RunTaskServiceRunning) {
-    Write-Host "`nTask started. Auto-resume=$autoResume. Results: /sdcard/results/realresult/" -ForegroundColor Green
-} else {
-    Write-Warning "RunTaskService may not be running."
-}
-Write-Host "Stop: adb shell am startservice -n com.ape.offlinescriptmanager/com.ape.offlinescriptmanager.view.RunTaskService -a com.ape.offlinescriptmanager.view.RunTaskService.action.stop"
+Invoke-MtbfForEachDeviceParallel -Serials $serials -SuiteId $selected.Id -Action run `
+    -Mode $resolvedMode -TaskTimes $TaskTimes -Tester $Tester -RedeployConfig:$RedeployConfig

@@ -1,173 +1,123 @@
 # stability_MTBF-Test
 
-MTBF 离线老化测试**执行包**（仅含运行所需 APK、XML 与部署脚本，不含 apktool 源码工程）。
+MTBF 离线老化测试**执行包**（仅含运行所需 APK/JAR、XML 与部署脚本，不含 apktool 源码工程）。
 
-完整 APK 自编译与修改请使用 [apps/OfflineScriptManager](../apps/OfflineScriptManager/)。
+完整 OfflineScriptManager 自编译请使用 [apps/OfflineScriptManager](../apps/OfflineScriptManager/)。
+
+交互选套参照 [stability_GPU-Test](../stability_GPU-Test/)：在 `suites/task/` 选任务 XML，按 XML 内 `<apk>` 从 `suites/apk/` 安装对应 APK。
+
+## 两种离线模式
+
+| 模式 | 调度器 | 前提 | 适用 |
+|------|--------|------|------|
+| **jar** | `shared/jar/sevice.jar` → `/data/local/tmp` + `dalvikvm` | **adb root** | 无匹配 platform 密钥的机型（如 ZTE） |
+| **apk** | `shared/apk/OfflineScriptManager.apk` | **platform / system uid** 签名 | Tinno 等有密钥机型 |
+
+`runAll.bat` 会先选模式，再选 APK 族与任务。
 
 ## 目录结构
 
 ```
 stability_MTBF-Test/
-├── apk/                              # 安装包
-│   ├── OfflineScriptManager.apk      # 离线调度器（需 platform 签名 / system uid）
-│   ├── ReliabilityUiautomatorTest.apk
-│   └── ReliabilityUiautomatorTestTest.apk
-├── config/                           # 设备端配置
-│   ├── runtask.xml                   # 离线任务（约 130 个 testpoint）
-│   ├── UiAutomatorTestData.xml       # WiFi / 账号等全局参数
-│   └── uiautomatorconfig             # 占位符配置（参考用）
+├── runAll.bat                        # 交互：模式 → APK 族 → 任务（推荐入口）
+├── suites/
+│   ├── apk/                          # APK 池（各任务共用）
+│   │   ├── ReliabilityUiautomatorTest.apk
+│   │   ├── ReliabilityUiautomatorTestTest.apk
+│   │   └── ...
+│   └── task/                         # 用例集（每份 XML = 一套可选任务）
+├── shared/
+│   ├── apk/OfflineScriptManager.apk  # 模式 apk
+│   └── jar/sevice.jar                # 模式 jar（与 552 平台 OfflineRun 同款）
+├── config/                           # UiAutomatorTestData.xml 等共用配置
 ├── scripts/
-│   ├── deploy.bat / deploy.ps1       # 安装 APK + 推送配置
-│   ├── run.bat / run.ps1             # 启动离线任务（已部署前提下）
-│   └── stop.bat / stop.ps1           # 停止任务并关闭自动续跑
-├── test-config.properties            # 循环次数、测试员、是否自动开跑
+│   ├── deploy.bat / deploy.ps1       # -Mode jar|apk
+│   ├── run.bat / run.ps1
+│   └── stop.bat / stop.ps1
+├── test-config.properties
 └── README.md
 ```
 
-## 前置条件
+## 选套流程（三阶段）
 
-| 项目 | 要求 |
-|------|------|
-| PC | `adb` 在 PATH，建议 `adb root` 可用 |
-| 设备 | 工程机 / 已授权 adb；TINNO platform 签名匹配 |
-| OfflineScriptManager | 必须为 **system uid** 版（本包内 APK 已满足） |
-| 网络 / 账号 | 按实机修改 `config/UiAutomatorTestData.xml` 中 WiFi 等 |
+1. **选模式**：`jar offline` / `OfflineScriptManager (apk)`
+2. **选 APK 族**（`suites/apk/` 中存在的 `*Test.apk`）
+3. **选任务 XML**：只显示 `<apk name="...">` 与所选 APK 一致的项
 
-> **注意：** `runtask.xml` 不含 `proviouspoint` 前置步骤。首次换机需确保测试资源（第三方 App、音频等）已按 MTBF 平台在线任务要求提前部署。
+jar 模式：任务 XML 推到 `/data/local/tmp/runtask.xml`，并启动 Sevice。  
+apk 模式：任务 XML 推到 `/sdcard/runtask.xml`，启动 RunTaskService。
 
 ## 快速开始
 
-### 1. 编辑配置（首次必做）
+### 1. 准备物料
 
-**`test-config.properties`**
+- `suites/apk/`：测试 APK
+- `shared/jar/sevice.jar` 或 `shared/apk/OfflineScriptManager.apk`（按模式）
+- `config/UiAutomatorTestData.xml`：WiFi / 账号
+- `test-config.properties`：`task.times`、`auto.start` 等
 
-```properties
-task.times=1          # 整套循环次数（试跑建议 1，正式老化可改 1000）
-tester.name=tester
-auto.start=false      # deploy 后是否自动开跑
-```
-
-**`config/UiAutomatorTestData.xml`** — 修改 WiFi、账号等为实机环境。
-
-### 2. 一键部署（7 天连续老化）
+### 2. 交互选套（推荐）
 
 ```bat
-cd F:\automation-toolkit\android-tools\stability_MTBF-Test\scripts
-deploy.bat
+cd F:\automation-toolkit\android-tools\stability_MTBF-Test
+runAll.bat
 ```
 
-默认 `test-config.properties` 已按 **7 天连续运行** 配置：
-
-| 配置项 | 默认值 | 说明 |
-|--------|--------|------|
-| `task.times` | `100` | 整套循环次数（单轮约 6~8h，100 轮可覆盖 7 天有余） |
-| `auto.start` | `true` | 部署后自动开跑 |
-| `auto.resume` | `true` | 开机恢复 + 30 分钟看门狗自动拉起 `RunTaskService` |
-
-**部署后请保持设备插电**，然后可拔掉 USB，设备自主执行。
-
-等价于：
-
-1. 安装 3 个 APK（含带看门狗的 OfflineScriptManager）
-2. push `runtask.xml`、`UiAutomatorTestData.xml` → `/sdcard/`
-3. 设置屏幕常亮、禁用锁屏、写入自动续跑 prefs
-4. 校验 `sharedUser=android.uid.system` 并启动任务
-
-带参数示例：
+一键（跳过菜单）：
 
 ```bat
-deploy.bat -TaskTimes 100 -Tester "Rin"
-deploy.bat -TaskTimes 0          rem 使用 config/runtask.xml 原始 times（默认 1000）
+runAll.bat -Mode jar -Serial all -Suite "模拟老化(仿RM老化+MTBF)_Trassion_2023_8_23"
 ```
 
-### 3. 启动测试
-
-若 `auto.start=false`，部署后执行：
+### 3. 命令行指定
 
 ```bat
-run.bat
-run.bat -TaskTimes 1 -Tester tester
-run.bat -RedeployConfig    rem 重新 push 全部 config 后再启动
+cd scripts
+deploy.bat -Mode jar -Suite "模拟老化(仿RM老化+MTBF)_Trassion_2023_8_23"
+deploy.bat -Mode jar -Serial all -Suite "模拟老化(仿RM老化+MTBF)_Trassion_2023_8_23"
+deploy.bat -Mode jar -Serial 6R0A77SSDE6000033,AYXDNX6710000135 -Suite "模拟老化(仿RM老化+MTBF)_Trassion_2023_8_23"
+deploy.bat -Mode apk -Suite "版测700_X6838" -TaskTimes 1 -Tester "Rin"
+deploy.ps1 -ListSuites
+run.bat -Mode jar -Serial all -Suite "版测700_X6838"
+stop.bat -Mode jar -Serial all
 ```
 
-启动后可拔掉 USB，设备自主执行。
-
-### 4. 停止任务
-
-```bat
-scripts\stop.bat
-scripts\stop.bat -Force    rem 优雅停止失败时强制杀进程
-```
-
-等价于：
-
-1. 将 `auto_resume` 设为 `false`（防止看门狗 30 分钟后再次拉起）
-2. 发送 `RunTaskService.action.stop` 优雅停止
-3. 必要时 `force-stop` OfflineScriptManager
-
-手动命令（备用）：
-
-```bat
-adb shell am startservice -n com.ape.offlinescriptmanager/com.ape.offlinescriptmanager.view.RunTaskService -a com.ape.offlinescriptmanager.view.RunTaskService.action.stop
-```
+`-Suite` 填 **不含 `.xml` 的文件名**（与 `suites/task/` 下一致）。  
+多机：交互选设备支持 `1,2` / `A=全部`；命令行 `-Serial all` 或 `-Serial id1,id2`（**逐台顺序**部署启动，避免并行 adb 冲突）。
 
 ## 结果与日志
 
 | 路径 | 说明 |
 |------|------|
-| `/sdcard/results/realresult/` | 用例 Pass/Fail 汇总 XML |
+| `/sdcard/results/realresult/` | Pass/Fail 汇总 |
 | `/sdcard/results/Log/` | 运行日志 |
-| `/sdcard/results/record_data/` | 电量等采集数据 |
-
-拉取结果：
+| `/sdcard/results/record_data/` | 电量等 |
 
 ```bat
 adb pull /sdcard/results ./results
-```
-
-## 验证是否在真实执行
-
-```bat
-adb shell dumpsys package com.ape.offlinescriptmanager | findstr sharedUser
 adb logcat -s TestRunner
 ```
 
-- `sharedUser` 应为 `android.uid.system/1000`  
-- 单条用例耗时应为 **数十秒**，不是几百毫秒  
-- logcat 应出现 `TestRunner: started/finished`，无 `Permission Denial`
-
-## 更新 APK
-
-| 文件 | 更新方式 |
-|------|----------|
-| `OfflineScriptManager.apk` | 在 `apps/OfflineScriptManager` 执行 `build-offline-apk.bat`，复制产物到本目录 `apk/` |
-| 测试 APK | 从 MTBF 平台 `data/jar/` 或新版本用例包替换 `apk/` 下两个 Reliability*.apk |
-| `runtask.xml` | 从平台任务 XML 转换，或从 `apps/OfflineScriptManager` 同步 |
-
-## 与 apps/OfflineScriptManager 的分工
-
-| | stability_MTBF-Test | apps/OfflineScriptManager |
-|---|---|---|
-| 用途 | **跑测试** | **改 APK / 重编译** |
-| 体积 | 小（仅执行物） | 大（smali 工程 + 反编译源码） |
-| 典型用户 | 测试工程师 | 开发 / 维护人员 |
-
 ## 常见问题
 
-**Q: 安装 OfflineScriptManager 失败 `SHARED_USER_INCOMPATIBLE`?**  
-A: APK 非 platform 签名。请用 `apps/OfflineScriptManager` 以 `sign.mode=platform` 重新构建后覆盖 `apk/OfflineScriptManager.apk`。
+**Q: jar 与 apk 怎么选？**  
+A: 能装上 system 签名 OfflineScriptManager → 用 apk；装不上（`SHARED_USER_INCOMPATIBLE`）且有 root → 用 jar。
 
-**Q: 界面一直 Pass 但每条不到 1 秒?**  
-A: 未获得 system uid，instrument 权限不足。检查签名与 `dumpsys package` 的 `sharedUser`。
+**Q: jar 模式报 whoami 不是 root？**  
+A: 需要 `adb root` 成功。用户版 ROM 无 root 时无法用 jar 离线。
 
-**Q: 如何改循环次数?**  
-A: 改 `test-config.properties` 的 `task.times`，或 `deploy/run` 加 `-TaskTimes N`（会 patch `runtask.xml` 的 `<runtask times="...">`）。
+**Q: 任务 XML 根节点是 `<task>` 可以吗？**  
+A: 可以。脚本推送时会改成 `<runtask>`，并注入 `androidx.test.runner.AndroidJUnitRunner`。
 
-**Q: Android 15/16 跑一夜后 OfflineScriptManager 进程消失?**  
-A: 旧版 APK 若声明 `foregroundServiceType=dataSync`，会在 **24h 内累计运行 6h** 后被系统强杀。请用最新 `apps/OfflineScriptManager` 构建（已移除 dataSync + `onTimeout` 兜底 + `MtbfAutoResumeReceiver` 看门狗），覆盖 `apk/OfflineScriptManager.apk` 后 `deploy.bat`。
+**Q: 如何新增用例集？**  
+A: 把平台导出的任务 XML 放到 `suites/task/`，确保引用的 `*Test.apk` 及配对宿主 APK 已在 `suites/apk/`。
 
-**Q: 如何连续跑 7 天?**  
-A: 使用默认 `test-config.properties`（`task.times=100`、`auto.resume=true`），执行 `deploy.bat` 后插电并拔线即可。看门狗每 30 分钟检查 `RunTaskService`，异常退出会自动拉起；重启后 `BOOT_COMPLETED` 也会自动恢复。
+**Q: 服务在跑但手机像没在测 / 每条不到 1 秒全 Fail?**  
+A: 常见原因是 runner 不匹配。脚本推送时会自动注入 androidx runner。若仍失败，检查 WiFi 配置与：
 
-**Q: 需要手点 App 吗?**  
-A: 不需要。`run.bat` 会通过 adb 写 prefs 并启动 `RunTaskService`。
+```bat
+adb shell pm list instrumentation | findstr reliability
+adb shell "grep -m 3 runner /data/local/tmp/runtask.xml"
+adb shell "grep -m 3 runner /sdcard/runtask.xml"
+adb logcat -s TestRunner
+```

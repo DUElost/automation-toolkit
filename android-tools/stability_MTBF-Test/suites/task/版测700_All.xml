@@ -1,0 +1,3186 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<task name="版测700_ALL" times="1" testTimeOut="259200000" takeScreenshot="true" stopWhenFail="false" taskRegressionType="0" caseRegressionType="0" testpointRegressionTimes="2">
+  <proviouspoint name="测试前需预置的操作" times="1">
+    <description content="例如清空设备上的那个文件夹，或者push什么文件放到设备" />
+    <testcase type="adb" times="1">
+      <device name="device A" />
+      <cmd name="install -r" />
+      <description content="安装qq音乐" />
+      <attribute>
+        <arg name="localpath" value="QQmusic.apk" />
+      </attribute>
+    </testcase>
+    <testcase type="adb" times="1">
+      <device name="device A" />
+      <cmd name="push" />
+      <description content="qq音乐apk安装设备中" />
+      <attribute>
+        <arg name="localpath" value="QQmusic.apk" />
+        <arg name="devicepath" value="/sdcard" />
+      </attribute>
+    </testcase>
+    <testcase type="adb" times="1">
+      <device name="device A" />
+      <cmd name="push" />
+      <description content="push豌豆荚到设备中" />
+      <attribute>
+        <arg name="localpath" value="Wandoujia.apk" />
+        <arg name="devicepath" value="/data/local/tmp" />
+      </attribute>
+    </testcase>
+    <testcase type="adb" times="1">
+      <device name="device A" />
+      <cmd name="push" />
+      <description content="qq音乐apk安装在/data/local/tmp/下" />
+      <attribute>
+        <arg name="localpath" value="QQmusic.apk" />
+        <arg name="devicepath" value="/data/local/tmp" />
+      </attribute>
+    </testcase>
+    <testcase type="adb" times="1">
+      <device name="device A" />
+      <cmd name="push" />
+      <description content="push 3GP文件格式到SDCard" />
+      <attribute>
+        <arg name="localpath" value="sumsung.3gp" />
+        <arg name="devicepath" value="/sdcard/" />
+      </attribute>
+    </testcase>
+    <testcase type="adb" times="1">
+      <device name="device A" />
+      <cmd name="push" />
+      <description content="push music" />
+      <attribute>
+        <arg name="localpath" value="Green Day - 21 Guns.mp3" />
+        <arg name="devicepath" value="/sdcard/" />
+      </attribute>
+    </testcase>
+    <testcase type="adb" times="1">
+      <device name="device A" />
+      <cmd name="reboot" />
+      <description content="重启设备" />
+    </testcase>
+    <testcase type="adb" times="1">
+      <device name="device A" />
+      <cmd name="sleep" />
+      <description content="" />
+      <attribute>
+        <arg name="timeout" value="180000" />
+      </attribute>
+    </testcase>
+    <testcase type="adb" times="1">
+      <device name="device A" />
+      <cmd name="wait-for-device" />
+      <description content="" />
+    </testcase>
+  </proviouspoint>
+  <testpoint name="1、设置--应用和通知--特殊应用权限--安装未知应用 2、查看安装未知应用下所有应用默认状态 3、在列表中的应用中如文件极客中安装第三方应用" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Application_SCFVV2612" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="test1" times="1">
+    <testcase type="uiautomator2" times="4">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_FrequentlyQuestion_Launcher_0066" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="test2" times="3">
+    <testcase type="uiautomator2" times="4">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_FrequentlyQuestion_Launcher_0067" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="test3" times="3">
+    <testcase type="uiautomator2" times="4">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_FrequentlyQuestion_Launcher_0068" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="设置-应用-最近打开的应用所有应用中点击任一应用程序 " times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Application_SCFVV2616" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="单卡时查看TAB页" times="1">
+    <description content="单卡时查看TAB页&#13;&#10;1.设置-网络和互联网-移动网络&#13;&#10;2.标题栏显示移动网络，显示SIM卡名称，UI显示正常" />
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Setting_Network_SCFVV1988" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="插sim卡，查看漫游" times="1">
+    <description content="插sim卡，查看漫游&#13;&#10;1.网络和互联网-移动网络--点击sim卡进入，查看默认值&#13;&#10;2.开启漫游" />
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Setting_Network_SCFVV2131" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="插sim卡，查看漫游1" times="1">
+    <description content="3.弹出框--取消" />
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Setting_Network_SCFVV2131_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="插sim卡，查看漫游2" times="1">
+    <description content="4.弹出框--确定" />
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Setting_Network_SCFVV2131_2" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="卡一首选网络设置为支持的最高网络，信息默认SIM卡设置为卡1收发短信" times="1">
+    <description content="前提条件：手机插入双卡；&#13;&#10;卡一首选网络设置为支持的最高网络&#10;&#13;&#10;1、进入系统设置---SIM卡---短信---卡1&#13;&#10;&#10;2、进入信息编辑界面，编辑发送信息" />
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Setting_Network_SCFVV2302" />
+      <description content="" />
+      <attribute>
+        <arg name="number" value="&#64;&#64;number" />
+      </attribute>
+    </testcase>
+  </testpoint>
+  <testpoint name="卡一首选网络设置为支持的最高网络，信息默认SIM卡设置为卡1收发短信1" times="1">
+    <description content="3、卡一接收短信。&#10;备注：google信息，需重新新建信息，才会切换成设置中新设置的SIM卡。" />
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Setting_Network_SCFVV2302_1" />
+      <description content="" />
+      <attribute>
+        <arg name="number" value="&#64;&#64;number" />
+      </attribute>
+    </testcase>
+  </testpoint>
+  <testpoint name="连接USB后查看界面显示" times="1">
+    <description content="前提条件：测试机通过USB与电脑连接&#13;&#10;1.设置-已连接设备，查看界面显示" />
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Setting_Device_SCFVV2387" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="查看在手机存储中安装的第三方应用" times="1">
+    <description content="1.在手机存储中选择apk安装文件进行安装，并进入此应用；" />
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Setting_App_SCFVV2500" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="已从内部存储安装应用，打开最近应用和全部应用，查看是否有该应用" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Setting_App_SCFVV2500_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="复制3gp格式视频至其他目录" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Func_SETTING_SCFVV3168" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="复制3gp格式视频至其他目录1" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Func_SETTING_SCFVV3168_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="查看在SD中安装的第三方应用" times="1">
+    <description content="1.从SD卡中选择apk安装文件进行安装，并进入此应用；" />
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Setting_App_SCFVV2501" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="SD卡存储设置菜单" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Storage_SCFVV_3128" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="SD卡存储设置菜单1" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Storage_SCFVV_3128_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="进入设置--存储--SD卡 按菜单键--存储设置--选择格式化，并确认清空并格式化 " times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Storage_SCFVV_3129" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="进入设置-应用和通知 查看最近打开的应用下列表显示 " times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_App_SCFVV_2492" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="无SD卡查看内部存储设备空间容量显示" times="1">
+    <description content="1. 进入设置--存储&#13;&#10;2. 查看内部共享存储空间总容量，可用空间，系统占用空间，应用等其它内存大小显示" />
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Setting_Storage_SCFVV3050" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="查看SD卡空间显示" times="1">
+    <description content="预置条件：分别插入不同容量的SD卡1G-64G&#13;&#10;1. 进入设置--存储&#13;&#10;2. 查看SD卡总容量，已使用空间&#13;&#10;备注：12.0需在存储界面上方选项切换为SD卡" />
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Setting_Storage_SCFVV3072" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="已从SD卡安装应用，打开最近应用和全部应用，查看是否有该应用" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Setting_App_SCFVV2501_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="插入SD卡后查看SD卡名称显示" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Func_SETTING_SCFVV3056" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="弹出SD卡功能" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Func_SETTING_SCFVV3076" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="弹出SD卡功能1" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Func_SETTING_SCFVV3076_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="装载SD卡功能" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Func_SETTING_SCFVV3077" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="装载SD卡功能1" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Func_SETTING_SCFVV3077_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="Chromebook界面点击了解详情" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Network_SCFVV20583" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="压力测试" times="1">
+    <description content="1、设置-应用-所有应用-点击任一应用进入-应用信息界面&#13;&#10;2、点击停用后进行启用（重复操作10次）&#13;&#10;3、执行步骤2后点击打开进入相应应用" />
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Setting_App_SCFVV2623" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="强行停止应用" times="1">
+    <description content="1、进行应用信息列表-强行停止应用&#13;&#10;2、应用信息列表打开被强行停止的应用" />
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Setting_App_SCFVV2624" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="使用屏幕上的文字内容" times="1">
+    <description content="1、默认应用-数字助理应用，使用屏幕上的文字内容-开启" />
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Setting_App_SCFVV2658" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="使用屏幕上的文字内容1" times="1">
+    <description content="2、默认应用-数字助理应用，使用屏幕上的文字内容-关闭" />
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Setting_App_SCFVV2658_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="开启/关闭使用屏幕截图" times="1">
+    <description content="1、默认应用-数字助理应用，使用屏幕截图-开启" />
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Setting_App_SCFVV2659" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="开启/关闭使用屏幕截图1" times="1">
+    <description content="2、默认应用-数字助理应用，使用屏幕截图-关闭" />
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Setting_App_SCFVV2659_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="增强型通知" times="1">
+    <description content="1、设置-应用-特殊应用权限-增强型通知&#13;&#10;2、选择为“无”&#13;&#10;3、选择为“Android自适应通知功能”" />
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Setting_App_SCFVV22396" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="多次休眠后唤醒屏幕" times="1">
+    <description content="1.默认休眠时间到达，按power键唤醒屏幕，解锁；&#13;&#10;2.重复步骤1，10次。" />
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Setting_Display_SCFVV3427" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="屏幕锁定方式为“图案”" times="1">
+    <description content="前提条件：屏幕锁定方式为无&#13;&#10;操作步骤：&#13;&#10;1. 进入安全设置--设置屏幕锁定，选择“图案”&#13;&#10;2. 根据提示绘制至少连接四点图案，2次绘制相同图案成功后保存&#13;&#10;3. 手机锁屏后再绘图解锁。" />
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Setting_Security_SCFVV3719" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="屏幕锁定方式为“图案”1" times="1">
+    <description content="前提条件：屏幕锁定方式为无&#13;&#10;操作步骤：&#13;&#10;1. 进入安全设置--设置屏幕锁定，选择“图案”&#13;&#10;2. 根据提示绘制至少连接四点图案，2次绘制相同图案成功后保存&#13;&#10;3. 手机锁屏后再绘图解锁。" />
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Setting_Security_SCFVV3719_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="设置PIN码锁定屏幕" times="1">
+    <description content="前提条件：屏幕锁定方式为无&#13;&#10;操作步骤：&#13;&#10;1.设置-安全-屏幕锁定方式，选择PIN码，输入小于4位的数字&#13;&#10;2.输入大于等于4位数字&#13;&#10;3.输入大于16位数字&#13;&#10;4.删除已输入的数字&#13;&#10;5.输入正确的PIN码，点击下一步&#13;&#10;6.再次输入步骤5的PIN码，点击确认&#13;&#10;7.按power键灭屏后亮屏，输入正确的PIN码" />
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Setting_Security_SCFVV3756" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="设置密码码锁定屏幕" times="1">
+    <description content="前提条件：屏幕锁定方式为无&#13;&#10;操作步骤：&#13;&#10;1.点击更改屏幕锁定方式-&gt;密码，输入少于4位的字母&#13;&#10;2.输入超过4位小于等于16位的字符&#13;&#10;3.输入超过16位的小写字母、大写字母、数字、符号的组合&#13;&#10;4.输入的密码中包含空格&#13;&#10;5.输入中按删除键&#13;&#10;6.输入密码后按取消" />
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Setting_Security_SCFVV3778" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="开启“提高位置信息的精确度”连接WLAN定位" times="1">
+    <description content="前提条件：仅打开并连接WLAN&#13;&#10;1、设置-位置信息-高级-Google位置信息精确度-开启“提高位置信息的精确度”&#13;&#10;2、进入google地图，定位" />
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Setting_Location_SCFVV4049" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="开关紧急求救功能" times="1">
+    <description content="前提条件：仅打开并连接WLAN&#13;&#10;1、设置-位置信息-高级-Google位置信息精确度-开启“提高位置信息的精确度”&#13;&#10;2、进入google地图，定位" />
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Setting_Exigence_SCFVV20891" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="锁屏-呼出紧急联系人设置图案/PIN码/密码解锁方式 按power键锁屏，亮屏后进入紧急拨号界面 双击急救信息选项，查看急救信息并呼叫急救联系人 " times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Setting_Exigence_SCFVV4141" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="系统-手势-点击按两下电源键 查看按两下电源键默认状态 " times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Setting_System_SCFVV4769" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="使用网络提供的时间，观察默认值" times="1">
+    <description content="1.日期和时间-使用网络提供的时间，观察默认值" />
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Setting_System_SCFVV4871" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="关闭自动设置时间，同时修改日期和时间为非当前日期、时间" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Setting_System_SCFVV4871_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="多用户开关开启" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Setting_System_SCFVV5001" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="多用户创建一个访客" times="1">
+    <description content="设置-系统多用户访客-点击重新开始&#13;&#10;备注：创建用户时点击重新开始" />
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Setting_System_SCFVV22382" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="检查TINNO_DEBUG_SUPPORT是否关闭了" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Func_Prepare_SCFVV5388" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="单卡一上网" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Network_SCFVV2281" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="未连接网络时查看已保存的网络" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Func_WLAN_SCFVV5762" />
+      <description content="" />
+      <attribute>
+        <arg name="wifiName" value="&#64;&#64;WifiAccount" />
+      </attribute>
+    </testcase>
+  </testpoint>
+  <testpoint name="连接认证型认证的普通网络输入错误密码" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Func_WLAN_SCFVV5683" />
+      <description content="" />
+      <attribute>
+        <arg name="wifiName" value="&#64;&#64;WifiAccount" />
+        <arg name="wifiPWD" value="&#64;&#64;WifiPassword" />
+      </attribute>
+    </testcase>
+  </testpoint>
+  <testpoint name="连接可用网络时输入正确密码" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Func_WLAN_SCFVV5681" />
+      <description content="" />
+      <attribute>
+        <arg name="wifiName" value="&#64;&#64;WifiAccount" />
+        <arg name="wifiPWD" value="&#64;&#64;WifiPassword" />
+      </attribute>
+    </testcase>
+  </testpoint>
+  <testpoint name="添加城市" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Func_Clock_SCFVV6795" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="添加城市1" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Func_Clock_SCFVV6795_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="添加城市2" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Func_Clock_SCFVV6795_2" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="知栏暂停、计圈、重置" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Func_Clock_SCFVV6868" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="知栏暂停、计圈、重置1" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Func_Clock_SCFVV6868_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="进入屏保" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Func_Clock_SCFVV6882" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="设备名称查看" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Func_BT_SCFVV5986" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="蓝牙网络共享默认开关" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Func_BT_SCFVV6028" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="删除闹钟" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Func_Clock_SCFVV6718" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="删除闹钟1" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Func_Clock_SCFVV6718_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="删除闹钟2" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Func_Clock_SCFVV6718_2" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="查看联系人时进行收藏" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Func_Contact_SCFVV7380" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="查看联系人时进行收藏1" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Func_Contact_SCFVV7380_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="姓名拼音设为一律显示" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Func_Contact_SCFVV7549" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="姓名拼音设为一律显示1" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Func_Contact_SCFVV7549_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="将设备中的联系人添加到收藏夹" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Func_Contact_SCFVV7435" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="将设备中的联系人添加到收藏夹1" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Func_Contact_SCFVV7435_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="导出为.vcf文件" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Func_Contact_SCFVV7566" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="联系人复制到本机中" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Func_Contact_SCFVV7558" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="输入保存的联系人号码进行屏蔽" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Func_Contact_SCFVV7573" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="输入电话号码进行搜索" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Func_Contact_SCFVV7588" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="查看联系人时进行拨号" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Func_Phone_SCFVV7955" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="查看联系人时进行发短信" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Func_Phone_SCFVV7957" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="在搜索框中输入存在的号码搜索联系人" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Func_Phone_SCFVV8061" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="进入电话，点击右上角更多菜单，选择”通话记录“进入；通话记录界面点击右上角更多图标选择清除通话记录； " times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Func_Phone_SCFVV8096" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="平台FM 上下切换搜索频道播放" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Func_FM_SCFVV6923" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="平台FM 停止、播放FM" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Func_FM_SCFVV6926" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="平台系统截图" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Func_ScreenShot_SCFVV7162" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="去电未接通时挂断" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Func_ScreenShot_SCFVV7659" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="三键导航进入应用按back键" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Func_Calculator_SCFVV8238" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="三键导航进入应用按power键" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Func_Calculator_SCFVV8240" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="手势导航进入应用上滑" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Func_Calculator_SCFVV8243" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="快捷方式进入" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Func_Calculator_SCFVV8244" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="删除单个文件" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Func_Gallery_SCFVV8354" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="删除某个会话" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Func_INFO_SCFVV8579" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="删除某个会话1" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Func_INFO_SCFVV8579_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="查看主莱单各图标是否有缺失" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Func_INFO_SCFVV8720" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="添加快捷开关为关的快捷开关" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Func_SystemUI_SCFVV8916" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="添加快捷开关为关的快捷开关1" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Func_SystemUI_SCFVV8916_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="插卡时，开启wifi并连接" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Func_SystemUI_SCFVV8933" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="插卡时，开启wifi并连接1" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Func_SystemUI_SCFVV8933_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="点击USB调试通知" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Func_SystemUI_SCFVV9047" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="点击USB连接通知" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Func_SystemUI_SCFVV9048" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="多个应用卡片时，全部清除" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Func_SystemUI_SCFVV9142" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="开启屏幕录制" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Func_Record_SCFVV9303" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="关闭屏幕录制" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Func_Record_SCFVV9304" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="关闭屏幕录制1" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Func_Record_SCFVV9304_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="google相册删除照片" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Func_Record_SCFVV21036" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="进入移动网络设置，设置首选网络类型为4G" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Network_SCFVV1990" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="进入移动网络设置，设置首选网络类型为3G" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Network_SCFVV1991" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="进入移动网络设置，设置首选网络类型为4G 切换首选网络类型为3G" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Network_SCFVV1996" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="进入移动网络设置，设置首选网络类型为3G 切换首选网络类型为2G" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Network_SCFVV1998" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="关闭VOLTE视频通话" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Network_SCFVV2115" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="关闭VOLTE视频通话1" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Network_SCFVV2115_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="移动数据流量周期" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Network_SCFVV2135" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="移动数据流量周期1" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Network_SCFVV2135_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="开关设置数据流量警告" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Network_SCFVV2137" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="开关设置数据流量警告1" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Network_SCFVV2137_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="修改数据流量警告" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Network_SCFVV2138" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="设置数据流量上限默认状态" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Network_SCFVV2147" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="新建接入点" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Network_SCFVV2183" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="新建接入点1" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Network_SCFVV2183_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="新建接入点2" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Network_SCFVV2183_2" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="新建接入点3" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Network_SCFVV2183_3" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="飞行模式默认状态" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Network_SCFVV2187" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="飞行模式默认状态1" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Network_SCFVV2187_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="验证能否将应用设为不受流量限制的白名单应用" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Network_SCFVV2206" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="SIM卡插槽查看号码条目" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Network_SCFVV2277" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="查看与新设备配对菜单" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Network_SCFVV2340" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="修改设备名称" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Network_SCFVV2341" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="修改设备名称1" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Network_SCFVV2341_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="修改设备名称2" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Network_SCFVV2341_2" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="开关蓝牙" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Network_SCFVV2343" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="开关蓝牙1" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Network_SCFVV2343_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="查看投射界面" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Network_SCFVV2344" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="投射界面返回" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Network_SCFVV2345" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="USB界面返回" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Network_SCFVV2389" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="USB界面返回1" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Network_SCFVV2389_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="查看Chromebook界面显示" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Network_SCFVV20580" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="有打开应用时查看最近打开的应用" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Network_SCFVV2493" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="有打开应用时查看最近打开的应用1" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Network_SCFVV2493_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="查看所有应用" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Network_SCFVV2494" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="查看所有应用1" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Network_SCFVV2494_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="查看已安装的应用" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Network_SCFVV2495" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="查看已停用的应用" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Network_SCFVV2496" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="卸载第三方应用" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Network_SCFVV2502" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="卸载第三方应用1" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Network_SCFVV2502_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="设置任意一种方式锁屏 ;;；" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Notifications_SCFVV2737" />
+      <description content="查看锁屏界面提醒（如未接来电、信息、电子邮件、第三方聊天工具消息、日历活动提醒、音乐后台播放、新闻通知等）和无声通知（如手机垃圾清理、应用升级通知）。" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1、设置-显示-高级-锁定屏幕显示-显示所有通知" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Notifications_SCFVV2737_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="2、设置→应用和通知→通知→锁定屏幕上的通知→关闭敏感通知" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Notifications_SCFVV2737_2" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="3、设置-显示-高级-查看锁定屏幕显示默认状态" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Notifications_SCFVV2737_3" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="查看锁屏界面提醒（" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Notifications_SCFVV2737_4" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="设置-应用和通知-通知-勿扰模式-设置里面各设置项并开启勿扰模式" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Notifications_SCFVV2768" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name=".设置-应用和通知-通知-勿扰模式-设置里面各设置项并开启勿扰模式;2.设置-声音-勿扰模式-查看里面设 置项是否和步骤1中同步显示1" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Notifications_SCFVV2768_1" />
+      <description content="下拉状态栏查看勿扰快捷菜单状态。" />
+    </testcase>
+  </testpoint>
+  <testpoint name=".设置-应用和通知-通知-勿扰模式-设置里面各设置项并开启勿扰模式;2.设置-声音-勿扰模式-查看里面设 置项是否和步骤1中同步显示2" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Notifications_SCFVV2768_2" />
+      <description content="下拉状态栏查看勿扰快捷菜单状态。" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1.进入设置-应用和通知-无线紧急警报 2.开启、关闭允许接收警报。" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Notifications_SCFVV2770" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="进入设置-应用和通知-无线紧急警报 2.开启、关闭允许接收警报。1" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Notifications_SCFVV2770_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="设置-通知-应用设置-应用程序通知 点击倒三角图标选择“最新” " times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Notifications_SCFVV2771" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="设置-通知-应用设置-应用程序通知 点击倒三角图标选择“最频繁” " times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Notifications_SCFVV2772" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="设置-通知-应用设置-应用程序通知 点击倒三角图标选择“已关闭”" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Notifications_SCFVV2773" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1.设置-通知-应用设置-点击任一应用进入2.开启和关闭所有通知" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Notifications_SCFVV2774" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1.设置-通知-应用设置-点击任一应用进入2.开启和关闭所有通知1" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Sound_SCFVV20719" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1.设置-声音-振动和触感反馈" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Notifications_SCFVV2774_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="通知-对话-查看对话" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Notifications_SCFVV2778" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="进入设置-无障碍-振动和触感反馈。" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Sound_SCFVV20741" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="有优先对话时 通知-对话-查看对话 " times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Notifications_SCFVV2779" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="强行停止应用2" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Application_SCFVV2503" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="强行停止应用2_1" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Application_SCFVV2503_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="关闭存储空间管理器开关" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Func_SETTING_SCFVV20679" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="开启存储空间管器" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Func_SETTING_SCFVV20680" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="清除缓存" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Application_SCFVV2505" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="默认打开-清除默认操作" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Application_SCFVV2517" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="默认打开-清除默认操作1" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Application_SCFVV2517_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="验证在没有使用时卸载" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Application_SCFVV2530" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="卸载应用后再次安装" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Application_SCFVV2531" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="查看助手应用默认状态" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Application_SCFVV2552" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="将图标添加到主屏幕" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Application_SCFVV2558" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="adb命令安装应用" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Application_SCFVV2619" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="安装应用后查看存储" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Func_SETTING_SCFVV3051" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="在存储中清除缓存数据" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Func_SETTING_SCFVV3071" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="允许闹钟响闹" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Func_SETTING_SCFVV3221" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="允许媒体声音" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Func_SETTING_SCFVV3223" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="设置-通知-无线紧急警报-开启和关闭允许接收警报" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Notifications_SCFVV_2794" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="设置-通知-无线紧急警报-紧急警报历史记录" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Notifications_SCFVV_2795" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="通知-无线紧急警报-警报提醒;1.设置警报频率为1次;2.设置警报频率为每隔2分钟 3.设置警报频率为每隔15分钟" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Notifications_SCFVV_2796" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="通知-无线紧急警报-警报提醒;1.设置警报频率为1次;2.设置警报频率为每隔2分钟 3.设置警报频率为每隔15分钟1" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Notifications_SCFVV_2796_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="通知-无线紧急警报-警报提醒;1.设置警报频率为1次;2.设置警报频率为每隔2分钟 3.设置警报频率为每隔15分钟2" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Notifications_SCFVV_2796_2" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="通知-无线紧急警报-偏好设置 开启和关闭振动" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Notifications_SCFVV_2797" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="通知-无线紧急警报-偏好设置 开启和关闭振动1" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Notifications_SCFVV_2797_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="设置-通知-开启和关闭增强型通知" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Notifications_SCFVV_2798" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="设置-通知-开启和关闭增强型通知1" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Notifications_SCFVV_2798_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="通知-通知使用权-点击任一应用开启授予通知访问权限 关闭授予通知访问权限" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Notifications_SCFVV_2804" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="通知-通知使用权-点击任一应用开启授予通知访问权限 关闭授予通知访问权限1" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Notifications_SCFVV_2804_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="长按设置应用，点击电池菜单 " times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Battery_SCFVV_2817" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="设置→电池，在电池菜单主界面查看" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Battery_SCFVV_2819" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="设置→电池→电池管理器→使用电池管理器。" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Battery_SCFVV_2822" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="设置→电池→查看“电池电量百分比”默认开关状态" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Battery_SCFVV_2829" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="开启智能省电/待机智能省电/智能模式  设置有效闹钟并执行闹钟" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Battery_SCFVV_2836" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1、设置-应用-所有应用，进入任一应用程序信息界面，点击通知 开启和关闭通知" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Application_SCFVV22394" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1、设置-应用-所有应用，进入任一应用程序信息界面，点击通知 开启和关闭通知1" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Application_SCFVV22394_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="设置-应用-特殊应用权限-通知访问权限；修改任一应用权限为允许和不允许" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Application_SCFVV22397" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="设置-应用-特殊应用权限-通知访问权限；修改任一应用权限为允许和不允许1" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Application_SCFVV22397_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="预置条件：屏幕锁定方式为图案解锁；设置→应用和通知→通知→在锁定屏幕上→选择“显示所有通知内容" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Notification_SCFVV2712" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="预置条件：屏幕锁定方式为图案解锁，设置-显示-高级-锁定屏幕显示-显示所有通知；.设置→应用和通知→通知→锁定屏幕上的通知→选择“显示提醒和无声通知/显示默认对话和已设为静音的对话" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Notification_SCFVV2715" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="预置条件：屏幕锁定方式为PIN码，10.0系统及以上系统（设置-显示-高级-锁定屏幕显示-显示所有通知）设置→应用和通知→通知→在锁定屏幕上/锁定屏幕上的通知→选择-完全不显示通知/不再显示通知”不显示任何通知" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Notification_SCFVV2718" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="屏幕锁定方式为PIN解锁，设置-显示-高级-锁定屏幕显示-显示所有通知;设置→应用和通知→通知→锁定屏幕上的通知→选择-仅显示提醒通知/隐藏已设为静音的对话和通知" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Notification_SCFVV2721" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="预置条件：屏幕锁定方式为密码解锁;设置→应用和通知→通知→在锁定屏幕上→选择-隐藏敏感内容" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Notification_SCFVV2724" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1.设置→电池→省电优化设置→省电模式选择→智能省电模式→开启。/设置→电池→智能模式" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Battery_SCFVV_2834" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1、应用程序界面，选择系统应用去卸载 2、应用程序界面，选择三方软件去卸载" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Application_SCFVV2618" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1、设置-应用-所有应用选择任一应用点击进入应用信息 2、点击卸载 3、返回桌面" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Application_SCFVV2620" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1、点击主屏幕应用右侧设置图标 2、点击通知" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Application_SCFVV2628" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1.设备使用的时间—信息中心点击又上角更多选项 2、点击管理您的数据 3、分别开启、关闭，“每日设备使用情况数据”、“就寝期间的传感器数据”、“时区历史记录”、“时钟”" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Application_SCFVV2654" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1.设备使用的时间—信息中心点击又上角更多选项 2、点击管理您的数据 3、分别开启、关闭，“每日设备使用情况数据”、“就寝期间的传感器数据”、“时区历史记录”、“时钟”1" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Application_SCFVV2654_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1.设备使用的时间—信息中心点击又上角更多选项 2、点击管理您的数据 3、分别开启、关闭，“每日设备使用情况数据”、“就寝期间的传感器数据”、“时区历史记录”、“时钟”2" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Application_SCFVV2654_2" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1.设备使用的时间—信息中心点击又上角更多选项 2、点击管理您的数据 3、分别开启、关闭，“每日设备使用情况数据”、“就寝期间的传感器数据”、“时区历史记录”、“时钟”3" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Application_SCFVV2654_3" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1.设备使用的时间—信息中心点击又上角更多选项 2、点击管理您的数据 3、分别开启、关闭，“每日设备使用情况数据”、“就寝期间的传感器数据”、“时区历史记录”、“时钟”4" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Application_SCFVV2654_4" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1.设备使用的时间—信息中心点击又上角更多选项 2、点击管理您的数据 3、分别开启、关闭，“每日设备使用情况数据”、“就寝期间的传感器数据”、“时区历史记录”、“时钟”5" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Application_SCFVV2654_5" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1.设备使用的时间—信息中心点击又上角更多选项 2、点击管理您的数据 3、分别开启、关闭，“每日设备使用情况数据”、“就寝期间的传感器数据”、“时区历史记录”、“时钟”6" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Application_SCFVV2654_6" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1.设备使用的时间—信息中心点击又上角更多选项 2、点击管理您的数据 3、分别开启、关闭，“每日设备使用情况数据”、“就寝期间的传感器数据”、“时区历史记录”、“时钟”7" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Application_SCFVV2654_7" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="进入安全-查找我的设备查看状态是否同步" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Application_SCFVV2655" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1、设置--应用和通知--特殊应用权限--媒体管理应用 2、点击其下任一应用进行开启 " times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Application_SCFVV2656" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1、设置--应用和通知--特殊应用权限--媒体管理应用 2、点击其下任一应用进行关闭1" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Application_SCFVV2656_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1、设置--应用和通知--特殊应用权限--闹钟和提醒 " times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Application_SCFVV2657" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1、设置--应用和通知--特殊应用权限--闹钟和提醒  2、修改闹钟和提醒为“允许” 3、修改闹钟和提醒为“不允许”1" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Application_SCFVV2657_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1、应用-设备使用时间-右滑 2、左滑”" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Application_SCFVV2661" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1、应用-设备使用时间-上滑 2、点击查看全部xx应用" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Application_SCFVV2662" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="验证能否连续开启关闭流量节省程序" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Network_SCFVV_2214" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="开启飞行模式使用系统应用”信息“发送、接收对话 关闭飞行模式使用系统应用“信息”发送、接收对话 " times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Notifications_SCFVV_2807" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="开启电池电量百分比" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level0_Setting_Battery_SCFVV_2830" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="对比电池主界面显示和状态栏上显示的电量百分比" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Battery_SCFVV_2833" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="开启wifi、蓝牙、数据连接后开启省电模式" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Battery_SCFVV_2843" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="省电模式下手动开启wifi" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Battery_SCFVV_2873" />
+      <description content="" />
+      <attribute>
+        <arg name="wifiName" value="&#64;&#64;WifiAccount" />
+        <arg name="wifiPWD" value="&#64;&#64;WifiPassword" />
+      </attribute>
+    </testcase>
+  </testpoint>
+  <testpoint name="开启省电模式后，设置闹钟，查看闹钟响闹" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Battery_SCFVV_2882" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="使用Play保护机制扫描应用" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting__Security_SCFVV_3694" />
+      <description content="" />
+      <attribute>
+        <arg name="wifiName" value="&#64;&#64;WifiAccount" />
+        <arg name="wifiPWD" value="&#64;&#64;WifiPassword" />
+        <arg name="googleAccount" value="Super233886&#64;gmail.com" />
+        <arg name="googlePWD" value="tinno&#64;851427" />
+      </attribute>
+    </testcase>
+  </testpoint>
+  <testpoint name="改进有害应用检测功能" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Security_SCFVV_3695" />
+      <description content="" />
+      <attribute>
+        <arg name="wifiName" value="&#64;&#64;WifiAccount" />
+        <arg name="wifiPWD" value="&#64;&#64;WifiPassword" />
+        <arg name="googleAccount" value="Super233886&#64;gmail.com" />
+        <arg name="googlePWD" value="tinno&#64;851427" />
+      </attribute>
+    </testcase>
+  </testpoint>
+  <testpoint name="查找我的设备" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Security_SCFVV_3696" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="查找我的设备1" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Security_SCFVV_3696_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="进入安全设置——电源按钮即时锁定，开启 自动锁定时间设置为非立即，按POWER键后立即点亮屏幕 " times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Security_SCFVV_3749" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="设置-安全，点击屏幕锁定旁边的设置按钮，关闭电源按钮即时锁定 按power键灭屏后再亮屏 " times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Security_SCFVV_3750" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="当屏幕锁定或屏幕待机时间到自动进入休眠后 在屏幕锁定界面拨打紧急号码" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Security_SCFVV_3753" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="更改PIN码，取消" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Security_SCFVV3759" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="更改PIN码，确定" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Security_SCFVV3760" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="更改PIN码，确定" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Security_SCFVV3768" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="在解锁界面点击紧急呼叫 拨打紧急非紧急号码 " times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Security_SCFVV3785_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="在解锁界面点击紧急呼叫 拨打紧急号码" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Security_SCFVV3785_2" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="取消密码锁屏" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Security_SCFVV3786" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1、设置--隐私权--权限管理器--电话；2、开启需要用到电话的应用访问权限如电话、通讯录、信息等；3、进入被开启的应用，并使用拨号功能。”" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Privacy_SCFVV_3928" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1、设置--隐私权--权限管理器--电话；2、开启需要用到电话的应用访问权限如电话、通讯录、信息等；3、进入被开启的应用，并使用拨号功能1。”" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Privacy_SCFVV_3928_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1、设置--隐私权--权限管理器--信息；2、开启需要用到电话的应用访问权限如电话、通讯录、信息等； 3、进入被开启的应用，并使用信息功能。" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Privacy_SCFVV_3930" />
+      <description content="" />
+      <attribute>
+        <arg name="number" value="&#64;&#64;number" />
+      </attribute>
+    </testcase>
+  </testpoint>
+  <testpoint name="1、设置--隐私权--权限管理器--信息；2、开启需要用到电话的应用访问权限如电话、通讯录、信息等； 3、进入被开启的应用，并使用信息功能1。" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Privacy_SCFVV_3930_1" />
+      <description content="" />
+      <attribute>
+        <arg name="number" value="&#64;&#64;number" />
+      </attribute>
+    </testcase>
+  </testpoint>
+  <testpoint name=" 1、设置--隐私权--权限管理器--麦克风；2、开启需要用到麦克风的应用访问权限如录音机、相机等；3、进入被开启的应用，并使用与麦克风相关的功能。" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Privacy_SCFVV_3936" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name=" 1、设置--隐私权--权限管理器--麦克风；2、开启需要用到麦克风的应用访问权限如录音机、相机等；3、进入被开启的应用，并使用与麦克风相关的功能1。" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Privacy_SCFVV_3936_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1、设置--隐私权--权限管理器--麦克风；2、关闭需要用到麦克风的应用访问权限如录音机、相机等；3、进入被开启的应用，并使用与麦克风相关的功能。" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Privacy_SCFVV_3937" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1、设置--隐私权--权限管理器--麦克风；2、关闭需要用到麦克风的应用访问权限如录音机、相机等；3、进入被开启的应用，并使用与麦克风相关的功能。" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Privacy_SCFVV_3937_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1、设置--隐私权--权限管理器--位置信息；2、开启需要用到位置信息的应用访问权限如地图、相机、google等； 3、进入被开启的应用，并使用与位置信息相关的功能。" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Privacy_SCFVV_3946" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1、设置--隐私权--权限管理器--位置信息；2、开启需要用到位置信息的应用访问权限如地图、相机、google等； 3、进入被开启的应用，并使用与位置信息相关的功能1。" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Privacy_SCFVV_3946_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name=" 1、设置--隐私权--权限管理器--位置信息；2、关闭需要用到位置信息的应用访问权限如地图、相机、google等；3、进入被关闭的应用，并使用与位置信息相关的功能。" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Privacy_SCFVV_3947" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name=" 1、设置--隐私权--权限管理器--位置信息；2、关闭需要用到位置信息的应用访问权限如地图、相机、google等；3、进入被关闭的应用，并使用与位置信息相关的功能1。" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Privacy_SCFVV_3947_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1、设置--隐私权--权限管理器--位置信息；2、进入任意使用位置信息功能的应用，如地图；3、开启使用确切位置；4、进入地图，进行定位。" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Privacy_SCFVV_3948" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1、设置--隐私权--权限管理器--位置信息；2、进入任意使用位置信息功能的应用，如地图；3、开启使用确切位置；4、进入地图，进行定位1。" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Privacy_SCFVV_3948_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1、设置--隐私权--权限管理器--文件和媒体； 2、开启需要用到文件和媒体权限的应用访问权限如文件极客、相机、图库等  3、进入被开启的应用，并使用与文件和媒体相关的功能。" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Privacy_SCFVV_3950" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1、设置--隐私权--权限管理器--文件和媒体； 2、开启需要用到文件和媒体权限的应用访问权限如文件极客、相机、图库等  3、进入被开启的应用，并使用与文件和媒体相关的功能1。" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Privacy_SCFVV_3950_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1、设置--隐私权--权限管理器--文件和媒体；2、关闭需要用到文件和媒体权限的应用访问权限如文件极客、相机、图库等；3、进入被关闭的应用，并使用与文件和媒体相关的功能。" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Privacy_SCFVV_3951" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1、设置--隐私权--权限管理器--文件和媒体；2、关闭需要用到文件和媒体权限的应用访问权限如文件极客、相机、图库等；3、进入被关闭的应用，并使用与文件和媒体相关的功能1。" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Privacy_SCFVV_3951_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1、设置--隐私权--权限管理器--相机；2、开启需要用到相机的应用访问权限如相机、电话、信息等；3、进入被开启的应用，并使用与相机相关的功能。" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Privacy_SCFVV_3952" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1、设置--隐私权--权限管理器--相机；2、开启需要用到相机的应用访问权限如相机、电话、信息等；3、进入被开启的应用，并使用与相机相关的功能1。" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Privacy_SCFVV_3952_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="设置--隐私权--权限管理器--相机 关闭需要用到相机的应用访问权限如相机、电话、信息等； 进入被关闭的应用，并使用与相机相关的功能。" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Privacy_SCFVV_3953" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="前提条件：位置信息已开启 1、下拉状态栏，关闭位置信息快捷开关；2、进入设置--位置信息--查看使用位置信息开关状态。" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Location_SCFVV4041" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="前提条件：位置信息已关闭 1、进入设置--位置信息--开启使用位置信息；2、下拉状态栏，查看位置信息快捷开关状态。" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Location_SCFVV4044" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1、进入设置--安全和紧急情况--急救信息/打开急救信息（未添加急救信息时显示）；      2、在医疗信息栏添加医疗信息（包括：名称、地址、血型、过敏症、用药、器官捐献、医疗注意事项）      3、返回到安全和紧急情况页再次进入急救信息" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_About_Mobile_SCFVV_4133" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1、设置-安全和紧急情况 2.打开急救信息选项，查看急救信息并呼叫急救联系人。" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_About_Mobile_SCFVV_4142" />
+      <description content="" />
+      <attribute>
+        <arg name="number" value="&#64;&#64;number" />
+      </attribute>
+    </testcase>
+  </testpoint>
+  <testpoint name="1、设置系统导航为三指导航 2、进入设置--关于手机 3、点击Home键退出  4、点击back键退出 5、点击menu键退出到多任务界面，再点击应用卡片进入" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_About_Mobile_SCFVV_5025" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1、设置系统导航为三指导航 2、进入设置--关于手机 3、点击Home键退出  4、点击back键退出 5、点击menu键退出到多任务界面，再点击应用卡片进入1" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_About_Mobile_SCFVV_5025_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1、设置系统导航为三指导航 2、进入设置--关于手机 3、点击Home键退出  4、点击back键退出 5、点击menu键退出到多任务界面，再点击应用卡片进入2" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_About_Mobile_SCFVV_5025_2" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1、进入设置--关于手机--型号，查看设备型号显示。" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_About_Mobile_SCFVV_5067" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1、进入设置--关于手机，查看Android版本显示。" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_About_Mobile_SCFVV_5073" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="进入设置--关于手机--Android版本---查看版本号（Build number） 进入设置--关于手机--查看版本号（Build number）。" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_About_Mobile_SCFVV_5079" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="前提条件：位置信息已关闭，手机已开启网络连接 1、进入google地图 2、点击定位图标。" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Location_SCFVV_4109" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1、设置-位置信息-开启紧急位置信息服务" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Location_SCFVV_4117" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="锁屏界面进入紧急呼救，连续点击紧急信息。 " times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_About_Mobile_SCFVV_5039" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="急救信息中添加紧急联系人进入联系人中对该联系人执行编辑 删除。锁屏界面进入急救信息，查看紧急联系人。 。 " times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_About_Mobile_SCFVV_5042" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="设置图案解锁方式  按power键锁屏，亮屏后进入紧急拨号界面 双击急救信息选项，查看急救信息并呼叫急救联系人" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_About_Mobile_SCFVV_5045" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="设置图案解锁方式  按power键锁屏，亮屏后进入紧急拨号界面。拨打112,911等紧急号码" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_About_Mobile_SCFVV_5046" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1、进入设置--安全和紧急情况--紧急位置信息服务，关闭使用紧急位置信息服务2、返回到设置-位置信息查看位置信息服务-紧急位置信息服务是否同步关闭3、设置搜索框中搜索位置信息服务，查看是否能进入菜单" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Location_SCFVV_22408" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1、进入设置--安全和紧急情况--紧急位置信息服务，关闭使用紧急位置信息服务2、返回到设置-位置信息查看位置信息服务-紧急位置信息服务是否同步关闭3、设置搜索框中搜索位置信息服务，查看是否能进入菜单1" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Location_SCFVV_22408_1" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1、进入设置--安全和紧急情况--紧急位置信息服务，关闭使用紧急位置信息服务2、返回到设置-位置信息查看位置信息服务-紧急位置信息服务是否同步关闭3、设置搜索框中搜索位置信息服务，查看是否能进入菜单2" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_Location_SCFVV_22408_2" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1.设置--系统--手势--系统导航--查看系统导航选项列表。" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_System_SCFVV_4742" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1.设置-&gt;系统-&gt;手势-&gt;快速打开相机。" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_System_SCFVV_4714" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1.按两次电源键进入相机；。" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_System_SCFVV_4725" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1.按两次电源键进入相机；按录像键录像。 ；。" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_System_SCFVV_4726" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="系统-手势设置按两下电源键-启动相机 亮屏非锁屏界面，连按两次电源键 亮屏锁屏界面，连按两次电源键" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_System_SCFVV_4774" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="进入设置--系统--语言和输入法--语言；点击右上角的移除；勾选上想要删除的语言，选择删除； 返回到添加语言列表查看所有语言。 " times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_System_SCFVV_4552" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="开启手势导航任意应用界面的屏幕中间右侧向左滑动。" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_System_SCFVV_4790" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="开启手势导航任意应用界面的屏幕中间右侧向左滑动1。" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_System_SCFVV_4791" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="“三按钮”导航切换为手势导航 手势导航切换为三按钮”导航 进入概览界面或其它不同界面点击home键。" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_System_SCFVV_4814" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1、开启自动使用24小时制；2、切换手机语言为使用24小时制的国家语言，如Afrikaans、Indonesian、Français；（注：客户语言为24小时制则为必测项）3、查看状态栏、锁屏界面、时钟、时钟小部件中时间格式。" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Leve1_Setting_System_SCFVV_4865" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1.进入日期和时间设置--开启24小时格式2.查看设置时间" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Leve1_Setting_System_SCFVV_4884" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1.进入日期和时间设置--关闭24小时格式2.查看设置时间" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Leve1_Setting_System_SCFVV_4890" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="预置条件：“备份到Google云端硬盘”功能为关闭状态1、进入备份页面，开启“备份到Google云端硬盘”备注：7.0的为开启“备份我的数据”，此类问题请勿反馈，此备注适用于以下所有相关用例" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Leve1_Setting_System_SCFVV_4903" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1、进入设置-Google-自动填充查看界面" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_System_SCFVV_4492" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1、进入设置--google--自动填充--电话号码分享-开启、关闭电话号码分享开关" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_System_SCFVV_4500" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1、进入设置--google--设备和共用---设备--开启、关闭扫描附近的设备开关" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_System_SCFVV_4513" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="进入设置日期，修改年月日；进入设置-网络和互联网-流量使用情况" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Leve1_Setting_System_SCFVV_4858" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1、账号和密码-自动填充服务2、点击设置为无3、点击设置为Google" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_System_SCFVV_4278" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1、账号-安全性-点击您有安全建议-保护账号安全2、点击back虚拟键返回" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_FrequentlyQuestion_Setting_00011" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1、设置系统导航为三指导航2、进入设置--google。3、点击back键退出4、点击home键退出5、点击menu键退出到多任务界面，再点击应用卡片进入" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_System_SCFVV_4423" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1、设置系统导航为三指导航2、进入设置--google。 3、滑动屏幕左右侧返回4、上滑Home键退出" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_System_SCFVV_4426" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1. 预置条件：已连接可用的wifi，“备份到Google云端硬盘”功能已开启2、进入设置--系统--备份--帐号--添加帐号，输入正确的帐户密码" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_System_SCFVV_4907" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="1、设置-隐私权-权限管理器2、选择任意权限进入，对任意应用权限进行关闭3、设置-应用和通知-权限管理器-查看对应权限的应用权限是否同步被关闭4、进入此应用" times="1">
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name="com.tinno.reliabilityuiautomatortest.test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_Level1_Setting_System_SCFVV_3954" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+</task>

@@ -1,0 +1,39 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<task name="新续航模型测试_X6838_3.20" times="1" testTimeOut="259200000" takeScreenshot="true" stopWhenFail="false" taskRegressionType="0" caseRegressionType="0" testpointRegressionTimes="2">
+  <proviouspoint name="测试前需预置的操作" times="1">
+    <description content="例如清空设备上的那个文件夹，或者push什么文件放到设备" />
+  </proviouspoint>
+  <testpoint name="Chrome浏览网页1小时" times="1">
+    <description content="1. 运行Chrome&#13;&#10;2.163网页与百度网页相互浏览，（网页每3秒滑动一次，1分钟切换一个网页）" />
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name=".test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_FrequentlyQuestion_Launcher_0066" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="TikTok观看短视频1小时" times="1">
+    <description content="1.打开Tik Tok,待第一个视频加载&#13;&#10;2搜索musicplaylist8,从第一个视频开始顺序播放&#13;&#10;3.竖屏手持每隔10S刷下一个视频&#13;&#10;ps: 不插卡" />
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name=".test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_FrequentlyQuestion_Launcher_0069" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+  <testpoint name="FaceBook预览帖子1小时" times="1">
+    <description content="1. 进入Facebook主页&#13;&#10;2,每10S上划一次页面&#13;&#10;3.测试滑动页面功耗 120s" />
+    <testcase type="uiautomator2" times="1">
+      <device name="device A" />
+      <apk name="ReliabilityUiautomatorTestTest.apk" />
+      <package name=".test" />
+      <class name="com.tinno.reliabilityuiautomatortest.test.cases.BetaTest" />
+      <method name="test_FrequentlyQuestion_Launcher_0069" />
+      <description content="" />
+    </testcase>
+  </testpoint>
+</task>
