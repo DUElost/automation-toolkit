@@ -86,6 +86,14 @@ public class PowerCycleService extends Service {
 
         UnlockUtils.unlockBySwipe();
         int waitSec = PowerCyclePrefs.getWaitSeconds(this);
+        long actionAt = System.currentTimeMillis() + waitSec * 1000L;
+        PowerCyclePrefs.setNextActionAt(this, actionAt);
+        if (PowerCyclePrefs.MODE_POWER_OFF.equals(PowerCyclePrefs.getMode(this))) {
+            int minutes = Math.max(1, PowerCyclePrefs.getPowerOffMinutes(this));
+            PowerCyclePrefs.setNextPowerOnAt(this, actionAt + minutes * 60_000L);
+        } else {
+            PowerCyclePrefs.setNextPowerOnAt(this, 0L);
+        }
         handler.removeMessages(MSG_EXECUTE);
         handler.sendEmptyMessageDelayed(MSG_EXECUTE, waitSec * 1000L);
         return START_STICKY;
@@ -137,6 +145,7 @@ public class PowerCycleService extends Service {
     private void schedulePowerOnAlarm() {
         int minutes = Math.max(1, PowerCyclePrefs.getPowerOffMinutes(this));
         long triggerAt = System.currentTimeMillis() + minutes * 60_000L;
+        PowerCyclePrefs.setNextPowerOnAt(this, triggerAt);
         Intent alarmIntent = new Intent(PowerCycleAutoResumeReceiver.ACTION_ALARM_WAKE);
         alarmIntent.setPackage(getPackageName());
         PendingIntent pi = PendingIntent.getBroadcast(

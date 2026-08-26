@@ -113,6 +113,18 @@ $platformPem = $config["platform.x509.pem"]
 if (-not (Test-Path $attsDir)) { throw "ATTS 工程不存在: $attsDir" }
 if (-not (Test-Path $SignerJar)) { throw "缺少签名工具: $SignerJar" }
 
+Write-Step "同步 powercycle 源码到 ATTS"
+$srcDir = Join-Path $ManagerDir "powercycle-apk-src"
+$resDir = Join-Path $ManagerDir "powercycle-apk-res"
+$destJava = Join-Path $attsDir "app\src\main\java\com\mediatek\schpwronoff\powercycle"
+if (-not (Test-Path $destJava)) { New-Item -ItemType Directory -Path $destJava -Force | Out-Null }
+Copy-Item (Join-Path $srcDir "*.java") $destJava -Force
+Copy-Item (Join-Path $resDir "layout\activity_power_cycle.xml") `
+    (Join-Path $attsDir "app\src\main\res\layout\activity_power_cycle.xml") -Force
+Copy-Item (Join-Path $resDir "values\strings_power_cycle.xml") `
+    (Join-Path $attsDir "app\src\main\res\values\strings_power_cycle.xml") -Force
+Write-Host "  synced to $destJava"
+
 Write-Step "选择构建 JDK"
 Use-BuildJava -JavaHome $javaHome
 

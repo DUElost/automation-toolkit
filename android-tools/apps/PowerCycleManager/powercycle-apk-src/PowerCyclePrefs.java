@@ -3,8 +3,6 @@ package com.mediatek.schpwronoff.powercycle;
 import android.content.Context;
 import android.content.SharedPreferences;
 
-import com.mediatek.schpwronoff.utils.Constant;
-
 /**
  * 开关机测试运行参数（与 PC 端 deploy 脚本写入的 powercycle_runner.xml 对齐）。
  */
@@ -21,6 +19,8 @@ public final class PowerCyclePrefs {
     public static final String KEY_RUNNING = "running";
     public static final String KEY_TESTER = "tester_name";
     public static final String KEY_LAST_ACTION_TIME = "last_action_time";
+    public static final String KEY_NEXT_ACTION_AT = "next_action_at";
+    public static final String KEY_NEXT_POWER_ON_AT = "next_power_on_at";
 
     public static final String MODE_REBOOT = "reboot";
     public static final String MODE_POWER_OFF = "poweroff";
@@ -69,6 +69,29 @@ public final class PowerCyclePrefs {
         return prefs(context).getString(KEY_TESTER, "tester");
     }
 
+    public static long getNextActionAt(Context context) {
+        return prefs(context).getLong(KEY_NEXT_ACTION_AT, 0L);
+    }
+
+    public static long getNextPowerOnAt(Context context) {
+        return prefs(context).getLong(KEY_NEXT_POWER_ON_AT, 0L);
+    }
+
+    public static void setNextActionAt(Context context, long epochMs) {
+        prefs(context).edit().putLong(KEY_NEXT_ACTION_AT, epochMs).apply();
+    }
+
+    public static void setNextPowerOnAt(Context context, long epochMs) {
+        prefs(context).edit().putLong(KEY_NEXT_POWER_ON_AT, epochMs).apply();
+    }
+
+    public static void clearScheduleTimes(Context context) {
+        prefs(context).edit()
+                .putLong(KEY_NEXT_ACTION_AT, 0L)
+                .putLong(KEY_NEXT_POWER_ON_AT, 0L)
+                .apply();
+    }
+
     public static void setRunning(Context context, boolean running) {
         prefs(context).edit().putBoolean(KEY_RUNNING, running).apply();
     }
@@ -89,6 +112,10 @@ public final class PowerCyclePrefs {
     }
 
     public static void markFinished(Context context) {
-        prefs(context).edit().putBoolean(KEY_RUNNING, false).apply();
+        prefs(context).edit()
+                .putBoolean(KEY_RUNNING, false)
+                .putLong(KEY_NEXT_ACTION_AT, 0L)
+                .putLong(KEY_NEXT_POWER_ON_AT, 0L)
+                .apply();
     }
 }

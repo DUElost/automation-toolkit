@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="power_cycle_schedule_reboot_fmt">Next reboot: %1$s (%2$s)</string>
+    <string name="power_cycle_schedule_poweroff_fmt">Next power off: %1$s (%2$s)\nNext power on: %3$s (%4$s)</string>
+    <string name="power_cycle_countdown_sec_fmt">in %1$ds</string>
+</resources>

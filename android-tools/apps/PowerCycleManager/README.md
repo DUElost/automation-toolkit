@@ -21,8 +21,8 @@ apps/PowerCycleManager/
 | 类 | 职责 |
 |----|------|
 | `PowerCycleService` | 循环执行 reboot / shutdown，前台服务保活 |
-| `PowerCycleActivity` | Launcher 入口，显示进度 |
-| `BootCompletedReceiver` | 开机自动续跑 |
+| `PowerCycleActivity` | Launcher 入口，显示进度与下次重启/开关机倒计时 |
+| `BootCompletedReceiver` | 开机自动续跑，并拉起界面显示进度 |
 | `PowerCycleAutoResumeReceiver` | 闹钟唤醒 / 看门狗 |
 | `PowerCyclePrefs` | 与 PC 端 `powercycle_runner.xml` 对齐 |
 

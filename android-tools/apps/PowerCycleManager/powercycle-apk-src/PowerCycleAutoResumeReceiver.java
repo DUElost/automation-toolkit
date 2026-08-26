@@ -3,6 +3,8 @@ package com.mediatek.schpwronoff.powercycle;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.os.Handler;
+import android.os.Looper;
 
 import com.mediatek.schpwronoff.utils.LogUtil;
 
@@ -15,6 +17,7 @@ public class PowerCycleAutoResumeReceiver extends BroadcastReceiver {
     public static final String ACTION_KEEPALIVE = "com.tinno.autotesttool.action.POWER_CYCLE_KEEPALIVE";
 
     private static final String TAG = "PowerCycleAutoResume";
+    private static final long RESUME_UI_DELAY_MS = 800L;
 
     @Override
     public void onReceive(Context context, Intent intent) {
@@ -27,8 +30,12 @@ public class PowerCycleAutoResumeReceiver extends BroadcastReceiver {
         }
 
         LogUtil.i(TAG, "onReceive " + action);
-        Intent service = new Intent(context, PowerCycleService.class);
+        final Context app = context.getApplicationContext();
+        Intent service = new Intent(app, PowerCycleService.class);
         service.setAction(PowerCycleService.ACTION_START);
-        context.startForegroundService(service);
+        app.startForegroundService(service);
+
+        new Handler(Looper.getMainLooper()).postDelayed(
+                () -> PowerCycleActivity.bringToFront(app), RESUME_UI_DELAY_MS);
     }
 }
