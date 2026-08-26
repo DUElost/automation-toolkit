@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="activity_sleep_test">Sleep Wakeup Test</string>
+    <string name="sleep_test_status_fmt">Progress: %1$d / %2$d\nWake: %3$ds | Sleep: %4$ds\nState: %5$s</string>
+    <string name="sleep_test_schedule_fmt">Next screen off: %1$s (%2$s)\nNext wake: %3$s (%4$s)</string>
+    <string name="sleep_test_countdown_sec_fmt">in %1$ds</string>
+    <string name="sleep_test_notification_running">Sleep wakeup test running</string>
+</resources>

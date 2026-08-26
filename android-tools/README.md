@@ -8,8 +8,10 @@ Android 测试相关工具集。
 |------|------|------|
 | APK 构建 | [apps/OfflineScriptManager](apps/OfflineScriptManager/) | MTBF 离线调度器 APK 自编译 |
 | APK 构建 | [apps/PowerCycleManager](apps/PowerCycleManager/) | 开关机测试 APK 构建（基于 ATTS） |
+| APK 构建 | [apps/SleepTestManager](apps/SleepTestManager/) | 休眠唤醒测试 APK 构建（基于 ATTS） |
 | 测试执行 | [stability_MTBF-Test](stability_MTBF-Test/) | MTBF 离线老化执行包 |
 | 测试执行 | [stability_PowerCycle-Test](stability_PowerCycle-Test/) | 开关机专项执行包 |
+| 测试执行 | [stability_Sleep-Test](stability_Sleep-Test/) | 休眠唤醒专项执行包 |
 
 ## 目录结构
 
@@ -18,9 +20,11 @@ android-tools/
 ├── vendor/                    # 共享构建依赖（apktool / jadx / 签名工具）
 ├── apps/                      # APK 源码与构建
 │   ├── OfflineScriptManager/
-│   └── PowerCycleManager/
+│   ├── PowerCycleManager/
+│   └── SleepTestManager/
 ├── stability_MTBF-Test/       # MTBF 执行包
-└── stability_PowerCycle-Test/ # 开关机执行包
+├── stability_PowerCycle-Test/ # 开关机执行包
+└── stability_Sleep-Test/      # 休眠唤醒执行包
 ```
 
 ## 快速开始
@@ -32,11 +36,11 @@ cd F:\automation-toolkit\android-tools\apps\OfflineScriptManager
 build-offline-apk.bat
 ```
 
-构建产物复制到 `stability_MTBF-Test/apk/` 后，在测试包中部署：
+构建产物复制到 `stability_MTBF-Test/shared/apk/`（OfflineScriptManager）及 `suites/apk/`（Reliability* 等）后，任务 XML 放 `suites/task/`，然后：
 
 ```bat
-cd F:\automation-toolkit\android-tools\stability_MTBF-Test\scripts
-deploy.bat
+cd F:\automation-toolkit\android-tools\stability_MTBF-Test
+runAll.bat
 ```
 
 ### 构建开关机 APK
@@ -47,6 +51,22 @@ build-powercycle-apk.bat
 ```
 
 产物自动输出到 `stability_PowerCycle-Test/apk/AutoTestTool.apk`。
+
+### 构建休眠唤醒 APK
+
+```bat
+cd F:\automation-toolkit\android-tools\apps\SleepTestManager
+build-sleep-apk.bat
+```
+
+产物自动输出到 `stability_Sleep-Test/apk/AutoTestTool.apk`。
+
+部署：
+
+```bat
+cd F:\automation-toolkit\android-tools\stability_Sleep-Test\scripts
+deploy.bat
+```
 
 ## 前置条件
 
