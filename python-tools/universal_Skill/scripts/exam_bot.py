@@ -19,6 +19,15 @@ DEFAULT_ANSWERS = ROOT / "data" / "answers.json"
 SCREENSHOT_DIR = ROOT / "data" / "screenshots"
 DEFAULT_LOGIN_URL = "https://tinno.study.moxueyuan.com/login"
 STUDY_EXAM_URL_TMPL = "https://tinno.study.moxueyuan.com/task/exam/questions/{exam_id}"
+TRANSIENT_GOTO_ERRORS = (
+    "ERR_CONNECTION_CLOSED",
+    "ERR_CONNECTION_RESET",
+    "ERR_CONNECTION_REFUSED",
+    "ERR_NETWORK_CHANGED",
+    "ERR_INTERNET_DISCONNECTED",
+    "ERR_TIMED_OUT",
+    "Timeout",
+)
 
 EXTRACT_QUESTIONS_JS = r"""
 () => {
@@ -118,6 +127,37 @@ def to_study_exam_url(url: str) -> str:
     return study
 
 
+def is_transient_goto_error(exc: Exception) -> bool:
+    msg = str(exc)
+    return any(token in msg for token in TRANSIENT_GOTO_ERRORS)
+
+
+def goto_with_retry(
+    page,
+    url: str,
+    *,
+    max_attempts: int = 5,
+    wait_until: str = "domcontentloaded",
+    timeout: int = 60000,
+) -> None:
+    """Navigate with retries for flaky TLS / connection resets on moxueyuan."""
+    last_err: Optional[Exception] = None
+    for attempt in range(1, max_attempts + 1):
+        try:
+            page.goto(url, wait_until=wait_until, timeout=timeout)
+            return
+        except Exception as e:
+            last_err = e
+            if attempt >= max_attempts or not is_transient_goto_error(e):
+                raise
+            delay = min(2 ** (attempt - 1), 8)
+            print(f"Navigation failed (attempt {attempt}/{max_attempts}): {e}")
+            print(f"Retrying in {delay}s…")
+            time.sleep(delay)
+    if last_err:
+        raise last_err
+
+
 def resolve_exam_url(url: Optional[str] = None, qr: Optional[str] = None) -> str:
     """Resolve exam page URL from --url or --qr, normalized to study domain."""
     if bool(url) == bool(qr):
@@ -139,19 +179,48 @@ def resolve_login_url(url: Optional[str] = None) -> str:
     return (url or DEFAULT_LOGIN_URL).strip()
 
 
+def is_navigation_transient_error(exc: Exception) -> bool:
+    msg = str(exc)
+    return (
+        "Execution context was destroyed" in msg
+        or "Cannot find context with specified id" in msg
+    )
+
+
+def is_browser_closed_error(exc: Exception) -> bool:
+    msg = str(exc).lower()
+    return "has been closed" in msg or "target page, context or browser" in msg
+
+
 def is_logged_in(page, context) -> bool:
-    title = page.title() or ""
-    cur = page.url or ""
     cookies = {c["name"]: c.get("value") for c in context.cookies()}
     islogin = str(cookies.get("enterprise:domainName:islogin", "")).upper()
+    if islogin == "Y":
+        return True
+    try:
+        title = page.title() or ""
+        cur = page.url or ""
+    except Exception as e:
+        if is_navigation_transient_error(e):
+            return False
+        raise
     on_login = ("登录" in title) or ("/login" in cur.lower())
     if on_login:
         return False
-    if islogin == "Y":
-        return True
     if "exam" in cur.lower() or "ceping" in cur.lower() or "questions" in cur.lower():
         return True
     return False
+
+
+def save_login_state_if_ready(page, context, state_path: Path) -> bool:
+    if not is_logged_in(page, context):
+        return False
+    try:
+        page.wait_for_load_state("domcontentloaded", timeout=5000)
+    except Exception:
+        pass
+    context.storage_state(path=str(state_path))
+    return True
 
 
 def cmd_login(url: str, state_path: Path, wait_seconds: int = 300) -> int:
@@ -165,27 +234,50 @@ def cmd_login(url: str, state_path: Path, wait_seconds: int = 300) -> int:
         page.goto(url, wait_until="domcontentloaded")
         print(f"已打开登录页: {url}")
         print("请在【弹出的 Playwright 窗口】使用「扫码登录」完成认证（不要用日常 Chrome）。")
-        print(f"脚本会每 3 秒检测登录态，最长等待 {wait_seconds}s…")
+        print("登录成功后脚本会自动保存并关闭浏览器，请勿手动关窗。")
+        print(f"脚本会检测登录态，最长等待 {wait_seconds}s…")
+
+        nav_pending = {"flag": False}
+
+        def _on_nav(_frame) -> None:
+            nav_pending["flag"] = True
+
+        page.on("framenavigated", _on_nav)
+
         deadline = time.time() + wait_seconds
-        logged_in = False
+        saved = False
         while time.time() < deadline:
+            if not browser.is_connected():
+                break
             try:
-                if is_logged_in(page, context):
-                    page.wait_for_timeout(1500)
-                    if is_logged_in(page, context):
-                        logged_in = True
-                        break
+                if save_login_state_if_ready(page, context, state_path):
+                    saved = True
+                    print("检测到登录成功，已保存登录态。")
+                    break
             except Exception as e:
-                print(f"poll error: {e}")
-            time.sleep(3)
-        if not logged_in:
-            print("登录超时：未检测到有效登录态，不保存 storage_state。")
+                if is_browser_closed_error(e):
+                    break
+                if not is_navigation_transient_error(e):
+                    print(f"poll error: {e}")
+
+            if nav_pending["flag"]:
+                nav_pending["flag"] = False
+                time.sleep(0.8)
+            else:
+                time.sleep(1.5)
+
+        if browser.is_connected():
             browser.close()
-            return 2
-        context.storage_state(path=str(state_path))
-        browser.close()
-    print(f"Saved storage state -> {state_path}")
-    return 0
+
+        if saved:
+            print(f"Saved storage state -> {state_path}")
+            return 0
+
+        if not browser.is_connected():
+            print("浏览器已关闭：未能保存登录态。请重新运行 login，扫码后等待脚本自动保存（勿手动关窗）。")
+        else:
+            print("登录超时：未检测到有效登录态，不保存 storage_state。")
+        return 2
 
 
 def _click_option_by_text(page, option_text: str, dom_index: Optional[int] = None, opt_index: Optional[int] = None) -> bool:
@@ -262,7 +354,7 @@ def cmd_fill(
         browser = launch_browser(p)
         context = browser.new_context(storage_state=str(state_path))
         page = context.new_page()
-        page.goto(url, wait_until="networkidle")
+        goto_with_retry(page, url)
         page.wait_for_timeout(2000)
 
         if not is_logged_in(page, context):
@@ -274,7 +366,7 @@ def cmd_fill(
             browser = launch_browser(p)
             context = browser.new_context(storage_state=str(state_path))
             page = context.new_page()
-            page.goto(url, wait_until="networkidle")
+            goto_with_retry(page, url)
             page.wait_for_timeout(2000)
             if not is_logged_in(page, context):
                 print("Still not logged in after login flow.")
