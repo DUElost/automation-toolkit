@@ -16,6 +16,7 @@ from overtime_rules import (
     decide_action,
     floor_half_hour,
     is_weekend,
+    propose_for_day,
     propose_weekday,
     propose_weekend,
     target_days_last_week,
@@ -94,6 +95,17 @@ def test_is_weekend():
     assert is_weekend(date(2026, 8, 14)) is False  # Friday
     assert is_weekend(date(2026, 8, 15)) is True   # Saturday
     assert is_weekend(date(2026, 8, 16)) is True   # Sunday
+
+
+def test_makeup_sunday_uses_weekday_from_19():
+    # 2026-09-20 Sunday was 补班 — treat as workday OT from 19:00, not morning punch.
+    punches = [time(9, 0), time(21, 4)]
+    assert propose_for_day(date(2026, 9, 20), punches) == ProposedWindow(time(19, 0), time(21, 0))
+
+
+def test_rest_saturday_still_uses_weekend_span():
+    punches = [time(9, 56), time(12, 2), time(18, 1), time(21, 3)]
+    assert propose_for_day(date(2026, 9, 19), punches) == ProposedWindow(time(10, 0), time(20, 0))
 
 
 def test_decide_action_paths():

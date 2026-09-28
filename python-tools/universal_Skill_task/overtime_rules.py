@@ -7,6 +7,8 @@ from datetime import date, datetime, time, timedelta, timezone
 from enum import Enum
 from typing import Iterable, List, Optional, Sequence, Tuple
 
+from workday_calendar import is_official_workday
+
 BEIJING = timezone(timedelta(hours=8))
 
 LUNCH_SPAN_NOTE = "12:00-13:00 lunch break excluded from overtime span"
@@ -51,7 +53,13 @@ def target_days_last_week(now: Optional[datetime] = None) -> List[date]:
 
 
 def is_weekend(day: date) -> bool:
+    """Calendar Sat/Sun only (ignores 补班 / legal holidays)."""
     return day.weekday() >= 5
+
+
+def is_rest_or_holiday(day: date) -> bool:
+    """True when the day is not an official CN workday (rest weekend or legal holiday)."""
+    return not is_official_workday(day)
 
 
 def floor_half_hour(t: time) -> time:
@@ -100,7 +108,12 @@ def propose_weekend(punches: Sequence[time]) -> Optional[ProposedWindow]:
 
 
 def propose_for_day(day: date, punches: Sequence[time]) -> Optional[ProposedWindow]:
-    if is_weekend(day):
+    """Propose OT window using official workday calendar.
+
+    Makeup 补班 (even on Sat/Sun) follows weekday rules from 19:00.
+    Legal holidays and rest weekends follow weekend/full-day rules.
+    """
+    if is_rest_or_holiday(day):
         return propose_weekend(punches)
     return propose_weekday(punches)
 

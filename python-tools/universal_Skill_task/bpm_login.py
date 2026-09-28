@@ -64,6 +64,7 @@ def login_bpm(page: Page, cfg: AppConfig) -> None:
 
     page.wait_for_timeout(1_500)
     if LOGIN_PATH not in page.url:
+        dismiss_bpm_home_overlays(page)
         return
 
     _ensure_password_form(page)
@@ -79,3 +80,73 @@ def login_bpm(page: Page, cfg: AppConfig) -> None:
         raise LoginError(f"Login did not complete.{detail} url={page.url}") from exc
 
     page.wait_for_timeout(3_000)
+    dismiss_bpm_home_overlays(page)
+
+
+def dismiss_bpm_home_overlays(page: Page) -> None:
+    """Close login-home notices (e.g. 审计通知书) that block the top nav.
+
+    Only closes Ext window/dialog components and mask layers — never hide
+    arbitrary large DOM parents (that blanked the portal after timesheet).
+    """
+    try:
+        page.keyboard.press("Escape")
+    except Exception:
+        pass
+    page.wait_for_timeout(400)
+    try:
+        removed = page.evaluate(
+            """() => {
+              let closed = 0;
+              if (window.Ext) {
+                Ext.ComponentMgr.all.each(function (c) {
+                  try {
+                    const xt = (c.getXType && c.getXType()) || '';
+                    if (xt !== 'window' && xt !== 'messagebox' && xt !== 'panel') return;
+                    if (c.hidden) return;
+                    const text = (
+                      (c.title || '') + ' ' +
+                      ((c.body && c.body.dom && c.body.dom.innerText) || '')
+                    ).slice(0, 500);
+                    const hit = /审计|通知书|公告|点击图片查看详情|专审/.test(text);
+                    if (!hit) return;
+                    if (typeof c.close === 'function') { c.close(); closed++; return; }
+                    if (typeof c.hide === 'function') { c.hide(); closed++; }
+                  } catch (e) {}
+                });
+              }
+              document.querySelectorAll('.x-window').forEach((win) => {
+                const text = (win.innerText || '').slice(0, 500);
+                if (!/审计|通知书|点击图片查看详情|专审/.test(text)) return;
+                const closeBtn = win.querySelector('.x-tool-close');
+                if (closeBtn) {
+                  try { closeBtn.click(); closed++; } catch (e) {}
+                } else {
+                  win.style.display = 'none';
+                  closed++;
+                }
+              });
+              document.querySelectorAll('.x-mask, .ext-el-mask, .x-mask-loading, .x-shadow').forEach((el) => {
+                el.style.display = 'none';
+                closed++;
+              });
+              return closed;
+            }"""
+        )
+        if removed:
+            print(f"[INFO] dismissed BPM overlays count={removed}", flush=True)
+    except Exception:
+        pass
+    for label in ("关闭", "我知道了", "知道了"):
+        try:
+            loc = page.get_by_role("button", name=label)
+            if loc.count() and loc.first.is_visible():
+                loc.first.click(timeout=1_500)
+                page.wait_for_timeout(300)
+        except Exception:
+            pass
+    try:
+        page.keyboard.press("Escape")
+    except Exception:
+        pass
+    page.wait_for_timeout(500)

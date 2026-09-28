@@ -24,11 +24,16 @@ FORBIDDEN_CLICK_TEXTS: List[str] = [
 
 # Visible fields on ATT_S_OT_APP. OT_TYPE / TO_DATE exist but are hidden and
 # derived by the server from 加班日期 — do not fill them.
+# OT_DURATION (加班时数) is readonly; its onfocus=calculate() must be triggered.
 SEL_START_DATE = "input[name='FROM_DATE']"
 SEL_START_TIME = "input[name='FROM_TIME']"
 SEL_END_TIME = "input[name='TO_TIME']"
+SEL_HOURS = "input[name='OT_DURATION']"
 SEL_REASON = "textarea[name='REMARK']"
 SEL_SUBMIT = "input[type='submit'][name='Submit']"
+
+# Submit validation when OT_DURATION was never calculated (hours still 0.00).
+HOURS_REQUIRED_DIALOG = "请点击加班时数"
 
 
 class OvertimeApplyError(RuntimeError):
@@ -48,6 +53,17 @@ def is_forbidden_click_text(text: str) -> bool:
     if not s:
         return False
     return any(bad in s for bad in FORBIDDEN_CLICK_TEXTS)
+
+
+def hours_value_is_ready(value: str) -> bool:
+    """True when OT_DURATION holds a positive calculated hour count."""
+    s = (value or "").strip()
+    if not s:
+        return False
+    try:
+        return float(s) > 0
+    except ValueError:
+        return False
 
 
 def plan_prefill_values(
@@ -103,14 +119,43 @@ def _fill_first(frame: Frame, selector: str, value: str) -> None:
         raise OvertimeApplyError(f"Field {selector} kept {actual!r} instead of {value!r}")
 
 
+def _ensure_hours_calculated(page: Page, frame: Frame) -> str:
+    """Focus 加班时数 so EHR onfocus=calculate() fills OT_DURATION (> 0)."""
+    loc = frame.locator(SEL_HOURS).first
+    loc.wait_for(state="visible", timeout=15_000)
+    last = (loc.input_value() or "").strip()
+
+    for _ in range(3):
+        loc.click(force=True)
+        page.wait_for_timeout(800)
+        try:
+            frame.locator(SEL_REASON).first.click(timeout=3_000)
+        except Exception:
+            loc.evaluate("el => { el.blur(); }")
+        page.wait_for_timeout(500)
+        last = (loc.input_value() or "").strip()
+        if hours_value_is_ready(last):
+            print(f"[OK] OT_DURATION calculated={last}", flush=True)
+            return last
+
+    raise OvertimeApplyError(
+        f"OT_DURATION stayed {last!r} after focusing 加班时数 (need calculate())"
+    )
+
+
 def prefill_overtime_form(page: Page, decision: Decision, reason: Optional[str] = None) -> None:
     values = plan_prefill_values(decision, reason)
 
     open_overtime_apply(page)
     page.wait_for_timeout(3_000)
 
+    frame = None
     for selector, value in values.items():
-        _fill_first(_find_frame_with_selector(page, selector), selector, value)
+        frame = _find_frame_with_selector(page, selector)
+        _fill_first(frame, selector, value)
+
+    hours_frame = _find_frame_with_selector(page, SEL_HOURS)
+    _ensure_hours_calculated(page, hours_frame)
 
 
 def submit_overtime_form(page: Page) -> None:
@@ -120,21 +165,29 @@ def submit_overtime_form(page: Page) -> None:
     submit, so the handler is attached for the duration of the click.
     """
     frame = _find_frame_with_selector(page, SEL_SUBMIT)
+    hours = (frame.locator(SEL_HOURS).first.input_value() or "").strip()
+    if not hours_value_is_ready(hours):
+        _ensure_hours_calculated(page, frame)
+
     loc = frame.locator(SEL_SUBMIT).first
     loc.wait_for(state="visible", timeout=15_000)
 
     accepted: List[str] = []
 
     def accept(dialog):
-        accepted.append(dialog.message)
+        accepted.append(dialog.message or "")
         dialog.accept()
 
     page.on("dialog", accept)
     try:
         loc.click()
-        page.wait_for_timeout(5_000)
+        page.wait_for_timeout(8_000)
     finally:
         page.remove_listener("dialog", accept)
 
     for message in accepted:
         print(f"[INFO] accepted dialog: {message}", flush=True)
+        if HOURS_REQUIRED_DIALOG in message:
+            raise OvertimeApplyError(
+                f"Submit blocked: {message.strip() or HOURS_REQUIRED_DIALOG}"
+            )

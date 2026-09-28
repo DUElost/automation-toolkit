@@ -12,10 +12,11 @@ from overtime_rules import (
     Action,
     ExistingOvertime,
     decide_action,
-    is_weekend,
+    is_rest_or_holiday,
     propose_for_day,
     spans_lunch,
 )
+from workday_calendar import workday_kind
 
 ALLOW_SUBMIT_OVERTIME = False  # hard forbid submit in this phase
 
@@ -23,7 +24,7 @@ ALLOW_SUBMIT_OVERTIME = False  # hard forbid submit in this phase
 @dataclass(frozen=True)
 class Decision:
     target_date: date
-    day_kind: str  # weekday|weekend
+    day_kind: str  # workday|makeup|holiday|weekend
     punches: List[time]
     existing: Optional[ExistingOvertime]
     action: Action
@@ -56,9 +57,11 @@ def build_decision(
 ) -> Decision:
     proposed = propose_for_day(target_date, punches)
     action, window = decide_action(proposed, existing)
+    kind = workday_kind(target_date)
     notes_parts = []
     if window is not None:
-        if is_weekend(target_date) and window.start < time(18, 0) and window.end >= time(20, 0):
+        # Rest/holiday (incl. calendar weekend) use full-day span rules.
+        if is_rest_or_holiday(target_date) and window.start < time(18, 0) and window.end >= time(20, 0):
             raw_end_hint = max(punches) if punches else None
             if raw_end_hint and raw_end_hint > time(19, 0):
                 notes_parts.append("跨18:00-19:00，结束减1小时")
@@ -71,7 +74,7 @@ def build_decision(
 
     return Decision(
         target_date=target_date,
-        day_kind="weekend" if is_weekend(target_date) else "weekday",
+        day_kind=kind,
         punches=list(punches),
         existing=existing,
         action=action,

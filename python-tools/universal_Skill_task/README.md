@@ -31,8 +31,9 @@ python main.py
 
 1. 打开 `https://bpm.tinno.com`，浏览器弹出**个人数字证书**选择框，脚本自动确认
 2. 登录页默认是企业微信扫码，脚本切到密码登录并提交账号密码
-3. 登录后落在工时提报界面，脚本点击顶栏「门户」进入主页
-4. 在右下角「导航」面板点击 EHR，新标签页经 SSO 打开 EHR，无需二次登录
+3. 登录后进入**工时提报**待办列表：列表为空则直接跳过；否则逐条打开明细。工时(小时)按中国法定工作日日历：正常工作日/补班减 0.5，周末休息与法定节假日不减；**工作时数为空**或减完后≤0 则跳过该条并在飞书报告中标注未完成原因；任务名称/详细工作描述填 `--reason`；有 `--ALLOW` 时点「同意」（`--decisions-only` 跳过本步）
+4. **仅周一**追加**加班餐预订**：打开「加班餐预订流程」，就餐日期勾选本周符合条件的日期（法定工作日/补班；周五默认排除，若周五为工作日且次日仍为补班/工作日则纳入；节假日排除），预订人选本账号邮箱，有 `--ALLOW` 时点「同意」
+5. 再点顶栏「门户」，在右下角「导航」面板点击 EHR，新标签页经 SSO 打开 EHR，继续原有加班决策/提报
 
 ## 关于证书弹窗
 
@@ -82,6 +83,24 @@ python main_overtime_prefill.py --reason "V552AA项目稳定性挂测" --ALLOW
 
 人工核对截图：`artifacts/overtime_prefill_*_filled_YYYYMMDD.png`（提交后另有 `*_submitted_*`）
 
+## 备用：撤销已提交的错误加班申请
+
+独立脚本，**不接入**每日完整流程。进入 EHR「加班查询」，按日期+起止时间匹配行，点「撤销申请」。
+
+```powershell
+# 只列出匹配（默认 dry-run）
+python main_overtime_cancel.py --no-prompt --accounts-file accounts.yaml `
+  --date 2026-09-20 --start 09:00 --end 20:00
+
+# 真正撤销
+python main_overtime_cancel.py --ALLOW --no-prompt --accounts-file accounts.yaml `
+  --date 2026-09-20 --start 09:00 --end 20:00
+
+# 只跑某个账号
+python main_overtime_cancel.py --ALLOW --no-prompt --accounts-file accounts.yaml `
+  --account account2 --date 2026-09-20 --start 09:00 --end 20:00
+```
+
 ## 飞书汇总通知
 
 在 `.env` 中配置群机器人 Webhook（飞书群 → 设置 → 群机器人 → 自定义机器人）：
@@ -119,43 +138,22 @@ copy accounts.dev.yaml.example accounts.yaml
 
 ## 每天 10:00 定时 + 飞书通知
 
-推荐在仓库根目录用自带 `taskmgr` 注册（需 10:00 时电脑已开机且已登录）：
+当前已注册任务 `ehr-overtime-daily`（Daily 10:00），命令与工作目录：
 
-```powershell
-cd F:\automation-toolkit
-taskmgr add ehr-overtime-daily
-# 调度方式: 1（每天）
-# Hour: 10
-# Minute: 0
-# 启动命令:
-#   python .\python-tools\universal_Skill_task\main_overtime_prefill.py --decisions-only --no-prompt
-# 工作目录请选: python-tools\universal_Skill_task（或在命令里写全路径）
+```text
+python main_overtime_prefill.py --no-prompt --ALLOW --accounts-file accounts.yaml
+  --reason account1:V552AA项目多供稳定性挂测
+  --reason account2:X1102D项目多供稳定性挂测与结果收取
+工作目录: python-tools\universal_Skill_task
 ```
 
-说明：
-
-- `--decisions-only`：只读考勤/加班并决策，**不预填、不提交**（适合每日早报）
-- `--no-prompt`：无人值守，不等待 Enter
-- 若要预填但不提交，去掉 `--decisions-only`，仍保留 `--no-prompt`
-- **不要**在定时任务里加 `--ALLOW`，自动提交需人工确认后再手动执行
+覆盖：工时提报 →（仅周一）加班餐预订 → EHR 加班申请；均在有 `--ALLOW` 时提交。脚本更新后定时任务无需改参数，下次 10:00 自动用最新代码。
 
 管理：
 
 ```powershell
-taskmgr list
-taskmgr start ehr-overtime-daily    # 立即试跑
-taskmgr log ehr-overtime-daily      # 查看调度日志
-taskmgr remove ehr-overtime-daily   # 删除任务
-```
-
-也可用底层脚本注册（等价）：
-
-```powershell
-.\windows-scheduler\Register-ScheduledTool.ps1 `
-  -TaskName "ehr-overtime-daily" `
-  -FilePath "python" `
-  -Arguments ".\python-tools\universal_Skill_task\main_overtime_prefill.py --decisions-only --no-prompt" `
-  -WorkDir ".\python-tools\universal_Skill_task" `
-  -DailyAt "10:00" `
-  -ReplaceExisting
+cd D:\Tinno_auto\automation-toolkit
+.\windows-scheduler\taskmgr.bat list
+.\windows-scheduler\taskmgr.bat start ehr-overtime-daily    # 立即试跑
+.\windows-scheduler\taskmgr.bat log ehr-overtime-daily      # 查看调度日志
 ```

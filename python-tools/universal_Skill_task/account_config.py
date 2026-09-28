@@ -5,11 +5,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import TYPE_CHECKING, Dict, List, Optional, Sequence, Tuple
 
 import yaml
 
 from config import AppConfig, ConfigError
+
+if TYPE_CHECKING:
+    from bpm_overtime_meal import OvertimeMealRunResult
+    from bpm_timesheet import TimesheetRunResult
 
 
 @dataclass(frozen=True)
@@ -26,6 +30,10 @@ class AccountRunResult:
     reason: Optional[str] = None
     decisions: List = field(default_factory=list)
     submitted_dates: List[str] = field(default_factory=list)
+    timesheet: Optional["TimesheetRunResult"] = None
+    timesheet_step_skipped: bool = False
+    overtime_meal: Optional["OvertimeMealRunResult"] = None
+    overtime_meal_step_skipped: bool = False
     run_success: bool = True
     error_message: Optional[str] = None
 
@@ -42,6 +50,7 @@ class RunOptions:
     global_reason: Optional[str] = None
     reason_by_id: Tuple[Tuple[str, str], ...] = ()
     accounts_file: Optional[str] = None
+    timesheet_max: Optional[int] = None
 
 
 def parse_run_options(argv: Sequence[str]) -> RunOptions:
@@ -51,6 +60,7 @@ def parse_run_options(argv: Sequence[str]) -> RunOptions:
     global_reason: Optional[str] = None
     reason_by_id: Dict[str, str] = {}
     accounts_file: Optional[str] = None
+    timesheet_max: Optional[int] = None
     i = 0
     while i < len(argv):
         arg = argv[i]
@@ -65,6 +75,11 @@ def parse_run_options(argv: Sequence[str]) -> RunOptions:
             i += 1
         elif arg.startswith("--accounts-file="):
             accounts_file = arg.split("=", 1)[1]
+        elif arg == "--timesheet-max" and i + 1 < len(argv):
+            timesheet_max = int(argv[i + 1])
+            i += 1
+        elif arg.startswith("--timesheet-max="):
+            timesheet_max = int(arg.split("=", 1)[1])
         elif arg == "--reason" and i + 1 < len(argv):
             global_reason = _apply_reason_arg(argv[i + 1], reason_by_id, global_reason)
             i += 1
@@ -78,6 +93,7 @@ def parse_run_options(argv: Sequence[str]) -> RunOptions:
         global_reason=global_reason,
         reason_by_id=tuple(reason_by_id.items()),
         accounts_file=accounts_file,
+        timesheet_max=timesheet_max,
     )
 
 

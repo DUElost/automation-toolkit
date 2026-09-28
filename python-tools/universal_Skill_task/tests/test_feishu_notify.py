@@ -32,13 +32,20 @@ def test_format_decisions_summary_user_layout():
     ]
     text = format_decisions_summary(decisions, reason="稳定性挂测")
     assert "🕐 触发时间：" in text
-    assert "📊 EHR自动化决策结果：" in text
+    assert "📊 汇总结果：" in text
     assert "✅ Success：1/1" in text
+    assert "⏱️ 工时提报：" in text
     assert "账号数" not in text
     assert "ALLOW_SUBMIT_OVERTIME" not in text
 
 
 def test_build_account_results_card_has_text_body_and_summary():
+    from bpm_timesheet import (
+        TimesheetIncompleteItem,
+        TimesheetProcessedItem,
+        TimesheetRunResult,
+    )
+
     d1 = build_decision(
         date(2026, 8, 8),
         [time(14, 31), time(23, 29)],
@@ -51,6 +58,18 @@ def test_build_account_results_card_has_text_body_and_summary():
             username="dai.lv@tinno.com",
             reason="项目A",
             decisions=[d1, d2],
+            timesheet=TimesheetRunResult(
+                processed=[
+                    TimesheetProcessedItem(date="2026-08-08", hours=7.5, deduction=0.5),
+                    TimesheetProcessedItem(date="2026-08-09", hours=4.0, deduction=0.0),
+                ],
+                incomplete=[
+                    TimesheetIncompleteItem(
+                        date="2026-08-10",
+                        reason="工作时数为空",
+                    )
+                ],
+            ),
             run_success=True,
         ),
         AccountRunResult(
@@ -59,12 +78,14 @@ def test_build_account_results_card_has_text_body_and_summary():
             reason="项目B",
             decisions=[d1],
             submitted_dates=["2026-08-08"],
+            timesheet=TimesheetRunResult(skipped_empty=True),
             run_success=True,
         ),
     ]
     payload = build_account_results_card(results)
     card = payload["card"]
     assert card["schema"] == "2.0"
+    assert card["header"]["template"] == "orange"
     elements = card["body"]["elements"]
     assert not any(el.get("tag") == "table" for el in elements)
     assert sum(1 for el in elements if el.get("tag") == "hr") == 2
@@ -74,14 +95,26 @@ def test_build_account_results_card_has_text_body_and_summary():
     assert "👤 **zhang.san@tinno.com**" in body
     assert "rin" not in body
     assert "📌 项目A" in body
-    assert "✅ 已提交加班申请：" in body
+    assert "⏱️ 工时提报：" in body
+    assert "✅ 本轮已完成：" in body
+    assert "  08/08「周六」 7.5 (按工作日扣 0.5)" in body
+    assert "  08/09「周日」 4 (不扣除)" in body
+    assert "⚠️ 未完成：" in body
+    assert "08/10「周一」 工作时数为空" in body
+    assert "待办列表为空，已跳过" in body
+    assert "🍱 加班餐：" in body
+    assert "📋 加班申请：" in body
+    assert "✅ 本次已提交加班申请：" in body
+    assert "✅ 已有相同记录：" in body
     assert "08/08「周六」" in body
     assert "⏭️ 无需申请" in body
     assert "\u3000" not in body
     summary = divs[2]
     assert "✅ Success：2/2" in summary
+    assert "⏱️ 工时提报 完成 2 条 / 未完成 1 条" in summary
+    assert "🍱 加班餐 完成" in summary
     assert "👤" not in summary
-    assert "🎉 所有账号均执行成功" in summary
+    assert "有 1 条工时提报未完成" in summary
 
 
 def test_build_summary_post_structure():

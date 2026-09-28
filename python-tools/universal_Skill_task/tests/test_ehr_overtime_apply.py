@@ -15,6 +15,7 @@ from ehr_overtime_apply import (
     SEL_START_TIME,
     format_ehr_date,
     format_ehr_time,
+    hours_value_is_ready,
     is_forbidden_click_text,
     plan_prefill_values,
 )
@@ -41,6 +42,15 @@ def test_is_forbidden_click_text():
     assert is_forbidden_click_text("保存申请") is True
     assert is_forbidden_click_text("加班申请") is False
     assert is_forbidden_click_text("首页") is False
+
+
+def test_hours_value_is_ready():
+    assert hours_value_is_ready("4.00") is True
+    assert hours_value_is_ready("0.5") is True
+    assert hours_value_is_ready("0.00") is False
+    assert hours_value_is_ready("0") is False
+    assert hours_value_is_ready("") is False
+    assert hours_value_is_ready("abc") is False
 
 
 def _apply_decision():

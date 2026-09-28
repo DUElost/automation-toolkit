@@ -33,7 +33,7 @@ _ACTION_LABELS = {
 _SECTION_META = {
     Action.APPLY: ("📝", "待提交加班申请"),
     Action.SKIP_DIFF_MANUAL: ("⚠️", "需人工核对"),
-    Action.SKIP_ALREADY_SAME: ("✅", "已提交加班申请"),
+    Action.SKIP_ALREADY_SAME: ("✅", "已有相同记录"),
     Action.SKIP_NO_NEED: ("⏭️", "无需申请"),
 }
 
@@ -55,6 +55,14 @@ def _lark_div(content: str) -> dict:
 
 def _hr() -> dict:
     return {"tag": "hr"}
+
+
+def _fmt_md_date(iso_date: str) -> str:
+    try:
+        d = datetime.strptime(iso_date[:10], "%Y-%m-%d").date()
+    except ValueError:
+        return iso_date
+    return f"{d.strftime('%m/%d')}「{_WEEKDAY_ZH[d.weekday()]}」"
 
 
 def _day_heading(d: Decision) -> str:
@@ -92,14 +100,12 @@ def _account_display_name(item: AccountRunResult) -> str:
     return item.username or item.account_id
 
 
-def _decision_line(d: Decision, submitted_set: set[str]) -> str:
+def _decision_line(d: Decision) -> str:
     heading = _day_heading(d)
     if d.action == Action.SKIP_NO_NEED:
         note = _user_note(d)
         return f"{heading} {note}"
     window = _fmt_window(d)
-    if d.target_date.isoformat() in submitted_set:
-        return f"{heading} {window}（已提交）"
     if d.action == Action.SKIP_DIFF_MANUAL:
         note = _user_note(d)
         return f"{heading} {window} {note}" if note != "-" else f"{heading} {window}"
@@ -116,22 +122,111 @@ def _format_decisions_text(
         return "📭 无决策数据"
     submitted_set = set(submitted_dates)
     sections: List[str] = []
+
+    # Dates actually submitted in this run (decision may still be APPLY).
+    newly = [d for d in decisions if d.target_date.isoformat() in submitted_set]
+    if newly:
+        lines = ["✅ 本次已提交加班申请："]
+        lines.extend(_decision_line(d) for d in newly)
+        sections.append("\n".join(lines))
+
+    remaining = [d for d in decisions if d.target_date.isoformat() not in submitted_set]
     for action in _SECTION_ORDER:
         emoji, title = _SECTION_META[action]
-        group = [d for d in decisions if d.action == action]
+        group = [d for d in remaining if d.action == action]
         if not group:
             continue
         lines = [f"{emoji} {title}："]
-        lines.extend(_decision_line(d, submitted_set) for d in group)
+        lines.extend(_decision_line(d) for d in group)
         sections.append("\n".join(lines))
     return "\n\n".join(sections)
+
+
+def _fmt_hours(value: float) -> str:
+    if float(value).is_integer():
+        return str(int(value))
+    text = f"{float(value):.2f}".rstrip("0").rstrip(".")
+    return text
+
+
+def _fmt_timesheet_deduction(deduction: float) -> str:
+    if deduction and float(deduction) > 0:
+        return f"(按工作日扣 {_fmt_hours(deduction)})"
+    return "(不扣除)"
+
+
+def _fmt_timesheet_done_line(row) -> str:
+    return (
+        f"  {_fmt_md_date(row.date)} {_fmt_hours(row.hours)} "
+        f"{_fmt_timesheet_deduction(row.deduction)}"
+    )
+
+
+def _format_timesheet_text(item: AccountRunResult) -> str:
+    if item.timesheet_step_skipped:
+        return "⏱️ 工时提报：\n⏭️ 本步已跳过（decisions-only）"
+
+    ts = item.timesheet
+    if ts is None:
+        return "⏱️ 工时提报：\n- 无数据"
+
+    lines = ["⏱️ 工时提报："]
+    if ts.skipped_empty:
+        lines.append("📭 待办列表为空，已跳过")
+        return "\n".join(lines)
+
+    if ts.processed:
+        lines.append("✅ 本轮已完成：")
+        lines.extend(_fmt_timesheet_done_line(row) for row in ts.processed)
+    elif ts.incomplete:
+        lines.append("✅ 本轮已完成：无")
+    else:
+        # Pending list non-empty but nothing processed (e.g. timesheet-max=0).
+        lines.append("⏸️ 本轮未处理待办（受次数上限限制）")
+        return "\n".join(lines)
+
+    if ts.incomplete:
+        lines.append("⚠️ 未完成：")
+        for row in ts.incomplete:
+            lines.append(f"{_fmt_md_date(row.date)} {row.reason}")
+    else:
+        lines.append("⚠️ 未完成：无")
+
+    return "\n".join(lines)
+
+
+def _format_overtime_meal_text(item: AccountRunResult) -> str:
+    if item.overtime_meal_step_skipped:
+        return "🍱 加班餐：\n⏭️ 本步已跳过（decisions-only）"
+
+    meal = item.overtime_meal
+    if meal is None:
+        return "🍱 加班餐：\n- 无数据"
+
+    lines = ["🍱 加班餐："]
+    if meal.skipped_not_monday:
+        lines.append("⏭️ 非周一，已跳过")
+        return "\n".join(lines)
+    if meal.skipped_no_eligible:
+        lines.append("📭 本周无符合条件的就餐日期，已跳过")
+        return "\n".join(lines)
+    if meal.processed:
+        lines.append("✅ 本轮已完成：")
+        for row in meal.processed:
+            lines.append(f"  {_fmt_md_date(row.date)}")
+    else:
+        lines.append("✅ 本轮已完成：无")
+    return "\n".join(lines)
 
 
 def _format_account_body(item: AccountRunResult) -> str:
     parts = [_account_header(item)]
     if item.reason:
         parts.append(f"📌 {item.reason}")
+    parts.append(_format_timesheet_text(item))
+    parts.append(_format_overtime_meal_text(item))
     if item.decisions:
+        parts.append("📋 加班申请：")
         parts.append(_format_decisions_text(item.decisions, item.submitted_dates))
     elif not item.run_success:
         parts.append(f"❌ {_brief_error(item.error_message or '执行失败')}")
@@ -150,6 +245,9 @@ def _brief_error(error: str) -> str:
         ("门户", "BPM 门户打开失败"),
         ("我的考勤", "考勤页读取失败"),
         ("加班查询", "加班查询读取失败"),
+        ("工时提报", "工时提报失败"),
+        ("工作时数", "工时提报失败"),
+        ("加班餐", "加班餐申请失败"),
         ("login", "BPM 登录失败"),
         ("Login", "BPM 登录失败"),
         ("chromewebdata", "浏览器页面加载失败"),
@@ -168,13 +266,24 @@ def _format_multi_account_summary(results: Sequence[AccountRunResult]) -> str:
     total = len(results)
     success = sum(1 for item in results if item.run_success)
     failed = total - success
+    ts_done = sum(len(item.timesheet.processed) for item in results if item.timesheet)
+    ts_incomplete = sum(
+        len(item.timesheet.incomplete) for item in results if item.timesheet
+    )
+    meal_done = sum(
+        len(item.overtime_meal.processed) for item in results if item.overtime_meal
+    )
     lines = [
-        "📊 EHR自动化决策结果：",
+        "📊 汇总结果：",
         f"✅ Success：{success}/{total}",
         f"❌ Failed: {failed}/{total}",
+        f"⏱️ 工时提报 完成 {ts_done} 条 / 未完成 {ts_incomplete} 条",
+        f"🍱 加班餐 完成 {meal_done} 天",
     ]
-    if failed == 0:
+    if failed == 0 and ts_incomplete == 0:
         lines.append("🎉 所有账号均执行成功")
+    elif failed == 0 and ts_incomplete > 0:
+        lines.append(f"⚠️ 有 {ts_incomplete} 条工时提报未完成，请人工处理")
     else:
         lines.append(f"⚠️ {failed} 个账号执行失败")
     return "\n".join(lines)
@@ -187,6 +296,8 @@ def _account_header(item: AccountRunResult) -> str:
 def _card_header_template(results: Sequence[AccountRunResult]) -> str:
     if any(not item.run_success for item in results):
         return "red"
+    if any(item.timesheet and item.timesheet.incomplete for item in results):
+        return "orange"
     for item in results:
         if any(d.action in (Action.SKIP_DIFF_MANUAL, Action.APPLY) for d in item.decisions):
             return "orange"

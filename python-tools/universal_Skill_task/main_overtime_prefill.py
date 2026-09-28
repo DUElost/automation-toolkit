@@ -20,6 +20,8 @@ from account_config import (
 )
 from browser import launch_page
 from bpm_login import LoginError, login_bpm
+from bpm_overtime_meal import OvertimeMealError, process_overtime_meal
+from bpm_timesheet import TimesheetError, process_all_timesheets
 from config import AppConfig, ConfigError, load_config
 from ehr_attendance import AttendanceReadError, read_punches_for_days
 from ehr_nav import EhrNavError, wait_ehr_home_ready
@@ -119,6 +121,56 @@ def _run_single_account(
         try:
             login_bpm(page, account_cfg)
             print(f"[OK] [{account.account_id}] BPM login url={page.url}")
+
+            if not options.decisions_only:
+                ts_reason = reason or "待确认"
+                print(
+                    f"[INFO] [{account.account_id}] BPM 工时提报 "
+                    f"(allow_submit={options.allow_submit} "
+                    f"timesheet_max={options.timesheet_max})",
+                    flush=True,
+                )
+                ts_result = process_all_timesheets(
+                    page,
+                    ts_reason,
+                    allow_submit=options.allow_submit,
+                    max_items=options.timesheet_max,
+                )
+                result.timesheet = ts_result
+                print(
+                    f"[OK] [{account.account_id}] 工时提报 done "
+                    f"processed={[p.date for p in ts_result.processed]} "
+                    f"empty={ts_result.skipped_empty} "
+                    f"incomplete={[f'{i.date}:{i.reason}' for i in ts_result.incomplete]}",
+                    flush=True,
+                )
+
+                print(
+                    f"[INFO] [{account.account_id}] BPM 加班餐 "
+                    f"(allow_submit={options.allow_submit})",
+                    flush=True,
+                )
+                meal_result = process_overtime_meal(
+                    page,
+                    account.username,
+                    allow_submit=options.allow_submit,
+                )
+                result.overtime_meal = meal_result
+                print(
+                    f"[OK] [{account.account_id}] 加班餐 done "
+                    f"processed={[p.date for p in meal_result.processed]} "
+                    f"not_monday={meal_result.skipped_not_monday} "
+                    f"no_eligible={meal_result.skipped_no_eligible}",
+                    flush=True,
+                )
+            else:
+                result.timesheet_step_skipped = True
+                result.overtime_meal_step_skipped = True
+                print(
+                    f"[INFO] [{account.account_id}] decisions-only: skip 工时提报/加班餐",
+                    flush=True,
+                )
+
             ehr_page = open_ehr(page, context)
             print(f"[OK] [{account.account_id}] EHR opened url={ehr_page.url}")
             wait_ehr_home_ready(ehr_page)
@@ -164,7 +216,17 @@ def _run_single_account(
 
                 submit_overtime_form(ehr_page)
                 _screenshot(ehr_page, f"{account.account_id}_submitted_{target:%Y%m%d}")
-                saved = read_existing_overtime(ehr_page, target)
+                saved = None
+                for attempt in range(1, 4):
+                    saved = read_existing_overtime(ehr_page, target)
+                    if saved is not None:
+                        break
+                    print(
+                        f"[INFO] [{account.account_id}] verify {target.isoformat()} "
+                        f"attempt {attempt}/3 empty; retry",
+                        flush=True,
+                    )
+                    ehr_page.wait_for_timeout(4_000)
                 if saved is None:
                     msg = f"{target.isoformat()} not found in 加班查询 after submit"
                     result.decisions = decisions
@@ -186,6 +248,8 @@ def _run_single_account(
             EhrNavError,
             OvertimeApplyError,
             AttendanceReadError,
+            TimesheetError,
+            OvertimeMealError,
         ) as exc:
             print(f"[FAIL] [{account.account_id}] {exc}")
             try:
