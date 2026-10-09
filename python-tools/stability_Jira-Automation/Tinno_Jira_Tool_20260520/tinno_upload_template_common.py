@@ -133,6 +133,60 @@ def load_package_owner_mapping(file_path: str | Path) -> Dict[str, Dict[str, str
     return mapping
 
 
+def _lookup_ci(mapping: Dict[str, Any], key: str) -> Any:
+    text = str(key or "").strip()
+    if not text or not mapping:
+        return None
+    if text in mapping:
+        return mapping[text]
+    upper = text.upper()
+    for existing, value in mapping.items():
+        if str(existing).strip().upper() == upper:
+            return value
+    return None
+
+
+def load_module_assignee_mapping(file_path: str | Path) -> Dict[str, Dict[str, str]]:
+    path = Path(file_path)
+    if not path.exists():
+        return {}
+    try:
+        with open(path, "r", encoding="utf-8") as fp:
+            data = json.load(fp)
+    except (OSError, json.JSONDecodeError):
+        logger.warning("模块经办人映射读取失败: %s", path)
+        return {}
+    if not isinstance(data, dict):
+        return {}
+
+    mapping: Dict[str, Dict[str, str]] = {}
+    for raw_project, raw_modules in data.items():
+        project_key = str(clean_cell_value(raw_project) or "").strip().upper()
+        if not project_key or not isinstance(raw_modules, dict):
+            continue
+        modules: Dict[str, str] = {}
+        for raw_module, raw_assignee in raw_modules.items():
+            module_name = str(clean_cell_value(raw_module) or "").strip()
+            assignee_name = str(clean_cell_value(raw_assignee) or "").strip()
+            if module_name and assignee_name:
+                modules[module_name] = assignee_name
+        if modules:
+            mapping[project_key] = modules
+    return mapping
+
+
+def resolve_module_assignee(
+    project_key: str,
+    module_name: str,
+    module_assignee_mapping: Optional[Dict[str, Dict[str, str]]],
+) -> str:
+    project_modules = _lookup_ci(module_assignee_mapping or {}, project_key)
+    if not isinstance(project_modules, dict):
+        return ""
+    assignee = _lookup_ci(project_modules, module_name)
+    return str(assignee or "").strip()
+
+
 def load_affect_project_mapping(file_path: str | Path) -> Dict[str, Dict[str, str]]:
     path = Path(file_path)
     if not path.exists():
@@ -378,18 +432,44 @@ def _match_count_requirement(actual_count: int, operator: str, threshold: int) -
     return actual_count >= threshold
 
 
-def _detect_severity_level(issue_data: Dict[str, Any], defaults: Dict[str, Any], severity_rules: Optional[List[Dict[str, Any]]]) -> str:
-    exp_class = str(issue_data.get("exp_class") or "")
-    exp_type = str(issue_data.get("exp_type") or "")
-    search_text = f"{exp_class} {exp_type}".lower()
+def _detect_severity_level(issue_data: Dict[str, Any], defaults: Dict[str, Any], severity_rules: Optional[List[Dict[str, Any]]]) -> Optional[str]:
+    """按定级表匹配问题等级。没有规则表时沿用默认等级；有规则但没有命中时返回 None。"""
+    if not severity_rules:
+        return str(defaults.get("default_bug_severity", "B"))
+    search_text = " ".join(
+        str(issue_data.get(field_name) or "")
+        for field_name in ("exp_class", "exp_type", "package", "cur_process")
+    ).lower()
     count = int(issue_data.get("count") or 0)
-    for rule in severity_rules or []:
+    matches: List[tuple[int, int, Dict[str, Any]]] = []
+    for index, rule in enumerate(severity_rules):
         keyword = str(rule.get("keyword") or "").strip().lower()
         if not keyword or keyword not in search_text:
             continue
         if _match_count_requirement(count, str(rule.get("operator") or ">="), int(rule.get("threshold") or 0)):
-            return str(rule.get("level") or defaults.get("default_bug_severity", "B"))
-    return str(defaults.get("default_bug_severity", "B"))
+            matches.append((len(keyword), index, rule))
+    if not matches:
+        return None
+    # 更长的报错类型优先，避免 system_server_crash 被更短的 Java (JE) 先抢走。
+    matches.sort(key=lambda item: (-item[0], item[1]))
+    return str(matches[0][2].get("level") or "").strip() or None
+
+
+def format_skipped_severity_rows(skipped_rows: List[Dict[str, Any]]) -> List[str]:
+    if not skipped_rows:
+        return []
+    lines = [f"未命中问题等级规则，已跳过 {len(skipped_rows)} 条"]
+    for item in skipped_rows:
+        lines.append(
+            "Excel 第 {excel_row} 行，包名 {package}，异常类型 {exp_class}，异常子类 {exp_type}，次数 {count}".format(
+                excel_row=item.get("excel_row"),
+                package=item.get("package") or "",
+                exp_class=item.get("exp_class") or "",
+                exp_type=item.get("exp_type") or "",
+                count=item.get("count"),
+            )
+        )
+    return lines
 
 
 def _derive_affect_project_from_version(version: str) -> str:
@@ -397,7 +477,8 @@ def _derive_affect_project_from_version(version: str) -> str:
     if not text:
         return ""
     version_parts = [part.strip() for part in text.split("-") if str(part).strip()]
-    if len(version_parts) >= 2 and version_parts[1].upper().startswith("LX"):
+    # 板型段形如 LX2、NX2。MLD-NX2-16-260928V9 的前缀是 MLD-NX2，不能收成 MLD。
+    if len(version_parts) >= 2 and re.fullmatch(r"[A-Z]+\d+", version_parts[1].upper()):
         return f"{version_parts[0]}-{version_parts[1]}"
     first_token = re.split(r"[-_\s]", text, maxsplit=1)[0]
     return first_token.strip()
@@ -412,7 +493,9 @@ def _resolve_project_and_affect_project(
     explicit_affect_project = str(issue_data.get("affect_project") or "").strip()
     derived_affect_project = _derive_affect_project_from_version(str(issue_data.get("version") or ""))
     affect_project_key = explicit_affect_project or derived_affect_project
-    mapping_item = (affect_project_mapping or {}).get(affect_project_key, {})
+    mapping_item = _lookup_ci(affect_project_mapping or {}, affect_project_key)
+    if not isinstance(mapping_item, dict):
+        mapping_item = {}
     affect_project_value = (
         str(mapping_item.get("affect_project") or "").strip()
         or affect_project_key
@@ -432,6 +515,7 @@ def build_upload_rows(
     package_mapping: Dict[str, Dict[str, str]],
     severity_rules: Optional[List[Dict[str, Any]]] = None,
     affect_project_mapping: Optional[Dict[str, Dict[str, str]]] = None,
+    module_assignee_mapping: Optional[Dict[str, Dict[str, str]]] = None,
     test_case_summary_mapping: Optional[Dict[str, Dict[str, Any]]] = None,
     reporter_override: Optional[str] = None,
     assignee_override: Optional[str] = None,
@@ -439,14 +523,16 @@ def build_upload_rows(
     module_override: Optional[str] = None,
     default_test_case: Optional[str] = None,
     source_excel_path: Optional[str | Path] = None,
+    skipped_rows: Optional[List[Dict[str, Any]]] = None,
 ) -> List[Dict[str, Any]]:
     rows: List[Dict[str, Any]] = []
+    skipped = skipped_rows if skipped_rows is not None else []
     inferred_default_test_case = (
         str(clean_cell_value(default_test_case) or "").strip()
         or infer_test_case_from_excel_path(source_excel_path, test_case_summary_mapping)
         or str(clean_cell_value(defaults.get("default_test_case", "")) or "").strip()
     )
-    for _, row in main_df.iterrows():
+    for row_offset, (_, row) in enumerate(main_df.iterrows()):
         resolved_test_case = resolve_test_case_name(
             raw_test_case=find_first_value(row, "test_case", None),
             default_test_case=inferred_default_test_case,
@@ -461,9 +547,19 @@ def build_upload_rows(
         package_info = package_mapping.get(issue_data["package"], {})
         explicit_severity_level = str(find_first_value(row, "severity_level", "") or "").strip()
         severity_level = explicit_severity_level or _detect_severity_level(issue_data, defaults, severity_rules)
+        if not severity_level:
+            skipped.append(
+                {
+                    "excel_row": row_offset + 2,
+                    "package": issue_data["package"],
+                    "exp_class": issue_data["exp_class"],
+                    "exp_type": issue_data["exp_type"],
+                    "count": issue_data["count"],
+                }
+            )
+            continue
         priority = map_severity_to_priority(severity_level)
         reporter = reporter_override or defaults.get("default_reporter", "")
-        assignee = assignee_override or package_info.get("assignee") or defaults.get("default_assignee", "")
         module = (
             module_override
             or package_info.get("module")
@@ -475,6 +571,15 @@ def build_upload_rows(
             defaults=defaults,
             affect_project_mapping=affect_project_mapping,
             project_override=project_override,
+        )
+        jira_assignee = ""
+        if not assignee_override:
+            jira_assignee = resolve_module_assignee(project_value, module, module_assignee_mapping)
+        assignee = (
+            assignee_override
+            or jira_assignee
+            or package_info.get("assignee")
+            or defaults.get("default_assignee", "")
         )
         rows.append(
             {

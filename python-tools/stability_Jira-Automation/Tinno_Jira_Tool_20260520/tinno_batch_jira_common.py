@@ -223,6 +223,12 @@ class TinnoJiraClientAdapter:
             return SimpleNamespace(**payload)
         return SimpleNamespace(key=project_key, name=project_key)
 
+    def project_components(self, project_key: str) -> List[Dict[str, Any]]:
+        payload = self._client.get_project_components(project_key)
+        if not isinstance(payload, list):
+            return []
+        return [item for item in payload if isinstance(item, dict)]
+
     def project_versions(self, project_key: str) -> List[SimpleNamespace]:
         payload = self._client.get_project_versions(project_key)
         if not isinstance(payload, list):

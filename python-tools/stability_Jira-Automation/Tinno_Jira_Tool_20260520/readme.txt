@@ -76,11 +76,49 @@ Tinno 独立 Jira 工具，不与 Transsion 工具混用。
   严重度/优先级规则
 - `config/affect_project_mapping.json`
   第一阶段项目前缀解析与项目映射
+- `config/summary_product_mapping.json`
+  版本前缀到标题产品名的映射
+- `config/module_assignee_mapping.json`
+  按 Jira 项目保存的模块经办人，由项目初始化从 Jira 组件写入
 - `config/稳定性专项汇总.xlsx`
   第一阶段专项识别配置
 
 
 4、常用命令
+
+新增项目：初始化客户项目、Jira 关键字，并从 Jira 拉取模块经办人
+
+```powershell
+python ".\init_tinno_project.py"
+```
+
+也可直接传入关键信息，跳过交互：
+
+```powershell
+python ".\init_tinno_project.py" `
+  --customer-project "PFDFAA" `
+  --jira-key "PFDFAA"
+```
+
+多个版本前缀指向同一个 Jira 项目时用逗号分隔，例如 `--customer-project "MLD-LX2,V552AA"`。
+认证沿用第二阶段的 Cookie 与 P12。包名仍用 `包名与模块&经办人对应表_tinno.xls` 匹配模块；
+模块能对上 Jira 组件时，经办人改用组件上的实际经办人。
+
+试运行写到独立工作区，不修改 `config/` 下的正式文件：
+
+```powershell
+python ".\init_tinno_project.py" `
+  --workspace ".\result\project_init_workspace" `
+  --customer-project "MLD-NX2" `
+  --jira-key "PFDFAA" `
+  --summary-product "P535AA"
+```
+
+`MLD-NX2` 是 Monkey 版本前缀，标题产品名是 `P535AA`，Jira 关键字是 `PFDFAA`。
+板型段（如 `LX2`、`NX2`）会保留在前缀里，不会收成 `MLD`。
+
+工作区里会生成 `config/affect_project_mapping.json`、`config/summary_product_mapping.json`
+和 `config/module_assignee_mapping.json`。确认结果后再去掉 `--workspace` 写入正式配置。
 
 第一阶段：生成 Tinno 上传模板
 
@@ -127,8 +165,13 @@ python ".\create_tinno_jira_batch_from_excel.py" `
 备注说明：
 
 - `--add-comments`
+  - 真实建单默认追加评论；只有明确加上 `--no-add-comments` 时才不追加
   - 仅在真实执行时生效
   - 新建问题单成功后，会把 Excel 中 `PS` 列追加为评论
+- 问题等级
+  - 按 `config/问题等级定级表.xls` 匹配；报错类型同时对照异常类型、异常子类和包名
+  - 多条规则同时命中时，用更长的报错类型
+  - 有定级表但一条都对不上时，该行不进入上传模板，并在结束时列出跳过记录
 - 历史单备注
   - 当命中历史单且决策需要评论时，脚本会追加结构化 FAIL 备注
   - 当回归 PASS 判定成立时，脚本会追加结构化 PASS 备注
@@ -188,7 +231,7 @@ python ".\create_tinno_jira_batch_from_excel.py" --test-mode --regression-projec
     - 非较新版本：跳过，不重建
   - OPEN / WONT_FIX / RESOLVED_FIXED_WAIT_NEW_VERSION / REGRESSION_PASS 等主决策预演
   - PASS / FAIL 结构化备注生成
-  - 新建问题单后按 `--add-comments` 追加 `PS` 评论
+  - 新建问题单后默认追加 `PS` 评论，可用 `--no-add-comments` 关闭
   - 严格版本项目按配置比较版本（见下）
   - duplicate 跟随关闭：主单关单后关闭其重复子单（resolution=Duplicate 的主单不触发）
 - 尚待真实项目补证

@@ -15,6 +15,11 @@ import tinno_upload_template_common as upload_common
 
 
 class TinnoUploadTemplateCommonTest(unittest.TestCase):
+    def test_derive_affect_project_keeps_board_prefix(self) -> None:
+        self.assertEqual("MLD-LX2", upload_common._derive_affect_project_from_version("MLD-LX2-16-260518V3"))
+        self.assertEqual("MLD-NX2", upload_common._derive_affect_project_from_version("MLD-NX2-16-260928V9"))
+        self.assertEqual("V552AA", upload_common._derive_affect_project_from_version("V552AA-15-250905V60"))
+
     def test_load_test_case_summary_reads_excel(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             file_path = Path(temp_dir) / "test_case_summary.xlsx"
@@ -283,6 +288,119 @@ class TinnoUploadTemplateCommonTest(unittest.TestCase):
 
         self.assertEqual("A", rows[0]["Bug Severity"])
         self.assertEqual("High", rows[0]["Priority"])
+
+    def test_unmatched_severity_rule_is_skipped(self) -> None:
+        main_df = pd.DataFrame(
+            [
+                {
+                    "Package": "com.android.settings",
+                    "Version": "V552AA-15-250905V60",
+                    "Exp Class": "ANR",
+                    "Count": 1,
+                    "DeviceCount": 1,
+                },
+                {
+                    "Package": "com.android.settings",
+                    "Version": "V552AA-15-250905V60",
+                    "Exp Class": "Java (JE)",
+                    "Count": 9,
+                    "DeviceCount": 1,
+                },
+            ]
+        )
+        severity_rules = [
+            {
+                "level": "A",
+                "keyword": "Java (JE)",
+                "operator": ">=",
+                "threshold": 3,
+            }
+        ]
+        skipped_rows: list = []
+
+        rows = upload_common.build_upload_rows(
+            main_df=main_df,
+            defaults={
+                "project_key": "VCAME",
+                "issue_type": "Bug",
+                "default_reporter": "dai.lv",
+                "default_assignee": "autotest",
+                "default_bug_severity": "B",
+                "default_test_case": "Monkey专项",
+                "default_module_fallback": "System Stability",
+            },
+            package_mapping={},
+            severity_rules=severity_rules,
+            skipped_rows=skipped_rows,
+            default_test_case="Monkey专项",
+        )
+
+        self.assertEqual(1, len(rows))
+        self.assertEqual("A", rows[0]["Bug Severity"])
+        self.assertEqual(
+            [
+                {
+                    "excel_row": 2,
+                    "package": "com.android.settings",
+                    "exp_class": "ANR",
+                    "exp_type": "",
+                    "count": 1,
+                }
+            ],
+            skipped_rows,
+        )
+
+    def test_system_server_rules_override_generic_java_rule(self) -> None:
+        main_df = pd.DataFrame(
+            [
+                {
+                    "Package": "system_server_crash",
+                    "Version": "MLD-NX2-16-260928V9",
+                    "Exp Class": "Java (JE)",
+                    "Count": 2,
+                    "DeviceCount": 1,
+                },
+                {
+                    "Package": "system_server",
+                    "Version": "MLD-NX2-16-260928V9",
+                    "Exp Class": "Java (JE)",
+                    "Count": 1,
+                    "DeviceCount": 1,
+                },
+                {
+                    "Package": "com.android.settings",
+                    "Version": "MLD-NX2-16-260928V9",
+                    "Exp Class": "Java (JE)",
+                    "Count": 2,
+                    "DeviceCount": 1,
+                },
+            ]
+        )
+        severity_rules = [
+            {"level": "A", "keyword": "Java (JE)", "operator": ">=", "threshold": 3},
+            {"level": "B", "keyword": "Java (JE)", "operator": "<", "threshold": 3},
+            {"level": "S", "keyword": "system_server_crash", "operator": ">", "threshold": 0},
+            {"level": "S", "keyword": "system_server", "operator": ">", "threshold": 0},
+        ]
+
+        rows = upload_common.build_upload_rows(
+            main_df=main_df,
+            defaults={
+                "project_key": "PFDFAA",
+                "issue_type": "Bug",
+                "default_reporter": "dai.lv",
+                "default_assignee": "autotest",
+                "default_bug_severity": "B",
+                "default_test_case": "Monkey专项",
+                "default_module_fallback": "System Stability",
+            },
+            package_mapping={},
+            severity_rules=severity_rules,
+            default_test_case="Monkey专项",
+        )
+
+        self.assertEqual(["S", "S", "B"], [row["Bug Severity"] for row in rows])
+        self.assertEqual(["Highest", "Highest", "Medium"], [row["Priority"] for row in rows])
 
     def test_build_upload_rows_uses_row_test_case_name_before_cli_default(self) -> None:
         main_df = pd.DataFrame(

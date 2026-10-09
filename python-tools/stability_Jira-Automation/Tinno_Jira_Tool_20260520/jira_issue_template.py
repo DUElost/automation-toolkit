@@ -20,13 +20,14 @@ DEFAULT_REPORTER = os.getenv("JIRA_REPORTER", "dailv.tinno")
 SUMMARY_PREFIX = os.getenv("JIRA_SUMMARY_PREFIX", "[自动化]")
 CURRENT_DIR = Path(__file__).resolve().parent
 CONFIG_DIR = CURRENT_DIR / "config"
-SUMMARY_PRODUCT_MAPPING = {
+DEFAULT_SUMMARY_PRODUCT_MAPPING = {
     "ELA-LX2": "V551A",
     "ELA-LX3": "V551A",
     "MLD-LX1": "V552AA",
     "MLD-LX2": "V552AA",
     "MLD-LX3": "V552AA",
 }
+SUMMARY_PRODUCT_MAPPING_FILE = CONFIG_DIR / "summary_product_mapping.json"
 LOG_PATH_REPLACEMENTS = {
     "/home/jxtinno/sonic_tinno": "220.175.120.251",
 }
@@ -36,6 +37,29 @@ LOG_SERVER_USERNAME = "jxtinno"
 LOG_SERVER_PASSWORD_ENV = "TINNO_LOG_SERVER_PASSWORD"
 LOG_SERVER_PASSWORD_PLACEHOLDER = "<请从本地安全配置获取>"
 LOCAL_PS_WHITELIST_FILE = CONFIG_DIR / "local_ps_whitelist.json"
+
+
+def load_summary_product_mapping(file_path: str | Path | None = None) -> Dict[str, str]:
+    """加载版本前缀到标题产品名的映射，文件内容覆盖内置默认值。"""
+    mapping = dict(DEFAULT_SUMMARY_PRODUCT_MAPPING)
+    path = Path(file_path) if file_path else SUMMARY_PRODUCT_MAPPING_FILE
+    if not path.exists():
+        return mapping
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return mapping
+    if not isinstance(data, dict):
+        return mapping
+    for raw_prefix, raw_product in data.items():
+        prefix = str(raw_prefix or "").strip().upper()
+        product = str(raw_product or "").strip().upper()
+        if prefix and product:
+            mapping[prefix] = product
+    return mapping
+
+
+SUMMARY_PRODUCT_MAPPING = load_summary_product_mapping()
 
 
 def clean_version(version: Optional[str]) -> str:
@@ -65,9 +89,15 @@ def _resolve_summary_product_token(version: Optional[str]) -> str:
     if not version_text:
         return "Unknown"
     upper_version = version_text.upper()
-    for prefix, product in SUMMARY_PRODUCT_MAPPING.items():
-        if upper_version.startswith(prefix):
-            return product
+    prefixes = sorted(
+        SUMMARY_PRODUCT_MAPPING.items(),
+        key=lambda item: len(str(item[0] or "")),
+        reverse=True,
+    )
+    for prefix, product in prefixes:
+        normalized_prefix = str(prefix or "").strip().upper()
+        if normalized_prefix and upper_version.startswith(normalized_prefix):
+            return str(product or "").strip() or "Unknown"
     match = re.search(r"\b(V\d+[A-Z]+)\b", upper_version)
     if match:
         return str(match.group(1) or "").strip() or "Unknown"

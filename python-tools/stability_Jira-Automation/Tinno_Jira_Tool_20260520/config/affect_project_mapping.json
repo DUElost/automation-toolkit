@@ -18,5 +18,17 @@
   "V551A": {
     "jira_project": "VFFBA",
     "monkey_project": "VFFBA"
+  },
+  "MLD-NX2": {
+    "jira_project": "PFDFAA",
+    "monkey_project": "PFDFAA"
+  },
+  "ELA-LX2": {
+    "jira_project": "VFFBA",
+    "monkey_project": "VFFBA"
+  },
+  "ELA-LX3": {
+    "jira_project": "VFFBA",
+    "monkey_project": "VFFBA"
   }
 }

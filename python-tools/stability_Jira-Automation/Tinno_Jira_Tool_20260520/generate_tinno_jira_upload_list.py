@@ -26,7 +26,9 @@ from tinno_upload_template_common import (
     build_upload_rows,
     load_affect_project_mapping,
     load_defaults,
+    load_module_assignee_mapping,
     load_package_owner_mapping,
+    format_skipped_severity_rows,
     load_severity_rules,
     load_test_case_summary,
     read_excel_smart,
@@ -42,6 +44,7 @@ DEFAULT_CONFIG_FILE = CONFIG_DIR / "tinno_jira_defaults.json"
 DEFAULT_PACKAGE_MAPPING = CONFIG_DIR / "包名与模块&经办人对应表_tinno.xls"
 DEFAULT_SEVERITY_RULES = CONFIG_DIR / "问题等级定级表.xls"
 DEFAULT_AFFECT_PROJECT_MAPPING = CONFIG_DIR / "affect_project_mapping.json"
+DEFAULT_MODULE_ASSIGNEE_MAPPING = CONFIG_DIR / "module_assignee_mapping.json"
 DEFAULT_TEST_CASE_SUMMARY = CONFIG_DIR / "稳定性专项汇总.xlsx"
 DEFAULT_LOCAL_ENV_FILE = CURRENT_DIR / ".env.local"
 DEFAULT_OUTPUT_PREFIX = "JIRA_Upload_List_Tinno"
@@ -92,6 +95,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--package-mapping-file", dest="package_mapping_file", default=str(DEFAULT_PACKAGE_MAPPING), help="包名与模块&经办人映射")
     parser.add_argument("--severity-rules-file", dest="severity_rules_file", default=str(DEFAULT_SEVERITY_RULES), help="问题等级规则表")
     parser.add_argument("--affect-project-mapping-file", dest="affect_project_mapping_file", default=str(DEFAULT_AFFECT_PROJECT_MAPPING), help="Affect Project 映射表")
+    parser.add_argument("--summary-product-mapping-file", dest="summary_product_mapping_file", default=None, help="版本前缀到标题产品名的映射；省略时使用 config/summary_product_mapping.json")
+    parser.add_argument("--module-assignee-mapping-file", dest="module_assignee_mapping_file", default=None, help="项目模块经办人映射；省略时使用 config/module_assignee_mapping.json")
     parser.add_argument("--test-summary-file", dest="test_summary_file", default=str(DEFAULT_TEST_CASE_SUMMARY), help="稳定性专项汇总表")
     parser.add_argument("--set-project-key", dest="project_key", default=None, help="覆盖目标 Jira 项目 Key")
     parser.add_argument("--set-test-case", dest="test_case", default=None, help="覆盖默认测试专项名称或编号")
@@ -147,13 +152,25 @@ def main() -> int:
     package_mapping = load_package_owner_mapping(args.package_mapping_file)
     severity_rules = load_severity_rules(args.severity_rules_file)
     affect_project_mapping = load_affect_project_mapping(args.affect_project_mapping_file)
+    summary_product_mapping_file = getattr(args, "summary_product_mapping_file", None)
+    if summary_product_mapping_file:
+        import jira_issue_template
+
+        jira_issue_template.SUMMARY_PRODUCT_MAPPING = jira_issue_template.load_summary_product_mapping(
+            summary_product_mapping_file
+        )
+    module_assignee_mapping = load_module_assignee_mapping(
+        getattr(args, "module_assignee_mapping_file", None) or DEFAULT_MODULE_ASSIGNEE_MAPPING
+    )
     test_case_summary_mapping = load_test_case_summary(args.test_summary_file)
+    skipped_rows: list = []
     rows = build_upload_rows(
         main_df=main_df,
         defaults=defaults,
         package_mapping=package_mapping,
         severity_rules=severity_rules,
         affect_project_mapping=affect_project_mapping,
+        module_assignee_mapping=module_assignee_mapping,
         test_case_summary_mapping=test_case_summary_mapping,
         reporter_override=args.reporter,
         assignee_override=args.assignee,
@@ -161,10 +178,16 @@ def main() -> int:
         module_override=DEFAULT_TEST_MODE_MODULE if bool(getattr(args, "test_mode", False)) else None,
         default_test_case=args.test_case,
         source_excel_path=args.main_excel_path,
+        skipped_rows=skipped_rows,
     )
-    if not rows:
+    if not rows and not skipped_rows:
         logger.error("没有生成任何上传记录")
         return 1
+    if not rows:
+        logger.info("没有可写入上传模板的记录")
+        for line in format_skipped_severity_rows(skipped_rows):
+            logger.info("%s", line)
+        return 0
 
     output_path = args.output_path
     resolved_test_cases = sorted(
@@ -186,6 +209,8 @@ def main() -> int:
         logger.info("识别到测试专项: %s", ", ".join(resolved_test_cases))
     logger.info("上传模板已生成: %s", saved)
     logger.info("成功处理 %d 条记录", len(rows))
+    for line in format_skipped_severity_rows(skipped_rows):
+        logger.info("%s", line)
     return 0
 
 

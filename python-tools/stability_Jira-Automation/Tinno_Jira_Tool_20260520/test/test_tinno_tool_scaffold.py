@@ -27,6 +27,7 @@ class TinnoToolScaffoldTest(unittest.TestCase):
         expected = [
             "create_tinno_jira_batch_from_excel.py",
             "generate_tinno_jira_upload_list.py",
+            "init_tinno_project.py",
             "readme.txt",
             "config/tinno_jira_defaults.json",
             "config/regression_rules.json",
@@ -81,6 +82,16 @@ class TinnoToolScaffoldTest(unittest.TestCase):
 
         self.assertEqual("cookie-session", args.jira_cookie_jsessionid)
         self.assertEqual("cookie-xsrf", args.jira_cookie_xsrf_token)
+
+    def test_parse_args_adds_comments_unless_disabled(self) -> None:
+        module = load_batch_entry_module()
+        with mock.patch("sys.argv", ["create_tinno_jira_batch_from_excel.py", "--dry-run"]):
+            default_args = module.parse_args()
+        with mock.patch("sys.argv", ["create_tinno_jira_batch_from_excel.py", "--no-add-comments"]):
+            disabled_args = module.parse_args()
+
+        self.assertTrue(default_args.add_comments)
+        self.assertFalse(disabled_args.add_comments)
 
     def test_parse_args_supports_create_only_flag(self) -> None:
         module = load_batch_entry_module()

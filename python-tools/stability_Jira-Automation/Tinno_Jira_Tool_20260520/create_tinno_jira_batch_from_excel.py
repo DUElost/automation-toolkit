@@ -150,7 +150,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--config-file", dest="config_file", default=str(DEFAULT_CONFIG_FILE), help="默认配置路径")
     parser.add_argument("--dry-run", action="store_true", help="仅组装字段，不实际建单")
     parser.add_argument("--validate-metadata", action="store_true", help="读取 Create Meta 并打印")
-    parser.add_argument("--add-comments", action="store_true", help="创建成功后把 PS 列追加为评论")
+    parser.add_argument("--add-comments", dest="add_comments", action="store_true", help="真实建单后把 PS 列追加为评论，默认开启")
+    parser.add_argument("--no-add-comments", dest="add_comments", action="store_false", help="真实建单时不追加 PS 评论")
+    parser.set_defaults(add_comments=True)
     parser.add_argument("--wait-between-issues", dest="wait_between_issues", type=float, default=0.5, help="每条问题之间的等待秒数")
     return parser.parse_args()
 
