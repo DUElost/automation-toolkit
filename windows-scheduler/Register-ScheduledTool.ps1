@@ -16,7 +16,7 @@ param(
 
     [Parameter()]
     [ValidatePattern("^\d{2}:\d{2}$")]
-    [string]$DailyAt,
+    [string[]]$DailyAt,
 
     [Parameter()]
     [object]$RunAt,
@@ -152,7 +152,7 @@ function New-TaskTrigger {
         [string]$ScheduleType,
 
         [Parameter()]
-        [string]$TimeText,
+        [string[]]$TimeText,
 
         [Parameter()]
         [AllowNull()]
@@ -166,9 +166,14 @@ function New-TaskTrigger {
     )
 
     if ($ScheduleType -eq "Daily") {
-        $baseTime = [datetime]::Today.Add([timespan]::ParseExact($TimeText, "hh\:mm", $null))
-        $triggerTime = if ($Mode -eq "remind") { $baseTime.AddMinutes(-$ReminderOffsetMinutes) } else { $baseTime }
-        return New-ScheduledTaskTrigger -Daily -At $triggerTime
+        $triggers = @()
+        foreach ($singleTimeText in $TimeText) {
+            $baseTime = [datetime]::Today.Add([timespan]::ParseExact($singleTimeText, "hh\:mm", $null))
+            $triggerTime = if ($Mode -eq "remind") { $baseTime.AddMinutes(-$ReminderOffsetMinutes) } else { $baseTime }
+            $triggers += New-ScheduledTaskTrigger -Daily -At $triggerTime
+        }
+
+        return $triggers
     }
 
     if ($ScheduleType -eq "Interval") {
@@ -205,16 +210,26 @@ if (-not (Get-Command -Name Register-ScheduledTask -ErrorAction SilentlyContinue
 
 $resolvedRunAt = Convert-ToDateTime -InputValue $RunAt
 
+$dailyAtTimes = @()
+if ($null -ne $DailyAt) {
+    $dailyAtTimes = @(
+        $DailyAt |
+            ForEach-Object { ([string]$_).Trim() } |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+            Sort-Object -Unique
+    )
+}
+
 $scheduleType = $null
 $scheduleCount = 0
-if (-not [string]::IsNullOrWhiteSpace($DailyAt)) { $scheduleCount++ }
+if ($dailyAtTimes.Count -gt 0) { $scheduleCount++ }
 if ($null -ne $resolvedRunAt) { $scheduleCount++ }
 if ($EveryHours -gt 0) { $scheduleCount++ }
 
 if ($scheduleCount -gt 1) {
     throw "DailyAt, RunAt, and EveryHours are mutually exclusive. Specify only one."
 }
-elseif (-not [string]::IsNullOrWhiteSpace($DailyAt)) {
+elseif ($dailyAtTimes.Count -gt 0) {
     $scheduleType = "Daily"
 }
 elseif ($null -ne $resolvedRunAt) {
@@ -261,7 +276,7 @@ Ensure-Directory -Path $logDir
 
 $configPath = Join-Path -Path $configDir -ChildPath ("{0}.json" -f $taskKey)
 $scheduleLabel = if ($scheduleType -eq "Daily") {
-    "Daily $DailyAt"
+    "Daily {0}" -f ($dailyAtTimes -join ",")
 }
 elseif ($scheduleType -eq "Interval") {
     "Every ${EveryHours}h"
@@ -307,7 +322,7 @@ if ($ReminderMinutes -gt 0) {
 
 if ($registerExecuteTask -or $registerReminderTask) {
     $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument (Get-RunnerArguments -Mode "execute" -RunnerPath $runnerPath -ConfigPath $configPath) -WorkingDirectory $resolvedWorkDir
-    $executeTrigger = New-TaskTrigger -Mode "execute" -ScheduleType $scheduleType -TimeText $DailyAt -DateTimeValue $resolvedRunAt -EveryHours $EveryHours
+    $executeTrigger = New-TaskTrigger -Mode "execute" -ScheduleType $scheduleType -TimeText $dailyAtTimes -DateTimeValue $resolvedRunAt -EveryHours $EveryHours
 
     $currentUser = if ([string]::IsNullOrWhiteSpace($env:USERDOMAIN)) {
         $env:USERNAME
@@ -338,7 +353,7 @@ if ($registerExecuteTask) {
 
 if ($registerReminderTask) {
     $remindAction = New-ScheduledTaskAction -Execute "powershell.exe" -Argument (Get-RunnerArguments -Mode "remind" -RunnerPath $runnerPath -ConfigPath $configPath) -WorkingDirectory $resolvedWorkDir
-    $remindTrigger = New-TaskTrigger -Mode "remind" -ScheduleType $scheduleType -TimeText $DailyAt -DateTimeValue $resolvedRunAt -EveryHours $EveryHours -ReminderOffsetMinutes $ReminderMinutes
+    $remindTrigger = New-TaskTrigger -Mode "remind" -ScheduleType $scheduleType -TimeText $dailyAtTimes -DateTimeValue $resolvedRunAt -EveryHours $EveryHours -ReminderOffsetMinutes $ReminderMinutes
 
     Register-ScheduledTask `
         -TaskName $remindTaskName `

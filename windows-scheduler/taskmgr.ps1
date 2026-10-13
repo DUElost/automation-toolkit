@@ -293,13 +293,24 @@ function Get-TaskStatusText {
     }
 }
 
+function Get-DailyTimesFromLabel {
+    param([Parameter(Mandatory = $true)][string]$Label)
+
+    if ($Label -match '^Daily\s+(\d{2}:\d{2}(?:\s*,\s*\d{2}:\d{2})*)$') {
+        return @($Matches[1] -split "," | ForEach-Object { $_.Trim() })
+    }
+
+    return $null
+}
+
 function Get-ScheduleLabel {
     param($Config)
 
     $label = [string]$Config.schedule.label
     if ($Config.schedule.type -eq "Daily") {
-        if ($label -match '^Daily\s+(\d{2}:\d{2})$') {
-            return "每天 $($Matches[1])"
+        $dailyTimes = Get-DailyTimesFromLabel -Label $label
+        if ($null -ne $dailyTimes) {
+            return "每天 {0}" -f ($dailyTimes -join ", ")
         }
         return $label
     }
@@ -334,8 +345,9 @@ function Invoke-RegisterFromConfig {
     }
 
     if ($Config.schedule.type -eq "Daily") {
-        if ([string]$Config.schedule.label -match '^Daily\s+(\d{2}:\d{2})$') {
-            $registerArgs.DailyAt = $Matches[1]
+        $dailyTimes = Get-DailyTimesFromLabel -Label ([string]$Config.schedule.label)
+        if ($null -ne $dailyTimes -and $dailyTimes.Count -gt 0) {
+            $registerArgs.DailyAt = $dailyTimes
         }
         else {
             throw "无法从配置恢复 DailyAt: $($Config.schedule.label)"
@@ -552,14 +564,40 @@ function Invoke-CmdAdd {
             $scheduleSummary = ("{0} 分钟后（约 {1}）" -f $minutesInput, $runAt.ToString("HH:mm:ss"))
         }
         default {
-            $hour = [int](Read-HostDefault -Prompt "Hour   (0-23) [9]" -DefaultValue "9")
+            $hourInput = Read-HostDefault -Prompt "Hour   (0-23, 多点用逗号分隔如 9,14,19) [9]" -DefaultValue "9"
             $minute = [int](Read-HostDefault -Prompt "Minute (0-59) [0]" -DefaultValue "0")
-            if ($hour -lt 0 -or $hour -gt 23 -or $minute -lt 0 -or $minute -gt 59) {
+            if ($minute -lt 0 -or $minute -gt 59) {
                 Write-Die "时间格式无效"
             }
 
-            $dailyAt = "{0:D2}:{1:D2}" -f $hour, $minute
-            $scheduleSummary = ("每天 {0}" -f $dailyAt)
+            $hourTokens = @($hourInput -split "[,，;；\s]+" | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+            if ($hourTokens.Count -eq 0) {
+                Write-Die "时间格式无效"
+            }
+
+            $dailyAtList = New-Object System.Collections.Generic.List[string]
+            foreach ($token in $hourTokens) {
+                if ($token -match '^(\d{1,2}):(\d{2})$') {
+                    $tokenHour = [int]$Matches[1]
+                    $tokenMinute = [int]$Matches[2]
+                }
+                elseif ($token -match '^\d{1,2}$') {
+                    $tokenHour = [int]$token
+                    $tokenMinute = $minute
+                }
+                else {
+                    Write-Die "时间格式无效: $token"
+                }
+
+                if ($tokenHour -lt 0 -or $tokenHour -gt 23 -or $tokenMinute -lt 0 -or $tokenMinute -gt 59) {
+                    Write-Die "时间格式无效: $token"
+                }
+
+                $dailyAtList.Add("{0:D2}:{1:D2}" -f $tokenHour, $tokenMinute)
+            }
+
+            $dailyAt = @($dailyAtList | Sort-Object -Unique)
+            $scheduleSummary = ("每天 {0}" -f ($dailyAt -join ", "))
         }
     }
 

@@ -9,6 +9,7 @@
 
 | 日期 | 变更内容 |
 |------|----------|
+| 2026-10-13 | windows-scheduler 支持 `DailyAt` 多时间点（单任务多触发器）；新增 WSL 定时执行用法与 `wsl -e`/`bash -lc` 调用形态对照 |
 | 2026-06-13 | stability_Jira-Automation 迁移为 Transsion/Tinno/Moto 三套独立工具 |
 | 2026-05-26 | 新增 linux-tools/system_Task-Scheduler（systemd taskmgr，对齐 macOS） |
 | 2026-03-25 | 新增 stability_Start-Log-Scan、stability_FTPserver-Check、universal_Automation-Create-Task 模块 |
