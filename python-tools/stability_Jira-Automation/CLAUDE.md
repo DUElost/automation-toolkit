@@ -71,6 +71,8 @@ python -m pytest test\ -q
 
 VFFCA 严格版本比较（fix 忽略 LX 板型、current↔build 区分板型）见 [readme.txt §6.1](./Tinno_Jira_Tool_20260520/readme.txt)。
 
+新建问题时 labels 字段 = 该行测试专项标签（`Test Case` 列按 `test_case_label_mapping` 解析）+ 配置 `fixed_labels`（默认 `稳定性测试`）；历史缺陷是所有单固定为 `MonkeyAEE`，已修复。修复前建的单可用 `retro_patch_tinno_labels.py` 批量补打（默认支持 dry-run，先预览再执行）。
+
 ```powershell
 cd Tinno_Jira_Tool_20260520
 pip install -r requirements.txt

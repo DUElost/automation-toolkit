@@ -11,7 +11,7 @@ TOOL_DIR = Path(__file__).resolve().parent.parent
 if str(TOOL_DIR) not in sys.path:
     sys.path.insert(0, str(TOOL_DIR))
 
-from tinno_batch_jira_common import build_issue_fields
+from tinno_batch_jira_common import build_issue_fields, extract_specialty_token_from_summary
 
 
 class _FakeJiraClient:
@@ -164,6 +164,118 @@ class TinnoBuildIssueFieldsTest(unittest.TestCase):
         fields = build_issue_fields(self.jira, row, self.defaults)
 
         self.assertEqual([{"name": "Setting"}], fields["components"])
+
+    def test_build_issue_labels_preserves_specialty_and_adds_fixed_label(self) -> None:
+        row = pd.Series(
+            {
+                "Project": "VCAME",
+                "Issue Type": "Bug",
+                "Summary": "summary",
+                "Description": "description",
+                "Test Case": "MTBF专项",
+            }
+        )
+
+        fields = build_issue_fields(self.jira, row, self.defaults)
+
+        self.assertEqual(["MTBF", "稳定性测试"], fields["labels"])
+
+    def test_build_issue_labels_monkey_specialty_maps_to_monkeyaee(self) -> None:
+        row = pd.Series(
+            {
+                "Project": "VCAME",
+                "Issue Type": "Bug",
+                "Summary": "summary",
+                "Description": "description",
+                "Test Case": "Monkey专项",
+            }
+        )
+
+        fields = build_issue_fields(self.jira, row, self.defaults)
+
+        self.assertEqual(["MonkeyAEE", "稳定性测试"], fields["labels"])
+
+    def test_build_issue_labels_falls_back_to_summary_specialty_token(self) -> None:
+        row = pd.Series(
+            {
+                "Project": "VCAME",
+                "Issue Type": "Bug",
+                "Summary": "[自动化][V552AA][Total Number 6][MLD-LX2-16-260523V6][MTBF][Java (JE)]x发生Java (JE)",
+                "Description": "description",
+            }
+        )
+
+        fields = build_issue_fields(self.jira, row, self.defaults)
+
+        self.assertEqual(["MTBF", "稳定性测试"], fields["labels"])
+
+    def test_build_issue_labels_ignores_unknown_summary_token(self) -> None:
+        row = pd.Series(
+            {
+                "Project": "VCAME",
+                "Issue Type": "Bug",
+                "Summary": "[自动化][V552AA][Total Number 1][VVTB35.41-1][62次][ANR]x发生ANR",
+                "Description": "description",
+            }
+        )
+
+        fields = build_issue_fields(self.jira, row, self.defaults)
+
+        # 非白名单 token 不写入 labels，专项回退到配置默认值
+        self.assertEqual(["MonkeyAEE", "稳定性测试"], fields["labels"])
+
+    def test_build_issue_labels_keeps_legacy_default_when_no_specialty_found(self) -> None:
+        row = pd.Series(
+            {
+                "Project": "VCAME",
+                "Issue Type": "Bug",
+                "Summary": "summary",
+                "Description": "description",
+            }
+        )
+
+        fields = build_issue_fields(self.jira, row, self.defaults)
+
+        self.assertEqual(self.defaults.get("labels", ["MonkeyAEE"]) + self.defaults.get("fixed_labels", ["稳定性测试"]), fields["labels"])
+
+    def test_build_issue_labels_dedupes_fixed_label_with_specialty(self) -> None:
+        row = pd.Series(
+            {
+                "Project": "VCAME",
+                "Issue Type": "Bug",
+                "Summary": "summary",
+                "Description": "description",
+                "Test Case": "稳定性测试专项",
+            }
+        )
+
+        fields = build_issue_fields(self.jira, row, self.defaults)
+
+        self.assertEqual(["稳定性测试"], fields["labels"])
+
+    def test_extract_specialty_token_new_and_legacy_version_formats(self) -> None:
+        # 新版版本号段（\d{6}V\d+）
+        self.assertEqual(
+            "MTBF",
+            extract_specialty_token_from_summary(
+                "[自动化][V552AA][Total Number 6][MLD-LX2-16-260523V6][MTBF][Java (JE)]a发生Java (JE)"
+            ),
+        )
+        # 旧版单号段格式，回退按固定结构取第 5 段
+        self.assertEqual(
+            "MonkeyAEE",
+            extract_specialty_token_from_summary(
+                "[自动化][V551A][Total Number 1][VVTB35.41-1][MonkeyAEE][ANR]system发生ANR"
+            ),
+        )
+        self.assertEqual(
+            "MonkeyAEE",
+            extract_specialty_token_from_summary(
+                "[自动化][V551A][Total Number 30][P2][MonkeyAEE][java.lang.NullPointerException]x发生y"
+            ),
+        )
+        # 非自动化标题结构不猜测
+        self.assertEqual("", extract_specialty_token_from_summary("手工单标题"))
 
 
 if __name__ == "__main__":

@@ -13,6 +13,9 @@
   "labels": [
     "MonkeyAEE"
   ],
+  "fixed_labels": [
+    "稳定性测试"
+  ],
   "default_test_case": "Monkey专项",
   "test_case_label_mapping": {
     "Monkey专项": "MonkeyAEE",

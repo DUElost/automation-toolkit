@@ -55,6 +55,27 @@ PREVIOUS_VERSION_STATUS_VALUES = {
 }
 RECURRENCE_PROBABILITY_VALUES = {"100%", ">50%", ">10%", ">1%"}
 VERSION_PREFIXES = ("*version:*", "版本：", "版本:")
+# 与第一阶段 tinno_upload_template_common.DEFAULT_TEST_CASE_LABEL_MAPPING 保持一致；
+# 配置项 test_case_label_mapping 优先于此内置映射。
+DEFAULT_TEST_CASE_LABEL_MAPPING = {
+    "Monkey专项": "MonkeyAEE",
+}
+# 每次新建问题都必须追加的固定标签（测试专项标签之外的通用标签）。
+DEFAULT_FIXED_LABELS = ["稳定性测试"]
+# 已知稳定性专项 token 兜底集合（与 config/稳定性专项汇总.xlsx 的专项一致），
+# 用于配置缺少 test_case_label_mapping 时的白名单校验。
+DEFAULT_SPECIALTY_TOKENS = [
+    "MonkeyAEE",
+    "MTBF",
+    "DDR",
+    "GPU压力",
+    "开关机",
+    "休眠唤醒",
+    "恢复出厂",
+    "内存泄漏Stress",
+    "ADB重启+Monkey",
+    "联机UI重启",
+]
 
 
 def clean_cell_value(value: Any) -> Any:
@@ -814,6 +835,120 @@ def add_issue_comment(jira_client: TinnoJiraClientAdapter, issue_key: str, comme
         jira_client.add_comment(issue_key, comment)
 
 
+def _dedupe_labels(values: List[str]) -> List[str]:
+    deduped: List[str] = []
+    seen: set = set()
+    for value in values:
+        token = str(clean_cell_value(value) or "").strip()
+        if not token or token in seen:
+            continue
+        seen.add(token)
+        deduped.append(token)
+    return deduped
+
+
+def extract_specialty_token_from_summary(summary: Any) -> str:
+    """从 Summary 提取专项 token（第一阶段写入的就是专项标签）。
+
+    优先取版本号段后的下一个 token；旧版单号段格式（如 `VVTB35.41-1`、`P2`）不满足
+    版本号正则时，回退按固定结构 `[自动化][产品][Total Number N][版本][专项]...` 取第 5 段。
+    """
+    tokens = [item.strip() for item in re.findall(r"\[([^\]]+)\]", str(summary or "")) if item.strip()]
+    for index, token in enumerate(tokens):
+        if re.search(r"\d{6}V\d+", token, flags=re.IGNORECASE):
+            if index + 1 < len(tokens):
+                return tokens[index + 1]
+            break
+    if len(tokens) >= 5 and re.match(r"^Total Number \d+$", tokens[2], flags=re.IGNORECASE):
+        return tokens[4]
+    return ""
+
+
+_extract_specialty_token_from_summary = extract_specialty_token_from_summary
+
+
+def known_specialty_labels(defaults: Dict[str, Any]) -> set:
+    """已知专项 token 白名单（配置映射 + 内置映射的专项名与标签值）。"""
+    label_mapping = defaults.get("test_case_label_mapping") or DEFAULT_TEST_CASE_LABEL_MAPPING
+    known: set = set()
+    for raw_key, raw_value in dict(label_mapping or {}).items():
+        key = str(raw_key or "").strip()
+        value = str(raw_value or "").strip()
+        if key:
+            known.add(key.casefold())
+        if value:
+            known.add(value.casefold())
+    for key, value in DEFAULT_TEST_CASE_LABEL_MAPPING.items():
+        known.add(str(key).strip().casefold())
+        known.add(str(value).strip().casefold())
+    for token in DEFAULT_SPECIALTY_TOKENS:
+        known.add(str(token).strip().casefold())
+        known.add(f"{token}专项".strip().casefold())
+    return known
+
+
+def normalize_specialty_token_from_summary(summary: Any, defaults: Dict[str, Any]) -> str:
+    """从 Summary 提取专项 token 并做白名单校验。
+
+    非本工具生成的单（如其它自动化系统借用了相同段落结构，第 5 段是“62次/SKU2-C”
+    之类的计数）会被判为未识别，避免把脏 token 写进 labels。
+    """
+    token = extract_specialty_token_from_summary(summary)
+    if not token:
+        return ""
+    label_mapping = defaults.get("test_case_label_mapping") or DEFAULT_TEST_CASE_LABEL_MAPPING
+    if isinstance(label_mapping, dict):
+        mapped = str(clean_cell_value(label_mapping.get(token, "")) or "").strip()
+        if mapped:
+            return mapped
+    if token.casefold() in known_specialty_labels(defaults):
+        return token
+    return ""
+
+
+def resolve_specialty_label(row: Any, defaults: Dict[str, Any]) -> str:
+    """解析当前行对应的测试专项标签，与第一阶段 Summary 的专项 token 保持一致。"""
+    test_case = str(clean_cell_value(find_first_value(row, "test_case", "")) or "").strip()
+    if not test_case:
+        return normalize_specialty_token_from_summary(find_first_value(row, "summary", ""), defaults)
+    label_mapping = defaults.get("test_case_label_mapping") or DEFAULT_TEST_CASE_LABEL_MAPPING
+    if isinstance(label_mapping, dict):
+        mapped = str(clean_cell_value(label_mapping.get(test_case, "")) or "").strip()
+        if mapped:
+            return mapped
+    if test_case.endswith("专项"):
+        return test_case[:-2]
+    return test_case
+
+
+def resolve_issue_labels(row: Any, defaults: Dict[str, Any]) -> List[str]:
+    """新建问题的 labels：保留该行对应的测试专项标签，并追加固定标签（默认 稳定性测试）。
+
+    历史上这里直接使用配置里的静态 labels（全部为 MonkeyAEE），导致专项标签失真；
+    现在按行解析专项标签，找不到专项信息时才回退到配置 labels。
+    """
+    labels: List[str] = []
+    specialty_label = resolve_specialty_label(row, defaults)
+    if specialty_label:
+        labels.append(specialty_label)
+    else:
+        fallback = defaults.get("labels", ["MonkeyAEE"])
+        if isinstance(fallback, str):
+            fallback = [fallback]
+        for item in fallback or []:
+            token = str(clean_cell_value(item) or "").strip()
+            if token:
+                labels.append(token)
+    fixed_labels = defaults.get("fixed_labels", DEFAULT_FIXED_LABELS)
+    if isinstance(fixed_labels, str):
+        fixed_labels = [fixed_labels]
+    for item in fixed_labels or []:
+        token = str(clean_cell_value(item) or "").strip()
+        if token:
+            labels.append(token)
+    return _dedupe_labels(labels)
+
+
 def build_issue_fields(
     jira_client: TinnoJiraClientAdapter,
     row: Any,
@@ -828,7 +963,7 @@ def build_issue_fields(
     project_cache = project_cache if project_cache is not None else {}
     create_meta_cache = create_meta_cache if create_meta_cache is not None else {}
     field_ids = defaults.get("field_ids", {})
-    labels = defaults.get("labels", ["MonkeyAEE"])
+    labels = resolve_issue_labels(row, defaults)
 
     project_key = resolve_project_key(
         jira_client,

@@ -168,6 +168,12 @@ python ".\create_tinno_jira_batch_from_excel.py" `
   - 真实建单默认追加评论；只有明确加上 `--no-add-comments` 时才不追加
   - 仅在真实执行时生效
   - 新建问题单成功后，会把 Excel 中 `PS` 列追加为评论
+- labels 字段（新建问题时）
+  - labels = 该行测试专项标签 + 固定标签 `稳定性测试`，重复值自动去重
+  - 专项标签按上传模板 `Test Case` 列经 `test_case_label_mapping` 解析（如 `MTBF专项`→`MTBF`、`Monkey专项`→`MonkeyAEE`）；无 `Test Case` 列时回退取 Summary 版本号后的专项 token；仍解析不到才使用配置 `labels` 的静态值
+  - 固定标签可在配置 `fixed_labels` 中调整（默认 `["稳定性测试"]`）
+  - 修复历史问题：此前 labels 始终取配置 `labels` 静态值，所有单均为 `MonkeyAEE`，未跟随对应专项
+  - 仅影响新建；命中历史单更新时不改 labels
 - 问题等级
   - 按 `config/问题等级定级表.xls` 匹配；报错类型同时对照异常类型、异常子类和包名
   - 多条规则同时命中时，用更长的报错类型
@@ -198,6 +204,34 @@ python ".\create_tinno_jira_batch_from_excel.py" --test-mode --create-only --dry
 python ".\create_tinno_jira_batch_from_excel.py" --test-mode --regression-project VCAME
 ```
 
+补打历史单 labels（一次性 retro 脚本）
+
+历史缺陷修复前建的单，labels 全部是 MonkeyAEE；可用以下脚本给已建单批量补打
+“专项标签 + 稳定性测试”，并默认把恰好等于旧静态默认值的 labels 修正为 Summary
+中的真实专项（仅当 labels 恰好是旧默认值时才替换，人工加过的其它标签一律保留）：
+
+```powershell
+# 预览（只读，不提交）
+python ".\retro_patch_tinno_labels.py" `
+  --project VCAME `
+  --jira-cookie-jsessionid "<JSESSIONID>" `
+  --jira-cookie-xsrf-token "<XSRF_TOKEN>" `
+  --dry-run
+
+# 真实执行
+python ".\retro_patch_tinno_labels.py" `
+  --project VCAME `
+  --jira-cookie-jsessionid "<JSESSIONID>" `
+  --jira-cookie-xsrf-token "<XSRF_TOKEN>"
+```
+
+- `--issue-key VCAME-123`（可重复）只处理指定单；`--jql` 可完全自定义范围
+- `--reporter` / `--status` / `--specialty-token MTBF` 用于缩小 JQL 范围；默认只处理 Summary 含 `[自动化]` 的单，`--include-non-auto` 可放开
+- `--no-cleanup-legacy` 改为纯追加（保留旧的 MonkeyAEE，只补专项与稳定性测试）
+- 已是目标 labels 的单自动跳过（NO_CHANGE），可重复执行；明细写 `result/retro_patch_tinno_labels_audit_*.json`
+- 已知限制：Tinno Jira 的 Closed 状态编辑屏幕不含 labels 字段，真实更新会返回 400；
+  可用 `--exclude-status Closed` 跳过，或请管理员放开屏幕后重跑
+
 
 5、输出物说明
 
@@ -211,6 +245,8 @@ python ".\create_tinno_jira_batch_from_excel.py" --test-mode --regression-projec
   第二阶段 full dry-run / 回归预演审计输出
   - 统计总数、状态数、动作数、原因数
   - 明细行保存所有预演决策结果
+- `result/retro_patch_tinno_labels_audit_*.json`
+  retro 补打 labels 的执行审计（old/new labels、动作、状态统计）
 - `result/tinno_regression_cache/<Project>.db`
   Tinno 本地项目缓存库
   - 历史单同步快照
