@@ -15,6 +15,7 @@ from account_config import (
     AccountRunResult,
     RunOptions,
     parse_run_options,
+    project_for_account,
     reason_for_account,
     resolve_accounts,
 )
@@ -99,6 +100,8 @@ def _run_single_account(
     account: AccountConfig,
     reason: Optional[str],
     options: RunOptions,
+    *,
+    project: Optional[str] = None,
 ) -> AccountRunResult:
     result = AccountRunResult(
         account_id=account.account_id,
@@ -112,7 +115,8 @@ def _run_single_account(
 
     print(
         f"[INFO] account={account.account_id} target_days="
-        f"{days[0].isoformat()}..{days[-1].isoformat()} ({len(days)} days)",
+        f"{days[0].isoformat()}..{days[-1].isoformat()} ({len(days)} days) "
+        f"project={project!r} reason={reason!r}",
         flush=True,
     )
 
@@ -127,7 +131,7 @@ def _run_single_account(
                 print(
                     f"[INFO] [{account.account_id}] BPM 工时提报 "
                     f"(allow_submit={options.allow_submit} "
-                    f"timesheet_max={options.timesheet_max})",
+                    f"timesheet_max={options.timesheet_max} project={project!r})",
                     flush=True,
                 )
                 ts_result = process_all_timesheets(
@@ -135,6 +139,7 @@ def _run_single_account(
                     ts_reason,
                     allow_submit=options.allow_submit,
                     max_items=options.timesheet_max,
+                    project=project,
                 )
                 result.timesheet = ts_result
                 print(
@@ -295,9 +300,16 @@ def main() -> int:
     for index, account in enumerate(accounts):
         if index > 0:
             print("[INFO] previous account finished; starting fresh browser session", flush=True)
-        reason = reason_for_account(options, account.account_id)
+        reason = reason_for_account(
+            options, account.account_id, account_reason=account.reason
+        )
+        project = project_for_account(
+            options, account.account_id, account_project=account.project
+        )
         print(f"[INFO] ===== account {account.account_id} ({account.username}) =====", flush=True)
-        result = _run_single_account(cfg, account, reason, options)
+        result = _run_single_account(
+            cfg, account, reason, options, project=project
+        )
         results.append(result)
 
     _send_feishu_results(cfg, results)

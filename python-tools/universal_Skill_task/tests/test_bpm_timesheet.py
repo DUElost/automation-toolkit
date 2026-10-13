@@ -7,10 +7,15 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from bpm_timesheet import (
+    DEDUCTION_RULE,
+    DEDUCTION_RULE_CALENDAR,
+    DEDUCTION_RULE_HOURS_BAND,
     TimesheetSkipItem,
     adjusted_work_hours,
     deduction_for_date,
+    deduction_for_hours_band,
     hours_adjustment_is_valid,
+    resolve_deduction,
 )
 from workday_calendar import (
     is_official_workday,
@@ -27,12 +32,36 @@ def test_adjusted_work_hours_subtracts_configured_amount():
     assert adjusted_work_hours(4, 0.5) == 3.5
     assert adjusted_work_hours(4, 0.0) == 4.0
     assert adjusted_work_hours(0.5, 0.5) == 0.0
+    assert adjusted_work_hours(9.0, 1.0) == 8.0
 
 
 def test_hours_adjustment_is_valid():
     assert hours_adjustment_is_valid(4, 0.5) is True
     assert hours_adjustment_is_valid(0.5, 0.5) is False
     assert hours_adjustment_is_valid(0.5, 0.0) is True
+
+
+def test_deduction_for_hours_band():
+    assert deduction_for_hours_band(8.0) == 0.5
+    assert deduction_for_hours_band(7.5) == 0.5
+    assert deduction_for_hours_band(0.5) == 0.5
+    assert deduction_for_hours_band(8.01) == 1.0
+    assert deduction_for_hours_band(10.5) == 1.0
+
+
+def test_resolve_deduction_default_is_hours_band():
+    assert DEDUCTION_RULE == DEDUCTION_RULE_HOURS_BAND
+    # Same on workday and weekend.
+    assert resolve_deduction(8.0, date(2026, 9, 14)) == 0.5
+    assert resolve_deduction(9.0, date(2026, 9, 14)) == 1.0
+    assert resolve_deduction(8.0, date(2026, 9, 19)) == 0.5
+    assert resolve_deduction(9.0, date(2026, 9, 19)) == 1.0
+
+
+def test_resolve_deduction_calendar_rule_still_available():
+    # Legacy: weekend/holiday 0; workday/makeup 0.5 (ignores raw hours band).
+    assert resolve_deduction(9.0, date(2026, 9, 19), rule=DEDUCTION_RULE_CALENDAR) == 0.0
+    assert resolve_deduction(4.0, date(2026, 9, 14), rule=DEDUCTION_RULE_CALENDAR) == 0.5
 
 
 def test_2026_national_day_makeup_and_weekend():

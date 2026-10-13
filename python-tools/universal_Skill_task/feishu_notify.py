@@ -151,7 +151,7 @@ def _fmt_hours(value: float) -> str:
 
 def _fmt_timesheet_deduction(deduction: float) -> str:
     if deduction and float(deduction) > 0:
-        return f"(按工作日扣 {_fmt_hours(deduction)})"
+        return f"(扣 {_fmt_hours(deduction)})"
     return "(不扣除)"
 
 

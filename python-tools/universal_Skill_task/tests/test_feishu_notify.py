@@ -97,7 +97,7 @@ def test_build_account_results_card_has_text_body_and_summary():
     assert "📌 项目A" in body
     assert "⏱️ 工时提报：" in body
     assert "✅ 本轮已完成：" in body
-    assert "  08/08「周六」 7.5 (按工作日扣 0.5)" in body
+    assert "  08/08「周六」 7.5 (扣 0.5)" in body
     assert "  08/09「周日」 4 (不扣除)" in body
     assert "⚠️ 未完成：" in body
     assert "08/10「周一」 工作时数为空" in body

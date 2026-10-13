@@ -21,6 +21,8 @@ class AccountConfig:
     account_id: str
     username: str
     password: str
+    reason: Optional[str] = None
+    project: Optional[str] = None
 
 
 @dataclass
@@ -49,6 +51,8 @@ class RunOptions:
     decisions_only: bool = False
     global_reason: Optional[str] = None
     reason_by_id: Tuple[Tuple[str, str], ...] = ()
+    global_project: Optional[str] = None
+    project_by_id: Tuple[Tuple[str, str], ...] = ()
     accounts_file: Optional[str] = None
     timesheet_max: Optional[int] = None
 
@@ -59,6 +63,8 @@ def parse_run_options(argv: Sequence[str]) -> RunOptions:
     decisions_only = False
     global_reason: Optional[str] = None
     reason_by_id: Dict[str, str] = {}
+    global_project: Optional[str] = None
+    project_by_id: Dict[str, str] = {}
     accounts_file: Optional[str] = None
     timesheet_max: Optional[int] = None
     i = 0
@@ -81,10 +87,15 @@ def parse_run_options(argv: Sequence[str]) -> RunOptions:
         elif arg.startswith("--timesheet-max="):
             timesheet_max = int(arg.split("=", 1)[1])
         elif arg == "--reason" and i + 1 < len(argv):
-            global_reason = _apply_reason_arg(argv[i + 1], reason_by_id, global_reason)
+            global_reason = _apply_keyed_arg(argv[i + 1], reason_by_id, global_reason)
             i += 1
         elif arg.startswith("--reason="):
-            global_reason = _apply_reason_arg(arg.split("=", 1)[1], reason_by_id, global_reason)
+            global_reason = _apply_keyed_arg(arg.split("=", 1)[1], reason_by_id, global_reason)
+        elif arg == "--project" and i + 1 < len(argv):
+            global_project = _apply_keyed_arg(argv[i + 1], project_by_id, global_project)
+            i += 1
+        elif arg.startswith("--project="):
+            global_project = _apply_keyed_arg(arg.split("=", 1)[1], project_by_id, global_project)
         i += 1
     return RunOptions(
         allow_submit=allow,
@@ -92,24 +103,26 @@ def parse_run_options(argv: Sequence[str]) -> RunOptions:
         decisions_only=decisions_only,
         global_reason=global_reason,
         reason_by_id=tuple(reason_by_id.items()),
+        global_project=global_project,
+        project_by_id=tuple(project_by_id.items()),
         accounts_file=accounts_file,
         timesheet_max=timesheet_max,
     )
 
 
-def _apply_reason_arg(
+def _apply_keyed_arg(
     value: str,
-    reason_by_id: Dict[str, str],
-    global_reason: Optional[str],
+    by_id: Dict[str, str],
+    global_value: Optional[str],
 ) -> Optional[str]:
     text = value.strip()
     if ":" in text:
-        account_id, reason = text.split(":", 1)
+        account_id, item = text.split(":", 1)
         account_id = account_id.strip()
-        reason = reason.strip().strip('"').strip("'")
+        item = item.strip().strip('"').strip("'")
         if account_id:
-            reason_by_id[account_id] = reason
-        return global_reason
+            by_id[account_id] = item
+        return global_value
     return text.strip('"').strip("'")
 
 
@@ -131,12 +144,22 @@ def load_accounts_from_yaml(path: Path) -> List[AccountConfig]:
         account_id = str(item.get("id") or "").strip()
         username = str(item.get("username") or "").strip()
         password = str(item.get("password") or "")
+        reason = str(item.get("reason") or "").strip() or None
+        project = str(item.get("project") or "").strip() or None
         if not account_id or not username or not password:
             raise ConfigError("account requires id, username, and password")
         if account_id in seen:
             raise ConfigError(f"duplicate account id: {account_id}")
         seen.add(account_id)
-        accounts.append(AccountConfig(account_id=account_id, username=username, password=password))
+        accounts.append(
+            AccountConfig(
+                account_id=account_id,
+                username=username,
+                password=password,
+                reason=reason,
+                project=project,
+            )
+        )
     return accounts
 
 
@@ -148,8 +171,29 @@ def resolve_accounts(cfg: AppConfig, options: RunOptions) -> List[AccountConfig]
     return [AccountConfig(account_id=cfg.username, username=cfg.username, password=cfg.password)]
 
 
-def reason_for_account(options: RunOptions, account_id: str) -> Optional[str]:
+def reason_for_account(
+    options: RunOptions,
+    account_id: str,
+    *,
+    account_reason: Optional[str] = None,
+) -> Optional[str]:
     mapping = dict(options.reason_by_id)
     if account_id in mapping:
         return mapping[account_id]
-    return options.global_reason
+    if options.global_reason:
+        return options.global_reason
+    return account_reason
+
+
+def project_for_account(
+    options: RunOptions,
+    account_id: str,
+    *,
+    account_project: Optional[str] = None,
+) -> Optional[str]:
+    mapping = dict(options.project_by_id)
+    if account_id in mapping:
+        return mapping[account_id]
+    if options.global_project:
+        return options.global_project
+    return account_project

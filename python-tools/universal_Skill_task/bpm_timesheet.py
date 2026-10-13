@@ -16,7 +16,14 @@ PORTAL_TAB = "#Shortcutmenu a"
 TIMESHEET_LINK = "a[onclick*='WHSubmitView']"
 GRID_ID = "WHSubmitViewGrid"
 HOURS_DEDUCTION = 0.5
+HOURS_DEDUCTION_OVER_8 = 1.0
+HOURS_BAND_THRESHOLD = 8.0
 MAX_ITEMS = 30
+
+# Switchable deduction rules (keep "calendar" for rollback).
+DEDUCTION_RULE_CALENDAR = "calendar"  # 法定工作日/补班扣 0.5；周末/节假日不扣
+DEDUCTION_RULE_HOURS_BAND = "hours_band"  # 工作日&周末：≤8 扣 0.5，>8 扣 1
+DEDUCTION_RULE = DEDUCTION_RULE_HOURS_BAND
 
 
 class TimesheetError(RuntimeError):
@@ -68,7 +75,7 @@ def adjusted_work_hours(
     raw_hours: float,
     deduction: float = HOURS_DEDUCTION,
 ) -> float:
-    """Apply lunch/buffer deduction (0 on rest/holiday days)."""
+    """Apply lunch/buffer deduction."""
     return round(max(raw_hours - deduction, 0.0), 2)
 
 
@@ -77,9 +84,30 @@ def hours_adjustment_is_valid(raw_hours: float, deduction: float = HOURS_DEDUCTI
 
 
 def deduction_for_date(day: date) -> float:
-    """0.5 on official CN workdays (incl. 补班); 0 on weekends/legal holidays."""
+    """Legacy calendar rule: 0.5 on official CN workdays (incl. 补班); 0 on weekends/holidays."""
     return HOURS_DEDUCTION if should_deduct_half_hour(day) else 0.0
 
+
+def deduction_for_hours_band(raw_hours: float) -> float:
+    """New rule (workday & weekend alike): ≤8 → 0.5；>8 → 1.0."""
+    if float(raw_hours) > HOURS_BAND_THRESHOLD:
+        return HOURS_DEDUCTION_OVER_8
+    return HOURS_DEDUCTION
+
+
+def resolve_deduction(
+    raw_hours: float,
+    day: date,
+    *,
+    rule: Optional[str] = None,
+) -> float:
+    """Resolve deduction by active rule; default is DEDUCTION_RULE."""
+    active = (rule or DEDUCTION_RULE or "").strip() or DEDUCTION_RULE_HOURS_BAND
+    if active == DEDUCTION_RULE_CALENDAR:
+        return deduction_for_date(day)
+    if active == DEDUCTION_RULE_HOURS_BAND:
+        return deduction_for_hours_band(raw_hours)
+    raise TimesheetError(f"Unknown timesheet deduction rule: {active!r}")
 
 def open_portal(page: Page) -> None:
     dismiss_bpm_home_overlays(page)
@@ -287,28 +315,391 @@ def _read_workweek_date(page: Page) -> date:
         raise TimesheetError(f"工时日期 not a date: {text!r}") from exc
 
 
+DEFAULT_PROJ_TYPE = "研发项目"
+
+
+def _read_detail_field(page: Page, grid_id: str, data_index: str) -> str:
+    value = page.evaluate(
+        """({gridId, dataIndex}) => {
+          const grid = Ext.getCmp(gridId);
+          if (!grid || !grid.store || grid.store.getCount() < 1) return '';
+          return String(grid.store.getAt(0).get(dataIndex) || '');
+        }""",
+        {"gridId": grid_id, "dataIndex": data_index},
+    )
+    return str(value or "").strip()
+
+
+def _read_detail_proj_name(page: Page, grid_id: str) -> str:
+    return _read_detail_field(page, grid_id, "projName")
+
+
+def _select_detail_row(page: Page, grid_id: str) -> None:
+    page.evaluate(
+        """(gridId) => {
+          const grid = Ext.getCmp(gridId);
+          if (!grid) return;
+          if (grid.stopEditing) { try { grid.stopEditing(false); } catch (e) {} }
+          const sm = grid.getSelectionModel();
+          if (sm && sm.selectRow) sm.selectRow(0, false);
+        }""",
+        grid_id,
+    )
+
+
+def _open_detail_selector(page: Page, grid_id: str, data_index: str) -> dict:
+    """Select row 0, startEditing the column, click browse trigger."""
+    return page.evaluate(
+        """({gridId, dataIndex}) => {
+          const grid = Ext.getCmp(gridId);
+          if (!grid || !grid.store || grid.store.getCount() < 1) {
+            return {ok:false, err:'no grid'};
+          }
+          if (grid.stopEditing) { try { grid.stopEditing(false); } catch (e) {} }
+          const sm = grid.getSelectionModel();
+          if (sm.selectRow) sm.selectRow(0, false);
+          let colIndex = -1;
+          (grid.colModel.config || []).forEach((col, i) => {
+            if ((col.dataIndex || '') === dataIndex) colIndex = i;
+          });
+          if (colIndex < 0) return {ok:false, err:'no col', dataIndex: dataIndex};
+          grid.startEditing(0, colIndex);
+          const field = grid.activeEditor && grid.activeEditor.field;
+          if (!field || !field.onTriggerClick) return {ok:false, err:'no trigger'};
+          field.onTriggerClick();
+          return {
+            ok: true,
+            selectorKey: field.selectorKey || '',
+            selCount: sm.getSelections().length,
+          };
+        }""",
+        {"gridId": grid_id, "dataIndex": data_index},
+    )
+
+
+def _confirm_visible_selector(page: Page) -> bool:
+    return bool(
+        page.evaluate(
+            """() => {
+              let clicked = false;
+              Ext.ComponentMgr.all.each(function (c) {
+                try {
+                  if (((c.getXType && c.getXType()) || '') === 'button'
+                      && c.text === '确定' && c.isVisible && c.isVisible()) {
+                    c.handler ? c.handler.call(c.scope || c, c) : c.el.dom.click();
+                    clicked = true;
+                  }
+                } catch (e) {}
+              });
+              return clicked;
+            }"""
+        )
+    )
+
+
+def ensure_timesheet_proj_type(
+    page: Page,
+    proj_type: str = DEFAULT_PROJ_TYPE,
+    *,
+    grid_id: Optional[str] = None,
+) -> None:
+    """Ensure 项目类型 via ProjTypeSel (e.g. 研发项目) before picking project name."""
+    target = (proj_type or "").strip() or DEFAULT_PROJ_TYPE
+    gid = grid_id or _find_detail_grid_id(page)
+    current = _read_detail_field(page, gid, "projType")
+    if current == target:
+        print(f"[INFO] timesheet projType already {target!r}; skip", flush=True)
+        return
+
+    opened = _open_detail_selector(page, gid, "projType")
+    if not opened.get("ok"):
+        raise TimesheetError(f"Could not open 项目类型 selector: {opened}")
+
+    ready = False
+    for _ in range(30):
+        ready = bool(
+            page.evaluate(
+                """() => {
+                  let found = false;
+                  Ext.ComponentMgr.all.each(function (c) {
+                    try {
+                      if (!c.store || !c.colModel || c.store.getCount() < 1) return;
+                      if (!(c.getSelectionModel)) return;
+                      const idxs = (c.colModel.config || []).map((x) => x.dataIndex || '');
+                      if (idxs.includes('taskName') && idxs.includes('workdays')) return;
+                      const keys = Object.keys((c.store.getAt(0) || {}).data || {});
+                      if (keys.includes('list_name') && keys.includes('dic_id')) found = true;
+                    } catch (e) {}
+                  });
+                  return found;
+                }"""
+            )
+        )
+        if ready:
+            break
+        page.wait_for_timeout(400)
+    if not ready:
+        raise TimesheetError("项目分类选择器 store did not load")
+
+    selected = page.evaluate(
+        """(text) => {
+          let best = null;
+          Ext.ComponentMgr.all.each(function (c) {
+            try {
+              if (!(c.getSelectionModel && c.store && c.store.getCount() > 0)) return;
+              if (!(c.isVisible && c.isVisible())) return;
+              const idxs = (c.colModel.config || []).map((x) => x.dataIndex || '');
+              if (idxs.includes('taskName') && idxs.includes('workdays')) return;
+              const keys = Object.keys((c.store.getAt(0) || {}).data || {});
+              if (keys.includes('list_name') && keys.includes('dic_id')) best = c;
+            } catch (e) {}
+          });
+          if (!best) return {ok:false, err:'no type grid'};
+          let hit = null, hitIdx = -1;
+          best.store.each(function (rec, i) {
+            if (hit) return;
+            if (String((rec.data || {}).list_name || '') === text) {
+              hit = rec.data; hitIdx = i;
+            }
+          });
+          if (!hit) {
+            const samples = [];
+            best.store.each(function (rec, i) {
+              if (i < 8) samples.push((rec.data || {}).list_name);
+            });
+            return {ok:false, err:'type not found', samples: samples};
+          }
+          best.getSelectionModel().selectRow(hitIdx, false);
+          try { best.fireEvent('rowdblclick', best, hitIdx); } catch (e) {}
+          return {ok:true, gridId: best.id, hit: hit, hitIdx: hitIdx};
+        }""",
+        target,
+    )
+    if not selected.get("ok"):
+        raise TimesheetError(f"Could not select 项目类型 {target!r}: {selected}")
+    _confirm_visible_selector(page)
+    page.wait_for_timeout(1_200)
+    after = _read_detail_field(page, gid, "projType")
+    if after != target:
+        raise TimesheetError(
+            f"项目类型 select failed: want {target!r} got {after!r}"
+        )
+    print(f"[OK] timesheet projType selected {target!r}", flush=True)
+
+
+def select_timesheet_project(
+    page: Page,
+    project_name: str,
+    *,
+    grid_id: Optional[str] = None,
+    proj_type: str = DEFAULT_PROJ_TYPE,
+) -> None:
+    """Select 项目类型 then 项目名称 (WHsubmitProjSelector).
+
+    Order required by BPM UI:
+      1) 研发项目 (ProjTypeSel)
+      2) project name e.g. P535AA (WHsubmitProjSelector)
+    Search by title is attempted first; BPM often returns empty for known titles,
+    so pagination through the default list is the reliable fallback.
+    Selecting a project clears taskName; caller must refill task fields after.
+    """
+    target = (project_name or "").strip()
+    if not target:
+        return
+    gid = grid_id or _find_detail_grid_id(page)
+    _select_detail_row(page, gid)
+    ensure_timesheet_proj_type(page, proj_type, grid_id=gid)
+
+    current = _read_detail_proj_name(page, gid)
+    if current == target:
+        print(f"[INFO] timesheet project already {target!r}; skip name selector", flush=True)
+        return
+
+    opened = _open_detail_selector(page, gid, "projName")
+    if not opened.get("ok"):
+        raise TimesheetError(f"Could not open project selector: {opened}")
+
+    # Wait for project store
+    ready = False
+    for _ in range(30):
+        ready = bool(
+            page.evaluate(
+                """() => {
+                  let found = false;
+                  Ext.ComponentMgr.all.each(function (c) {
+                    try {
+                      if (!c.store || !c.colModel) return;
+                      const idxs = (c.colModel.config || []).map((x) => x.dataIndex || '');
+                      if (idxs.includes('title') && idxs.includes('proj_id')
+                          && c.store.getCount() > 0) found = true;
+                    } catch (e) {}
+                  });
+                  return found;
+                }"""
+            )
+        )
+        if ready:
+            break
+        page.wait_for_timeout(500)
+    if not ready:
+        raise TimesheetError("Project selector store did not load")
+
+    def _find_in_store() -> dict:
+        return page.evaluate(
+            """(kw) => {
+              let best = null;
+              Ext.ComponentMgr.all.each(function (c) {
+                try {
+                  if (!c.store || !c.colModel || c.store.getCount() < 1) return;
+                  const idxs = (c.colModel.config || []).map((x) => x.dataIndex || '');
+                  if (idxs.includes('title') && idxs.includes('proj_id')) best = c;
+                } catch (e) {}
+              });
+              if (!best) return {ok:false, err:'no project grid'};
+              let hit = null, hitIdx = -1;
+              best.store.each(function (rec, i) {
+                if (hit) return;
+                const title = String((rec.data || {}).title || '');
+                if (title === kw) { hit = rec.data; hitIdx = i; }
+              });
+              return {
+                ok: !!hit,
+                gridId: best.id,
+                hit: hit,
+                hitIdx: hitIdx,
+                count: best.store.getCount(),
+              };
+            }""",
+            target,
+        )
+
+    # Try title search (often empty on BPM; keep as fast path)
+    page.evaluate(
+        """(kw) => {
+          Ext.ComponentMgr.all.each(function (c) {
+            try {
+              const n = (c.name || '');
+              if (n === 'DLQUERY_title' && c.setValue) c.setValue(kw);
+              if (n === 'DLQUERY_proj_id' && c.setValue) c.setValue('');
+            } catch (e) {}
+          });
+          Ext.ComponentMgr.all.each(function (c) {
+            try {
+              if (((c.getXType && c.getXType()) || '') === 'button'
+                  && ((c.name || '') === 'DLQUERY_WHsubmitProjSelector' || c.text === '查询')) {
+                c.handler ? c.handler.call(c.scope || c, c) : c.el.dom.click();
+              }
+            } catch (e) {}
+          });
+        }""",
+        target,
+    )
+    page.wait_for_timeout(2_000)
+    found = _find_in_store()
+
+    if not found.get("ok"):
+        # Clear search and paginate
+        page.evaluate(
+            """() => {
+              Ext.ComponentMgr.all.each(function (c) {
+                try {
+                  const n = (c.name || '');
+                  if ((n === 'DLQUERY_title' || n === 'DLQUERY_proj_id') && c.setValue) {
+                    c.setValue('');
+                  }
+                } catch (e) {}
+              });
+              Ext.ComponentMgr.all.each(function (c) {
+                try {
+                  if (((c.getXType && c.getXType()) || '') === 'button'
+                      && ((c.name || '') === 'DLQUERY_WHsubmitProjSelector' || c.text === '查询')) {
+                    c.handler ? c.handler.call(c.scope || c, c) : c.el.dom.click();
+                  }
+                } catch (e) {}
+              });
+            }"""
+        )
+        page.wait_for_timeout(2_000)
+        for page_i in range(25):
+            found = _find_in_store()
+            if found.get("ok"):
+                print(
+                    f"[INFO] timesheet project {target!r} found on selector page {page_i}",
+                    flush=True,
+                )
+                break
+            moved = page.evaluate(
+                """() => {
+                  const el = document.querySelector('.x-tbar-page-next:not(.x-item-disabled)');
+                  if (!el) return false;
+                  el.click();
+                  return true;
+                }"""
+            )
+            if not moved:
+                break
+            page.wait_for_timeout(1_200)
+
+    if not found.get("ok"):
+        raise TimesheetError(f"Project {target!r} not found in 工时提报项目选择器")
+
+    confirmed = page.evaluate(
+        """({gridId, hitIdx}) => {
+          const g = Ext.getCmp(gridId);
+          if (!g) return {ok:false, err:'grid gone'};
+          g.getSelectionModel().selectRow(hitIdx, false);
+          try { g.fireEvent('rowdblclick', g, hitIdx); } catch (e) {}
+          let clicked = false;
+          Ext.ComponentMgr.all.each(function (c) {
+            try {
+              if (((c.getXType && c.getXType()) || '') === 'button'
+                  && c.text === '确定' && c.isVisible && c.isVisible()) {
+                c.handler ? c.handler.call(c.scope || c, c) : c.el.dom.click();
+                clicked = true;
+              }
+            } catch (e) {}
+          });
+          return {ok: true, clicked: clicked};
+        }""",
+        {"gridId": found["gridId"], "hitIdx": found["hitIdx"]},
+    )
+    page.wait_for_timeout(1_500)
+    after = _read_detail_proj_name(page, gid)
+    if after != target:
+        raise TimesheetError(
+            f"Project select failed: want {target!r} got {after!r} confirm={confirmed}"
+        )
+    print(f"[OK] timesheet project selected {target!r}", flush=True)
+
+
 def fill_timesheet_detail(
     page: Page,
     reason: str,
     *,
     missed_date: str,
+    project: Optional[str] = None,
 ) -> TimesheetProcessedItem:
-    """Fill task/hours on the open form; return processed row metadata.
+    """Fill 项目类型→项目名称→工时/任务 on the open form.
 
     Deduction calendar uses the list row's missed_date (source of truth), not
     the form workweekDate field which can be stale across successive opens.
+    When project is set: 研发项目 → project name (clears taskName) → task/hours.
     """
     grid_id = _find_detail_grid_id(page)
     raw_hours = _read_workday_ttl(page)
     target = date.fromisoformat(str(missed_date).strip().replace("/", "-")[:10])
-    deduction = deduction_for_date(target)
+    deduction = resolve_deduction(raw_hours, target)
     kind = workday_kind(target)
     if not hours_adjustment_is_valid(raw_hours, deduction):
         raise TimesheetSkipItem(
-            f"工作时数过小（{raw_hours}，{kind}减{deduction}后≤0）"
+            f"工作时数过小（{raw_hours}，{kind}/{DEDUCTION_RULE}减{deduction}后≤0）"
         )
     hours = adjusted_work_hours(raw_hours, deduction)
     task = (reason or "").strip() or "待确认"
+    proj = (project or "").strip() or None
+    if proj:
+        # 1) 研发项目  2) P535AA  3) 工时+任务详情（下方写入）
+        select_timesheet_project(page, proj, grid_id=grid_id)
     ok = page.evaluate(
         """({gridId, hours, task}) => {
           const grid = Ext.getCmp(gridId);
@@ -317,6 +708,7 @@ def fill_timesheet_detail(
           rec.beginEdit();
           rec.set('taskName', task);
           rec.set('workBehavior', task);
+          rec.set('workBehavior2', task);
           rec.set('workdays', hours);
           rec.endEdit();
           if (grid.view && grid.view.refresh) grid.view.refresh();
@@ -329,9 +721,11 @@ def fill_timesheet_detail(
         raise TimesheetError(
             f"Failed to set workdays={hours} taskName={task!r} on detail grid"
         )
+    proj_now = _read_detail_proj_name(page, grid_id)
     print(
         f"[OK] timesheet filled date={target.isoformat()} kind={kind} "
-        f"workdayTTL={raw_hours} deduct={deduction} -> workdays={hours} task={task!r}",
+        f"workdayTTL={raw_hours} deduct={deduction} -> workdays={hours} "
+        f"proj={proj_now!r} task={task!r}",
         flush=True,
     )
     return TimesheetProcessedItem(
@@ -404,6 +798,7 @@ def process_all_timesheets(
     *,
     allow_submit: bool,
     max_items: Optional[int] = None,
+    project: Optional[str] = None,
 ) -> TimesheetRunResult:
     """Drain 工时提报 pending list: fill each row; submit when allow_submit.
 
@@ -422,7 +817,7 @@ def process_all_timesheets(
 
     print(
         f"[INFO] 工时提报 pending={len(pending)} dates={[p.missed_date for p in pending]} "
-        f"max_items={limit}",
+        f"max_items={limit} project={project!r}",
         flush=True,
     )
     skipped_dates: set[str] = set()
@@ -445,7 +840,9 @@ def process_all_timesheets(
         missed = pending[0].missed_date
         _open_row_by_date(page, missed)
         try:
-            filled = fill_timesheet_detail(page, reason, missed_date=missed)
+            filled = fill_timesheet_detail(
+                page, reason, missed_date=missed, project=project
+            )
         except TimesheetSkipItem as exc:
             reason_text = str(exc).strip() or "无法完成提报"
             print(f"[WARN] [{missed}] {reason_text}; skip this row", flush=True)
