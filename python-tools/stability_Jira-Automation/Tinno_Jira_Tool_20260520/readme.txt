@@ -86,6 +86,16 @@ Tinno 独立 Jira 工具，不与 Transsion 工具混用。
 
 4、常用命令
 
+运行环境（`venv38/` 不再随仓库分发，clone 后本地搭建一次）：
+
+```powershell
+python -m venv venv38
+.\venv38\Scripts\python.exe -m pip install -r requirements.txt
+```
+
+- 下方所有命令中的 `python` 均建议写成 `.\venv38\Scripts\python.exe`
+- 全量测试（venv38 未装 pytest）：`.\venv38\Scripts\python.exe -X utf8 -m unittest discover -s test -p "test_*.py"`
+
 新增项目：初始化客户项目、Jira 关键字，并从 Jira 拉取模块经办人
 
 ```powershell

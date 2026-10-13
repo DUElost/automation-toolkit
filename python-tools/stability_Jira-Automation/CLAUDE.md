@@ -1,7 +1,7 @@
 # stability_Jira-Automation
 
 > 稳定性测试 Jira 批量提单工具集 — 三套独立工具，无共享父级代码
-> 更新时间：2026-06-15
+> 更新时间：2026-10-13
 
 ---
 
@@ -75,13 +75,14 @@ VFFCA 严格版本比较（fix 忽略 LX 板型、current↔build 区分板型�
 
 ```powershell
 cd Tinno_Jira_Tool_20260520
-pip install -r requirements.txt
-python create_tinno_jira_batch_from_excel.py `
+python -m venv venv38            # venv38 不随仓库分发，clone 后本地搭建（已在 .gitignore）
+venv38\Scripts\python.exe -m pip install -r requirements.txt
+venv38\Scripts\python.exe create_tinno_jira_batch_from_excel.py `
   --add-excel-file ".\result\JIRA_Upload_List_Tinno_xxx.xlsx" `
   --jira-cookie-jsessionid "<JSESSIONID>" `
   --jira-cookie-xsrf-token "<XSRF_TOKEN>" `
   --dry-run
-python -m pytest test\ -q
+venv38\Scripts\python.exe -m unittest discover -s test -p "test_*.py"   # venv38 未装 pytest，勿用 pytest 直跑
 ```
 
 ---
