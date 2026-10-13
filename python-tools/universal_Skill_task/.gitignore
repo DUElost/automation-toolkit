@@ -2,6 +2,10 @@
 accounts.yaml
 artifacts/*
 !artifacts/.gitkeep
+# one-off read-only BPM/ExtJS probe scripts (throwaway selector research harness;
+# the final implementation lives in bpm_timesheet.py). Already-tracked _probe_*.py
+# files stay tracked; re-adding one would need git add -f.
+_probe_*.py
 __pycache__/
 *.pyc
 .pytest_cache/
