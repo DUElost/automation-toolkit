@@ -1,6 +1,6 @@
 # Performance SMT Result Filler
 
-[根目录](../../CLAUDE.md) > [python-tools](../) > **performance_SMT_ResultFiller**
+[项目指南](../../docs/project-guide.md) > [python-tools](../) > **performance_SMT_ResultFiller**
 
 ---
 

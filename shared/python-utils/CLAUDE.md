@@ -1,6 +1,6 @@
 # Python Utils
 
-[根目录](../../CLAUDE.md) > [shared](../) > **python-utils**
+[项目指南](../../docs/project-guide.md) > [shared](../) > **python-utils**
 
 ---
 
