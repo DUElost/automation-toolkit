@@ -110,6 +110,42 @@ class TinnoRegressionEntryTest(unittest.TestCase):
 
         self.assertIsNone(matched)
 
+    def test_find_regression_match_rejects_different_version_prefix_in_same_project(self) -> None:
+        matching_rules = SimpleNamespace(
+            required_exact_fields=["affect_project", "environment", "exp_class"],
+            cause_similarity_threshold=0.9,
+        )
+        prefixes = ["MLD-NX2", "MLD-NX3", "MLD-NX3Carrier"]
+        current_row = {
+            "summary": "[自动化][P535AA][Total Number 1][MLD-NX3-16-261013V21][MonkeyAEE][Java (JE)]a发生Java (JE)",
+            "specialty": "MonkeyAEE",
+            "affect_project": "PFDFAA",
+            "environment": "*Package:* com.android.settings",
+            "exp_class": "Java (JE)",
+            "caused_by": "java.lang.RuntimeException: crash",
+            "build_version": "MLD-NX3-16-261013V21",
+        }
+        snapshot_rows = [
+            {
+                "jira_key": "PFDFAA-100",
+                "summary": "[自动化][P535AA][Total Number 1][MLD-NX2-16-261013V21][MonkeyAEE][Java (JE)]a发生Java (JE)",
+                "affect_project": "PFDFAA",
+                "environment": "*Package:* com.android.settings",
+                "exp_class": "Java (JE)",
+                "caused_by": "java.lang.RuntimeException: crash",
+                "build_version": "MLD-NX2-16-261013V21",
+            }
+        ]
+
+        matched = self.module.find_regression_match(
+            current_row,
+            snapshot_rows,
+            matching_rules,
+            version_prefixes=prefixes,
+        )
+
+        self.assertIsNone(matched)
+
     def test_extract_specialty_from_row_normalizes_test_case_label(self) -> None:
         row = {
             "Summary": "普通摘要",
@@ -558,6 +594,93 @@ class TinnoRegressionEntryTest(unittest.TestCase):
             fallback="P1",
         )
         self.assertEqual("P1", matched)
+
+    def test_regression_pass_skips_other_prefix_in_same_project(self) -> None:
+        fake_rules = SimpleNamespace(
+            regression=SimpleNamespace(
+                enabled=True,
+                required_regression_pass_versions=2,
+                enable_duplicate_followups=False,
+                write_audit_report=True,
+                strict_version_project_keys=[],
+            ),
+            status_rules=SimpleNamespace(
+                resolved_statuses=["已解决"],
+                resolved_fixed_resolutions=["完成"],
+                closed_statuses=["Closed", "已关闭"],
+            ),
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            store = self.module.RegressionStore(temp_path / "cache" / "PFDFAA.db")
+            project_db = self.module.DatabaseManager({"type": "sqlite", "path": str(temp_path / "project.db")})
+            project_db.insert_issue(
+                {
+                    "jira_key": "PFDFAA-100",
+                    "status": "已解决",
+                    "summary": "[自动化][P535AA][Total Number 1][MLD-NX2-16-261010V9][MonkeyAEE][Java (JE)]a发生Java (JE)",
+                    "normalized_summary": "[自动化][P535AA][Total Number 1][MLD-NX2-16-261010V9][MonkeyAEE][Java (JE)]a发生Java (JE)",
+                    "test_environment": "*Package:* com.android.settings",
+                    "raw_caused_by": "java.lang.RuntimeException",
+                    "assignee": "dai.lv",
+                    "bug_severity": "B",
+                    "priority": "Medium",
+                    "description": "desc",
+                    "resolution": "完成",
+                    "package_name": "com.android.settings",
+                    "exp_class": "Java (JE)",
+                    "exp_type": "Crash",
+                    "cur_process": "com.android.settings",
+                    "version": "MLD-NX2-16-261010V9",
+                    "count": 1,
+                    "device_count": 1,
+                    "source_file": "",
+                    "raw_data": {},
+                    "fix_version": "MLD-NX2-16-261010V9",
+                    "build_version": "MLD-NX2-16-261010V9",
+                    "regression_pass_count": 0,
+                    "verified_versions": [],
+                }
+            )
+            store.save_snapshot(
+                "run1",
+                [
+                    {
+                        "jira_key": "PFDFAA-100",
+                        "summary": "[自动化][P535AA][Total Number 1][MLD-NX2-16-261010V9][MonkeyAEE][Java (JE)]a发生Java (JE)",
+                        "status": "已解决",
+                        "resolution": "完成",
+                        "fix_version": "MLD-NX2-16-261010V9",
+                        "build_version": "MLD-NX2-16-261010V9",
+                        "affect_project": "PFDFAA",
+                        "environment": "*Package:* com.android.settings",
+                        "exp_class": "Java (JE)",
+                        "caused_by": "java.lang.RuntimeException",
+                        "raw_payload": "{}",
+                    },
+                ],
+            )
+            with mock.patch.object(self.module, "add_issue_comment") as add_issue_comment:
+                self.module.process_regression_pass_candidates(
+                    jira_client=SimpleNamespace(),
+                    store=store,
+                    project_db=project_db,
+                    run_id="run1",
+                    current_version="MLD-NX3-16-261013V21",
+                    current_version_candidates=["MLD-NX3-16-261013V21"],
+                    regression_rules=fake_rules,
+                    matched_jira_keys=set(),
+                    allowed_specialties={"MonkeyAEE"},
+                    args=Namespace(dry_run=False),
+                    results=[],
+                    summary_rows=[],
+                    version_prefixes=["MLD-NX2", "MLD-NX3", "MLD-NX3Carrier"],
+                )
+            updated = project_db.get_issue_by_key("PFDFAA-100")
+            project_db.close()
+
+        self.assertEqual(0, add_issue_comment.call_count)
+        self.assertEqual(0, updated["regression_pass_count"])
 
     def test_process_regression_pass_records_board_matched_version(self) -> None:
         fake_rules = SimpleNamespace(

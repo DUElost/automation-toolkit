@@ -23,6 +23,14 @@
     "jira_project": "PFDFAA",
     "monkey_project": "PFDFAA"
   },
+  "MLD-NX3": {
+    "jira_project": "PFDFAA",
+    "monkey_project": "PFDFAA"
+  },
+  "MLD-NX3Carrier": {
+    "jira_project": "PFDFAA",
+    "monkey_project": "PFDFAA"
+  },
   "ELA-LX2": {
     "jira_project": "VFFBA",
     "monkey_project": "VFFBA"

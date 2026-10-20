@@ -78,9 +78,9 @@ def _compare_versions(current_version: Any, fix_version: Any) -> int:
 def _compare_versions_by_date(version_a: str, version_b: str) -> int:
     """Compare MLD-style versions by build date and V-number only (ignore LX board).
 
-    Use when either side may come from Jira fix_version, where developers sometimes
-    omit or mislabel LX2 vs LX3. Monkey-sourced build_version / current_version
-    pairs should use _compare_mld_versions instead so board variants stay isolated.
+    Use when either side may come from Jira fix_version. Monkey versions of the
+    same registered prefix are ordered here; different prefixes are rejected
+    by match_version_prefix before this date comparison.
     """
     a_match = re.search(r'(\d+)(V\d+)', version_a)
     b_match = re.search(r'(\d+)(V\d+)', version_b)
@@ -105,50 +105,24 @@ def _compare_versions_by_date(version_a: str, version_b: str) -> int:
     return 0
 
 
-def _compare_mld_versions(current_version: str, fix_version: str) -> int:
-    """Compare MLD-style versions by board, then build date.
+def _compare_mld_versions(
+    current_version: str,
+    fix_version: str,
+    version_prefixes: Any = None,
+) -> int:
+    """同一登记前缀内按构建日期比较；前缀不同则视为不可比。
 
-    MLD format: MLD-LX{N}-{date}V{ver}  (e.g. MLD-LX3-16-260521V5)
-    Fix versions with embedded MLD styles should already be normalized
-    by _normalize_compare_version before calling this.
-
-    Board variants (LX2, LX3 etc.) are product variants — a fix on one
-    board does not apply to a different board.  When the boards differ
-    the comparison returns -1 (current < fix), which causes the caller
-    to skip regression PASS for that candidate.
-
-    When boards match, comparison is by BUILD DATE (earlier = older),
-    then V-number as tiebreaker.
+    项目之间已经由 Jira 项目隔开。项目内部用 init 写入的版本前缀区分型号，
+    不再单独识别 LX 数字。
     """
-    cur_match = re.search(r'(\d+)(V\d+)', current_version)
-    fix_match = re.search(r'(\d+)(V\d+)', fix_version)
+    from tinno_upload_template_common import match_version_prefix, registered_version_prefixes
 
-    if not cur_match or not fix_match:
-        return _compare_versions(current_version, fix_version)
-
-    # Board must match — different boards are not comparable
-    cur_lx = re.search(r'LX(\d+)', current_version)
-    fix_lx = re.search(r'LX(\d+)', fix_version)
-    if cur_lx and fix_lx:
-        if cur_lx.group(1) != fix_lx.group(1):
-            return -1
-
-    cur_date = int(cur_match.group(1))
-    fix_date = int(fix_match.group(1))
-
-    if cur_date < fix_date:
+    prefixes = list(version_prefixes) if version_prefixes is not None else registered_version_prefixes()
+    current_prefix = match_version_prefix(current_version, prefixes)
+    other_prefix = match_version_prefix(fix_version, prefixes)
+    if current_prefix and other_prefix and current_prefix.upper() != other_prefix.upper():
         return -1
-    if cur_date > fix_date:
-        return 1
-
-    # Same date → compare V-number as tiebreaker
-    cur_ver = int(cur_match.group(2)[1:])
-    fix_ver = int(fix_match.group(2)[1:])
-    if cur_ver < fix_ver:
-        return -1
-    if cur_ver > fix_ver:
-        return 1
-    return 0
+    return _compare_versions_by_date(current_version, fix_version)
 
 
 def _is_open_like(status: str) -> bool:

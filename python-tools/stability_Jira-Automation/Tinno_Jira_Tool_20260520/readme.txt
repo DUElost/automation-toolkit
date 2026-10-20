@@ -112,7 +112,7 @@ python ".\init_tinno_project.py" `
 
 多个版本前缀指向同一个 Jira 项目时用逗号分隔，例如 `--customer-project "MLD-LX2,V552AA"`。
 认证沿用第二阶段的 Cookie 与 P12。包名仍用 `包名与模块&经办人对应表_tinno.xls` 匹配模块；
-模块能对上 Jira 组件时，经办人改用组件上的实际经办人。
+模块能对上 Jira 组件时，经办人改用组件页上的 Lead。
 
 试运行写到独立工作区，不修改 `config/` 下的正式文件：
 
@@ -125,7 +125,8 @@ python ".\init_tinno_project.py" `
 ```
 
 `MLD-NX2` 是 Monkey 版本前缀，标题产品名是 `P535AA`，Jira 关键字是 `PFDFAA`。
-板型段（如 `LX2`、`NX2`）会保留在前缀里，不会收成 `MLD`。
+`MLD-NX3`、`MLD-NX3Carrier` 也登记在同一个项目下。已登记的前缀按最长匹配，
+`MLD-NX3` 不会覆盖 `MLD-NX3Carrier`。未登记的版本仍按板型段（如 `LX2`、`NX2`）取前缀。
 
 工作区里会生成 `config/affect_project_mapping.json`、`config/summary_product_mapping.json`
 和 `config/module_assignee_mapping.json`。确认结果后再去掉 `--workspace` 写入正式配置。
@@ -284,21 +285,18 @@ python ".\retro_patch_tinno_labels.py" `
   - `VFFCA` 已解决单真实回归验证
   - Tinno 各项目 fixVersions / 关单流转的项目化差异
 
-6.1、VFFCA 严格版本比较规则
+6.1、同项目内的版本前缀隔离
 
-实现位置：`tinno_regression_executor.py`
+版本前缀在 `init_tinno_project.py` 写入 `affect_project_mapping.json`。
+Jira 项目本身已经隔开 535 / 552 / 551，提交、命中历史单和回归只再区分该项目里登记过的型号前缀。
 
-三个版本字段含义：
-- `fix_version`：Jira 已解决时开发人员填写的修复版本，LX2/LX3 可能混填或漏填
-- `build_version`：建单时从 Monkey 报告写入的历史版本，板型可信
-- `current_version`：本轮 Monkey 测试版本，板型可信
+- `MLD-NX2`、`MLD-NX3`、`MLD-NX3Carrier` 同属 PFDFAA，彼此不命中、不回归
+- `MLD-LX2`、`MLD-LX3` 同属 VFFCA，彼此不命中、不回归
+- `ELA-LX2`、`ELA-LX3` 同属 VFFBA，标题产品名是 `V551A`，版本串仍保留 `ELA-LX2`、`ELA-LX3`
+- 同一前缀内仍按构建日期和 V 号比较新旧
+- `fix_version` 与 `build_version` 的日期比较不看前缀，因为修复版本可能由开发手填
 
-比较策略（仅 `strict_version_project_keys` 中的项目，如 VFFCA）：
-- `fix_version` ↔ `build_version`：只比构建日期与 V-number，**不区分 LX 板型**
-  （因 fix 来自 Jira，板型不可信）
-- `current_version` ↔ `fix_version`：只比构建日期与 V-number，**不区分 LX 板型**
-- `current_version` ↔ `build_version`：区分 LX2/LX3 板型后再比日期
-  （两者均来自测试报告，LX2 与 LX3 视为不同产品分支）
+`strict_version_project_keys` 仍只给 VFFCA 追加“当前版本不能早于建单版本、修复版本必须晚于建单版本”的日期链。型号隔离对所有项目生效，不再单独解析 LX 数字。
 
 duplicate 跟随关闭补充规则：
 - 主单 resolution 为 Duplicate / 重复问题 时不触发

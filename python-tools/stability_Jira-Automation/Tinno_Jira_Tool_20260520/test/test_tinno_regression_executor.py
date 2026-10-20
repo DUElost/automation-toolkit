@@ -93,8 +93,24 @@ class TinnoRegressionExecutorTest(unittest.TestCase):
             1,
         )
         self.assertEqual(
-            executor._compare_mld_versions("MLD-LX3-16-260518V3", "MLD-LX2-16-260512V2"),
+            executor._compare_mld_versions(
+                "MLD-LX3-16-260518V3",
+                "MLD-LX2-16-260512V2",
+                version_prefixes=["MLD-LX2", "MLD-LX3"],
+            ),
             -1,
+        )
+        self.assertEqual(
+            executor._compare_mld_versions(
+                "MLD-NX3Carrier-16-261013V21",
+                "MLD-NX2-16-261013V21",
+                version_prefixes=["MLD-NX2", "MLD-NX3", "MLD-NX3Carrier"],
+            ),
+            -1,
+        )
+        self.assertEqual(
+            executor._compare_versions_by_date("MLD-NX2-16-261013V21", "MLD-NX2-16-261010V9"),
+            1,
         )
 
     def test_vffca_resolved_fixed_requires_build_version(self) -> None:

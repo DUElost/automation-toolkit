@@ -30,13 +30,24 @@ class InitTinnoProjectTest(unittest.TestCase):
         self.assertEqual("VFFCA", init_module.infer_summary_product(["MLD-LX2"], "VFFCA"))
         self.assertEqual("PFDFAA", init_module.infer_summary_product(["MLD-NX2"], "PFDFAA"))
 
-    def test_extract_component_assignee_prefers_real_assignee(self) -> None:
+    def test_extract_component_assignee_prefers_lead_shown_on_components_page(self) -> None:
         component = {
-            "name": "AUTOTEST",
+            "name": "GMS",
             "realAssignee": {"name": "real.user"},
+            "assignee": {"name": "assignee.user"},
             "lead": {"name": "lead.user"},
         }
-        self.assertEqual("real.user", init_module.extract_component_assignee(component))
+        self.assertEqual("lead.user", init_module.extract_component_assignee(component))
+        self.assertEqual(
+            "assignee.user",
+            init_module.extract_component_assignee(
+                {"assignee": {"name": "assignee.user"}, "realAssignee": {"name": "real.user"}}
+            ),
+        )
+        self.assertEqual(
+            "real.user",
+            init_module.extract_component_assignee({"realAssignee": {"name": "real.user"}}),
+        )
         assignees, missing = init_module.extract_component_assignees(
             [
                 component,
@@ -44,7 +55,7 @@ class InitTinnoProjectTest(unittest.TestCase):
                 {"name": "Empty"},
             ]
         )
-        self.assertEqual({"AUTOTEST": "real.user", "System": "lead.only"}, assignees)
+        self.assertEqual({"GMS": "lead.user", "System": "lead.only"}, assignees)
         self.assertEqual(["Empty"], missing)
 
     def test_register_project_writes_mappings_without_dropping_existing_projects(self) -> None:

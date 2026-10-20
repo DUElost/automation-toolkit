@@ -14,7 +14,7 @@ import json
 import logging
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterable, List, Optional
 
 import pandas as pd
 
@@ -472,6 +472,30 @@ def format_skipped_severity_rows(skipped_rows: List[Dict[str, Any]]) -> List[str
     return lines
 
 
+def match_version_prefix(version: str, prefixes: Optional[Iterable[str]] = None) -> str:
+    """用 init 登记的版本前缀做最长匹配。
+
+    MLD-NX3 不会吃掉 MLD-NX3Carrier：前缀后面必须是结尾或非字母数字。
+    """
+    text = str(version or "").strip()
+    if not text:
+        return ""
+    if prefixes is None:
+        prefixes = registered_version_prefixes()
+    ordered = sorted({str(item).strip() for item in prefixes if str(item).strip()}, key=len, reverse=True)
+    upper = text.upper()
+    for prefix in ordered:
+        token = prefix.upper()
+        if upper.startswith(token) and (len(upper) == len(token) or not upper[len(token)].isalnum()):
+            return prefix
+    return ""
+
+
+def registered_version_prefixes() -> List[str]:
+    mapping_path = Path(__file__).resolve().parent / "config" / "affect_project_mapping.json"
+    return list(load_affect_project_mapping(mapping_path).keys())
+
+
 def _derive_affect_project_from_version(version: str) -> str:
     text = str(clean_cell_value(version) or "").strip()
     if not text:
@@ -491,7 +515,9 @@ def _resolve_project_and_affect_project(
     project_override: Optional[str],
 ) -> tuple[str, str]:
     explicit_affect_project = str(issue_data.get("affect_project") or "").strip()
-    derived_affect_project = _derive_affect_project_from_version(str(issue_data.get("version") or ""))
+    version_text = str(issue_data.get("version") or "")
+    registered_prefix = match_version_prefix(version_text, list((affect_project_mapping or {}).keys()))
+    derived_affect_project = registered_prefix or _derive_affect_project_from_version(version_text)
     affect_project_key = explicit_affect_project or derived_affect_project
     mapping_item = _lookup_ci(affect_project_mapping or {}, affect_project_key)
     if not isinstance(mapping_item, dict):

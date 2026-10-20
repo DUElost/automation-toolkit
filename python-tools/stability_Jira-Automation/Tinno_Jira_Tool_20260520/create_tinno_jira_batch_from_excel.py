@@ -54,6 +54,8 @@ from tinno_upload_template_common import (
     load_package_owner_mapping as load_upload_package_owner_mapping,
     load_severity_rules as load_upload_severity_rules,
     load_test_case_summary as load_upload_test_case_summary,
+    match_version_prefix,
+    registered_version_prefixes,
     save_upload_list as save_generated_upload_list,
 )
 from tinno_regression_executor import decide_action, evaluate_regression_pass
@@ -631,23 +633,34 @@ def select_current_version(versions: List[str]) -> str:
     return max(cleaned_versions, key=_version_sort_key)
 
 
+def _row_version_text(row: Dict[str, Any]) -> str:
+    for key in ("build_version", "current_version", "version"):
+        text = str(row.get(key) or "").strip()
+        if text:
+            return text
+    for token in re.findall(r"\[([^\]]+)\]", str(row.get("summary") or "")):
+        if re.search(r"\d{6}V\d+", token, flags=re.IGNORECASE):
+            return token.strip()
+    return ""
+
+
 def _match_current_version_by_board(
     build_version: Any,
     version_candidates: list[str],
     fallback: str | None = None,
+    version_prefixes: list[str] | None = None,
 ) -> str | None:
-    cleaned = [v for v in version_candidates if v.strip()]
+    cleaned = [v for v in version_candidates if str(v).strip()]
     if not cleaned:
         return fallback
-    build_text = str(build_version or "").strip()
-    build_lx = re.search(r'LX(\d+)', build_text)
-    if not build_lx:
+    prefixes = list(version_prefixes) if version_prefixes is not None else registered_version_prefixes()
+    build_prefix = match_version_prefix(str(build_version or ""), prefixes)
+    if not build_prefix:
         return fallback
-    board = build_lx.group(1)
-    board_matched = [v for v in cleaned if re.search(rf'\bLX{board}\b', v)]
-    if not board_matched:
-        return fallback
-    return max(board_matched, key=_version_sort_key)
+    matched = [item for item in cleaned if match_version_prefix(item, prefixes) == build_prefix]
+    if not matched:
+        return None
+    return max(matched, key=_version_sort_key)
 
 
 def _parse_summary_tokens(summary: Any) -> List[str]:
@@ -867,19 +880,25 @@ def _extract_sort_timestamps(row: Dict[str, Any]) -> Tuple[datetime | None, date
     )
 
 
-def find_regression_match(current_row: Dict[str, Any], snapshot_rows: List[Dict[str, Any]], matching_rules: Any) -> Dict[str, Any] | None:
+def find_regression_match(
+    current_row: Dict[str, Any],
+    snapshot_rows: List[Dict[str, Any]],
+    matching_rules: Any,
+    version_prefixes: list[str] | None = None,
+) -> Dict[str, Any] | None:
     threshold = getattr(matching_rules, "cause_similarity_threshold", 0.9)
     exact_fields = getattr(matching_rules, "required_exact_fields", None)
+    prefixes = list(version_prefixes) if version_prefixes is not None else registered_version_prefixes()
+    current_prefix = match_version_prefix(_row_version_text(current_row), prefixes)
     current_specialty = extract_specialty_from_row(current_row)
-    candidates = [
-        history_row
-        for history_row in snapshot_rows
-        if (
-            not current_specialty
-            or extract_specialty_from_row(history_row) == current_specialty
-        )
-        if is_strong_match(current_row, history_row, threshold, exact_fields=exact_fields)
-    ]
+    candidates = []
+    for history_row in snapshot_rows:
+        if current_specialty and extract_specialty_from_row(history_row) != current_specialty:
+            continue
+        if current_prefix and match_version_prefix(_row_version_text(history_row), prefixes) != current_prefix:
+            continue
+        if is_strong_match(current_row, history_row, threshold, exact_fields=exact_fields):
+            candidates.append(history_row)
     if not candidates:
         return None
 
@@ -1772,11 +1791,13 @@ def process_regression_pass_candidates(
     args: argparse.Namespace,
     results: List[Dict[str, Any]],
     summary_rows: List[Dict[str, Any]],
+    version_prefixes: list[str] | None = None,
 ) -> None:
     regression_config = getattr(regression_rules, "regression", None)
     status_rules = getattr(regression_rules, "status_rules", None)
     required_versions = int(getattr(regression_config, "required_regression_pass_versions", 2) or 2)
     strict_version_project_keys = get_strict_version_project_keys(regression_rules)
+    prefixes = list(version_prefixes) if version_prefixes is not None else registered_version_prefixes()
     resolved_statuses = list(getattr(status_rules, "resolved_statuses", []) or [])
     resolved_fixed_resolutions = list(getattr(status_rules, "resolved_fixed_resolutions", []) or [])
     closed_statuses = list(getattr(status_rules, "closed_statuses", []) or [])
@@ -1807,15 +1828,36 @@ def process_regression_pass_candidates(
         verified_versions = _load_verified_versions(issue_state.get("verified_versions"))
         project_key = infer_history_project_key(history_row)
         effective_current_version = current_version
+        history_prefix = match_version_prefix(str(history_row.get("build_version") or ""), prefixes)
+        batch_versions = [str(item) for item in (current_version_candidates or []) if str(item).strip()]
+        if str(current_version or "").strip():
+            batch_versions.append(str(current_version))
+        batch_prefixes = {match_version_prefix(item, prefixes) for item in batch_versions}
+        batch_prefixes.discard("")
+        if history_prefix and history_prefix not in batch_prefixes:
+            logger.info(
+                "回归验证候选 %s: action=REGRESSION_PASS_SKIP reason=VERSION_PREFIX_NOT_IN_BATCH prefix=%s",
+                jira_key,
+                history_prefix,
+            )
+            continue
         if current_version_candidates:
             matched = _match_current_version_by_board(
                 history_row.get("build_version"),
                 current_version_candidates,
                 fallback=current_version,
+                version_prefixes=prefixes,
             )
+            if history_prefix and not matched:
+                logger.info(
+                    "回归验证候选 %s: action=REGRESSION_PASS_SKIP reason=VERSION_PREFIX_NOT_IN_BATCH prefix=%s",
+                    jira_key,
+                    history_prefix,
+                )
+                continue
             if matched and matched != current_version:
                 logger.info(
-                    "候选 %s: 按板型配版本 %s (原 %s)",
+                    "候选 %s: 按版本前缀配版本 %s (原 %s)",
                     jira_key, matched, current_version,
                 )
             effective_current_version = matched or current_version

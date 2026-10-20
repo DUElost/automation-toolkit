@@ -63,18 +63,10 @@ SUMMARY_PRODUCT_MAPPING = load_summary_product_mapping()
 
 
 def clean_version(version: Optional[str]) -> str:
-    """与上传清单脚本保持一致的版本清洗逻辑。"""
+    """保留完整构建版本，型号前缀不改写。"""
     if not version:
         return "Unknown"
-    version = str(version)
-    if "ELA-LX3" in version or "ELA-LX2" in version:
-        version_parts = version.split("-")
-        if len(version_parts) >= 3:
-            version_suffix = "-".join(version_parts[2:])
-        else:
-            version_suffix = version_parts[-1] if len(version_parts) > 1 else ""
-        return f"V551A-{version_suffix}"
-    return version[:20]
+    return str(version).strip()
 
 
 def _resolve_summary_prefix_token() -> str:

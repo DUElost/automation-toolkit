@@ -12,6 +12,7 @@ if str(TOOL_DIR) not in sys.path:
     sys.path.insert(0, str(TOOL_DIR))
 
 import tinno_upload_template_common as upload_common
+import jira_issue_template as issue_template
 
 
 class TinnoUploadTemplateCommonTest(unittest.TestCase):
@@ -19,6 +20,52 @@ class TinnoUploadTemplateCommonTest(unittest.TestCase):
         self.assertEqual("MLD-LX2", upload_common._derive_affect_project_from_version("MLD-LX2-16-260518V3"))
         self.assertEqual("MLD-NX2", upload_common._derive_affect_project_from_version("MLD-NX2-16-260928V9"))
         self.assertEqual("V552AA", upload_common._derive_affect_project_from_version("V552AA-15-250905V60"))
+
+    def test_clean_version_keeps_full_build_number(self) -> None:
+        self.assertEqual(
+            "MLD-NX3Carrier-16-261013V21",
+            issue_template.clean_version("MLD-NX3Carrier-16-261013V21"),
+        )
+        self.assertEqual("MLD-NX2-16-261013V21", issue_template.clean_version("MLD-NX2-16-261013V21"))
+        self.assertEqual("MLD-NX3-16-261013V21", issue_template.clean_version("MLD-NX3-16-261013V21"))
+        self.assertEqual("ELA-LX2-16-261013V21", issue_template.clean_version("ELA-LX2-16-261013V21"))
+        self.assertEqual("ELA-LX3-16-261013V21", issue_template.clean_version("ELA-LX3-16-261013V21"))
+        summary = issue_template.build_summary(
+            {
+                "version": "ELA-LX2-16-261013V21",
+                "count": 1,
+                "exp_class": "Java (JE)",
+                "package": "com.android.settings",
+                "test_case_label": "MonkeyAEE",
+            }
+        )
+        self.assertIn("[V551A]", summary)
+        self.assertIn("[ELA-LX2-16-261013V21]", summary)
+
+    def test_match_version_prefix_keeps_same_project_models_distinct(self) -> None:
+        prefixes = ["MLD-NX2", "MLD-NX3", "MLD-NX3Carrier", "MLD-LX2", "MLD-LX3"]
+        self.assertEqual(
+            "MLD-NX3Carrier",
+            upload_common.match_version_prefix("MLD-NX3Carrier-16-261013V21", prefixes),
+        )
+        self.assertEqual("MLD-NX3", upload_common.match_version_prefix("MLD-NX3-16-261013V21", prefixes))
+        self.assertEqual("MLD-NX2", upload_common.match_version_prefix("MLD-NX2-16-261013V21", prefixes))
+        self.assertEqual("", upload_common.match_version_prefix("MLD-NX3Carrier-16-261013V21", ["MLD-NX2", "MLD-NX3"]))
+
+    def test_resolve_project_uses_registered_prefix(self) -> None:
+        project, _affect = upload_common._resolve_project_and_affect_project(
+            {"version": "MLD-NX3Carrier-16-261013V21", "affect_project": ""},
+            {"project_key": "VCAME", "default_affect_project": ""},
+            {
+                "MLD-NX3Carrier": {
+                    "jira_project": "PFDFAA",
+                    "affect_project": "MLD-NX3Carrier",
+                    "monkey_project": "PFDFAA",
+                }
+            },
+            None,
+        )
+        self.assertEqual("PFDFAA", project)
 
     def test_load_test_case_summary_reads_excel(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -3,7 +3,7 @@
 """Tinno 新项目初始化。
 
 运行时只需要客户系统项目（版本前缀）和 Jira 项目关键字。
-模块与经办人从 Jira 项目组件的实际经办人读取，并写入本地配置。
+模块与经办人从 Jira 组件页上的 Lead 读取，并写入本地配置。
 """
 
 from __future__ import annotations
@@ -197,7 +197,8 @@ def update_summary_product_mapping(path: Path, customer_projects: List[str], sum
 
 
 def extract_component_assignee(component: Dict[str, Any]) -> str:
-    for field_name in ("realAssignee", "lead", "assignee"):
+    # 组件页只展示 Lead。realAssignee 是接口里的隐藏字段，不能覆盖页面上的负责人。
+    for field_name in ("lead", "assignee", "realAssignee"):
         user = component.get(field_name)
         if isinstance(user, dict):
             username = str(user.get("name") or user.get("key") or "").strip()
