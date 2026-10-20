@@ -35,6 +35,8 @@ def analyse_aee(exp_main_file, to_recognize_except=True, extra_jira_tag=None, us
 
 
 class Aee(object):
+    # 同一 data 根下 mobilelog 缺失时短路，避免每条 AEE 重复探测
+    _mobile_log_missing_paths = set()
 
     def __init__(self, exp_main_path, to_recognize_except=True, extra_jira_tag=None, use_bi_hash=False):
         self._Aee__exp_main_path = exp_main_path
@@ -265,7 +267,10 @@ class Aee(object):
         """
         data_path = os.path.dirname(os.path.dirname(os.path.dirname(self._Aee__aee_dir)))
         mobile_log_path = os.path.join(data_path, "debuglogger", "mobilelog")
+        if mobile_log_path in Aee._mobile_log_missing_paths:
+            return False
         if not os.path.isdir(mobile_log_path):
+            Aee._mobile_log_missing_paths.add(mobile_log_path)
             TEST_LOGGER.info("尝试从数据目录下的mobile log的main log中获取：未找到mobile log")
             return False
         main_log_path_list = []
@@ -273,6 +278,11 @@ class Aee(object):
             for file in files:
                 if file.lower().startswith("main_log"):
                     main_log_path_list.append(os.path.join(root, file))
+        if not main_log_path_list:
+            # 目录在但无 main_log，同样短路后续同根探测
+            Aee._mobile_log_missing_paths.add(mobile_log_path)
+            TEST_LOGGER.info("尝试从数据目录下的mobile log的main log中获取：未找到mobile log")
+            return False
         for main_log_path in main_log_path_list:
             android_main_log = AndroidMainLog(main_log_path)
             closest_hash = android_main_log.get_hash_value(

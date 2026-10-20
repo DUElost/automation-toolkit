@@ -37,22 +37,21 @@ class AndroidMainLog(object):
         closest_hash = None
         tne_dir_name = os.path.basename(os.path.dirname(self._AndroidMainLog__file_path))
         self._AndroidMainLog__tne_dir_name = tne_dir_name
-        TEST_LOGGER.info("开始获取[{}] 类型：{}，包名：{}，时间：{} 的hash信息".format(
+        TEST_LOGGER.debug("开始获取[{}] 类型：{}，包名：{}，时间：{} 的hash信息".format(
             tne_dir_name, target_hash_type, target_hash_package, target_hash_time))
         if target_hash_package == "android_framework":
             target_hash_package = "android"
+        # 逐行扫描，避免 readlines() 整文件进内存
         with open(self._AndroidMainLog__file_path, errors="ignore", encoding="utf-8") as f:
-            for line in f.readlines():
+            for line in f:
                 if "BIHash" not in line:
                     continue
                 if "TranSuccCrashMgr:" in line:
                     matches = re.search(AndroidMainLog.REGEX_SYSTEM_BIHASH, line)
                     if matches:
-                        timestamp = matches.group(1)
                         package_name = matches.group(2)
-                        proc_name = matches.group(2)
-                        hash_value = matches.group(3)
-                        hash_info_list.append([timestamp, "system", package_name, proc_name, hash_value])
+                        hash_info_list.append(
+                            [matches.group(1), "system", package_name, package_name, matches.group(3)])
                     continue
                 if "TranSucc.CrashlyticsWork" not in line:
                     continue
@@ -69,11 +68,12 @@ class AndroidMainLog(object):
                     package_name = "android"
                 hash_info_list.append([timestamp, "apk", package_name, proc_name, hash_value])
 
-        TEST_LOGGER.info("[{}] 的Hash信息列表：{}".format(tne_dir_name, hash_info_list))
+        TEST_LOGGER.debug("[{}] 的Hash信息列表：{}".format(tne_dir_name, hash_info_list))
         if not hash_info_list:
-            TEST_LOGGER.info("未发现{} 的Hash信息".format(self._AndroidMainLog__tne_dir_name))
+            TEST_LOGGER.debug("未发现{} 的Hash信息".format(self._AndroidMainLog__tne_dir_name))
             return closest_hash
 
+        # 先按类型/包名过滤，再一次性取时间最近（结果与循环内反复就近计算等价）
         hash_info_tmp_list = []
         for hash_info in hash_info_list:
             hash_type_tmp = hash_info[1]
@@ -83,31 +83,33 @@ class AndroidMainLog(object):
                 hash_package_tmp = hash_package_tmp.split(":")[0]
             if ":" in hash_proc_tmp:
                 hash_proc_tmp = hash_proc_tmp.split(":")[0]
-            if hash_type_tmp == target_hash_type:
-                package_matched = (
-                    hash_package_tmp == target_hash_package
-                    or (target_hash_package and target_hash_package in hash_package_tmp)
-                    or (hash_package_tmp and hash_package_tmp in target_hash_package)
-                )
-                proc_matched = (
-                    hash_proc_tmp == target_hash_package
-                    or (target_hash_package and target_hash_package in hash_proc_tmp)
-                    or (hash_proc_tmp and hash_proc_tmp in target_hash_package)
-                )
-                if package_matched or proc_matched:
-                    hash_info_tmp_list.append(hash_info)
+            if hash_type_tmp != target_hash_type:
+                continue
+            package_matched = (
+                hash_package_tmp == target_hash_package
+                or (target_hash_package and target_hash_package in hash_package_tmp)
+                or (hash_package_tmp and hash_package_tmp in target_hash_package)
+            )
+            proc_matched = (
+                hash_proc_tmp == target_hash_package
+                or (target_hash_package and target_hash_package in hash_proc_tmp)
+                or (hash_proc_tmp and hash_proc_tmp in target_hash_package)
+            )
+            if package_matched or proc_matched:
+                hash_info_tmp_list.append(hash_info)
 
-            if hash_info_tmp_list:
-                closest_hash = hash_info_tmp_list[-1][4]
-                if (len(hash_info_tmp_list) > 1
-                        and target_hash_time
-                        and str(target_hash_time).lower() not in ("undefined", "none", "")):
-                    closest_hash = self._pick_closest_hash(
-                        hash_info_tmp_list, target_hash_time, closest_hash, tne_dir_name)
-                TEST_LOGGER.info("[{}] 获取最接近的Hash值：{}".format(tne_dir_name, closest_hash))
-            else:
-                TEST_LOGGER.info("[{}] 没有和 类型：{}，包名：{} 匹配的Hah值".format(
-                    tne_dir_name, target_hash_type, target_hash_package))
+        if not hash_info_tmp_list:
+            TEST_LOGGER.debug("[{}] 没有和 类型：{}，包名：{} 匹配的Hah值".format(
+                tne_dir_name, target_hash_type, target_hash_package))
+            return None
+
+        closest_hash = hash_info_tmp_list[-1][4]
+        if (len(hash_info_tmp_list) > 1
+                and target_hash_time
+                and str(target_hash_time).lower() not in ("undefined", "none", "")):
+            closest_hash = self._pick_closest_hash(
+                hash_info_tmp_list, target_hash_time, closest_hash, tne_dir_name)
+        TEST_LOGGER.info("[{}] 获取最接近的Hash值：{}".format(tne_dir_name, closest_hash))
         return closest_hash
 
     def _pick_closest_hash(self, hash_info_tmp_list, target_hash_time, closest_hash, tne_dir_name):
@@ -126,7 +128,7 @@ class AndroidMainLog(object):
             return closest_hash
         if "." not in target_str:
             target_str += ".000"
-        TEST_LOGGER.info("目标时间:{} 格式化后，为：{}".format(target_hash_time, target_str))
+        TEST_LOGGER.debug("目标时间:{} 格式化后，为：{}".format(target_hash_time, target_str))
         target_dt = datetime.datetime.strptime(target_str, "%Y-%m-%d %H:%M:%S.%f")
         for hash_info_tmp in hash_info_tmp_list:
             hash_time_tmp_org = hash_info_tmp[0]
@@ -136,7 +138,7 @@ class AndroidMainLog(object):
                 hash_time_tmp = "2000-" + hash_time_tmp
             else:
                 hash_time_tmp = "2000-01-01 " + hash_time_tmp.split(" ")[1]
-            TEST_LOGGER.info("{} 格式化后，为：{}".format(hash_time_tmp_org, hash_time_tmp))
+            TEST_LOGGER.debug("{} 格式化后，为：{}".format(hash_time_tmp_org, hash_time_tmp))
             hash_time_dt = datetime.datetime.strptime(hash_time_tmp, "%Y-%m-%d %H:%M:%S.%f")
             diff = abs(hash_time_dt - target_dt)
             if diff > datetime.timedelta(hours=12):
