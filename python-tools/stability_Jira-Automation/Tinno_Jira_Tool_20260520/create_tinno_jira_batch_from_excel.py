@@ -54,8 +54,10 @@ from tinno_upload_template_common import (
     load_package_owner_mapping as load_upload_package_owner_mapping,
     load_severity_rules as load_upload_severity_rules,
     load_test_case_summary as load_upload_test_case_summary,
+    load_module_assignee_mapping,
     match_version_prefix,
     registered_version_prefixes,
+    resolve_module_assignee,
     save_upload_list as save_generated_upload_list,
 )
 from tinno_regression_executor import decide_action, evaluate_regression_pass
@@ -76,6 +78,8 @@ DEFAULT_REGRESSION_COMMENT_CONFIG_FILE = CONFIG_DIR / "regression_comment_config
 DEFAULT_PACKAGE_MAPPING = CONFIG_DIR / "包名与模块&经办人对应表_tinno.xls"
 DEFAULT_SEVERITY_RULES = CONFIG_DIR / "问题等级定级表.xls"
 DEFAULT_AFFECT_PROJECT_MAPPING = CONFIG_DIR / "affect_project_mapping.json"
+DEFAULT_MODULE_ASSIGNEE_MAPPING = CONFIG_DIR / "module_assignee_mapping.json"
+SYSTEM_STABILITY_MODULE = "System Stability"
 DEFAULT_TEST_CASE_SUMMARY = CONFIG_DIR / "稳定性专项汇总.xlsx"
 DEFAULT_LOCAL_ENV_FILE = CURRENT_DIR / ".env.local"
 DEFAULT_PROJECT_HISTORY_SQLITE_PATH = "result/tinno_regression_cache"
@@ -1117,10 +1121,28 @@ def _should_retry_create_without_assignee(exc: Exception, issue_fields: Dict[str
     return "cannot be assigned issues" in lowered and '"assignee"' in lowered
 
 
+def _project_key_from_issue_fields(issue_fields: Dict[str, Any]) -> str:
+    project = (issue_fields or {}).get("project")
+    if isinstance(project, dict):
+        return str(project.get("key") or "").strip()
+    return str(project or "").strip()
+
+
+def _system_stability_assignee(
+    project_key: str,
+    module_assignee_mapping: Dict[str, Dict[str, str]] | None,
+) -> str:
+    mapping = module_assignee_mapping
+    if mapping is None:
+        mapping = load_module_assignee_mapping(DEFAULT_MODULE_ASSIGNEE_MAPPING)
+    return resolve_module_assignee(project_key, SYSTEM_STABILITY_MODULE, mapping)
+
+
 def _create_issue_with_assignee_fallback(
     jira_client: Any,
     issue_fields: Dict[str, Any],
     row_number: int,
+    module_assignee_mapping: Dict[str, Dict[str, str]] | None = None,
 ) -> Tuple[Dict[str, Any], Dict[str, Any], bool]:
     create_fields = dict(issue_fields or {})
     try:
@@ -1129,9 +1151,24 @@ def _create_issue_with_assignee_fallback(
         if not _should_retry_create_without_assignee(exc, create_fields):
             raise
         assignee_name = str((((create_fields or {}).get("assignee") or {}).get("name") or "")).strip()
+        project_key = _project_key_from_issue_fields(create_fields)
+        fallback_assignee = _system_stability_assignee(project_key, module_assignee_mapping)
+        if not fallback_assignee:
+            raise RuntimeError(
+                f"经办人 {assignee_name or '<empty>'} 不可分配，项目 {project_key or '<empty>'} 未配置 System Stability 负责人"
+            ) from exc
+        if fallback_assignee.lower() == assignee_name.lower():
+            raise RuntimeError(
+                f"经办人 {assignee_name} 不可分配，System Stability 负责人也是该用户"
+            ) from exc
         retry_fields = dict(create_fields)
-        retry_fields.pop("assignee", None)
-        logger.warning("%s 经办人 %s 不可分配，移除 assignee 后重试建单", build_excel_row_log_label(row_number), assignee_name or "<empty>")
+        retry_fields["assignee"] = {"name": fallback_assignee}
+        logger.warning(
+            "%s 经办人 %s 不可分配，改派 System Stability 负责人 %s",
+            build_excel_row_log_label(row_number),
+            assignee_name or "<empty>",
+            fallback_assignee,
+        )
         created_issue = jira_client.create_issue(retry_fields)
         return created_issue, retry_fields, True
 
@@ -2048,6 +2085,7 @@ def execute_decision(
     matched_row: Dict[str, Any] | None,
     args: argparse.Namespace,
     row_number: int,
+    module_assignee_mapping: Dict[str, Dict[str, str]] | None = None,
 ) -> Dict[str, Any]:
     action = str(getattr(decision, "action", "") or "")
     issue_key = str((matched_row or {}).get("jira_key") or "").strip() or None
@@ -2129,11 +2167,13 @@ def execute_decision(
             jira_client,
             issue_fields,
             row_number,
+            module_assignee_mapping,
         )
         issue_key = str((new_issue or {}).get("key") or "")
         result_message = f"{action} -> {issue_key}"
         if used_assignee_fallback:
-            result_message = f"{result_message}; assignee removed and retried"
+            fallback_name = _extract_assignee_from_issue_fields(effective_issue_fields)
+            result_message = f"{result_message}; assignee reassigned to System Stability lead {fallback_name}"
         ps_comment_status = ""
         if args.add_comments and ps_text:
             add_issue_comment(jira_client, issue_key, ps_text)

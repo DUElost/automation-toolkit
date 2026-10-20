@@ -113,6 +113,7 @@ python ".\init_tinno_project.py" `
 多个版本前缀指向同一个 Jira 项目时用逗号分隔，例如 `--customer-project "MLD-LX2,V552AA"`。
 认证沿用第二阶段的 Cookie 与 P12。包名仍用 `包名与模块&经办人对应表_tinno.xls` 匹配模块；
 模块能对上 Jira 组件时，经办人改用组件页上的 Lead。
+建单时若该经办人无法分配，改为改派同一项目 System Stability 的负责人，组件保持原模块。
 
 试运行写到独立工作区，不修改 `config/` 下的正式文件：
 

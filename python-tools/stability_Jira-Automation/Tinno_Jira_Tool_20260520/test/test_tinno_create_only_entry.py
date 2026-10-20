@@ -51,7 +51,7 @@ class TinnoCreateOnlyEntryTest(unittest.TestCase):
         self.assertEqual("第 1 条（Excel 第 2 行）", self.module.build_row_log_label(0))
         self.assertEqual("第 2 条（Excel 第 3 行）", self.module.build_row_log_label(1))
 
-    def test_execute_decision_retries_without_assignee_when_assignment_is_rejected(self) -> None:
+    def test_execute_decision_reassigns_system_stability_lead_when_assignment_is_rejected(self) -> None:
         class _RetryJira:
             def __init__(self) -> None:
                 self.calls = []
@@ -59,7 +59,7 @@ class TinnoCreateOnlyEntryTest(unittest.TestCase):
             def create_issue(self, fields):
                 self.calls.append(json.loads(json.dumps(fields)))
                 assignee = ((fields.get("assignee") or {}).get("name") or "").strip()
-                if assignee:
+                if assignee == "tao.wang1":
                     raise RuntimeError(
                         'Jira API请求失败 (POST https://jira.tinno.com/rest/api/2/issue), status=400, body={"errorMessages":[],"errors":{"assignee":"User \'tao.wang1\' cannot be assigned issues."}}'
                     )
@@ -72,6 +72,7 @@ class TinnoCreateOnlyEntryTest(unittest.TestCase):
             "issuetype": {"name": "Bug"},
             "summary": "demo",
             "assignee": {"name": "tao.wang1"},
+            "components": [{"name": "Sound Recorder"}],
         }
         decision = SimpleNamespace(
             action="CREATE_NEW",
@@ -90,13 +91,94 @@ class TinnoCreateOnlyEntryTest(unittest.TestCase):
             matched_row=None,
             args=args,
             row_number=2,
+            module_assignee_mapping={"VFFCA": {"System Stability": "xiaopeng.wang"}},
         )
 
         self.assertEqual("SUCCESS", result["status"])
         self.assertEqual("VFFCA-409", result["issue_key"])
         self.assertEqual(2, len(jira.calls))
-        self.assertIn("assignee", jira.calls[0])
-        self.assertNotIn("assignee", jira.calls[1])
+        self.assertEqual("tao.wang1", jira.calls[0]["assignee"]["name"])
+        self.assertEqual("xiaopeng.wang", jira.calls[1]["assignee"]["name"])
+        self.assertEqual([{"name": "Sound Recorder"}], jira.calls[1]["components"])
+        self.assertIn("xiaopeng.wang", result["result_message"])
+
+    def test_execute_decision_fails_when_system_stability_lead_is_missing(self) -> None:
+        class _RetryJira:
+            def __init__(self) -> None:
+                self.calls = []
+
+            def create_issue(self, fields):
+                self.calls.append(json.loads(json.dumps(fields)))
+                assignee = ((fields.get("assignee") or {}).get("name") or "").strip()
+                if assignee == "tao.wang1":
+                    raise RuntimeError(
+                        'Jira API请求失败 (POST https://jira.tinno.com/rest/api/2/issue), status=400, body={"errorMessages":[],"errors":{"assignee":"User \'tao.wang1\' cannot be assigned issues."}}'
+                    )
+                return {"key": "VFFCA-410"}
+
+        jira = _RetryJira()
+        result = self.module.execute_decision(
+            jira_client=jira,
+            row=pd.Series({"PS": ""}),
+            issue_fields={
+                "project": {"key": "VFFCA"},
+                "summary": "demo",
+                "assignee": {"name": "tao.wang1"},
+            },
+            decision=SimpleNamespace(
+                action="CREATE_NEW",
+                manual_review=False,
+                update_jira=False,
+                recreate_issue=True,
+                comment_required=False,
+            ),
+            matched_row=None,
+            args=Namespace(add_comments=False),
+            row_number=2,
+            module_assignee_mapping={"VFFCA": {}},
+        )
+
+        self.assertEqual("FAILED", result["status"])
+        self.assertEqual(1, len(jira.calls))
+
+    def test_execute_decision_does_not_drop_assignee_when_stability_lead_is_also_rejected(self) -> None:
+        class _RetryJira:
+            def __init__(self) -> None:
+                self.calls = []
+
+            def create_issue(self, fields):
+                self.calls.append(json.loads(json.dumps(fields)))
+                raise RuntimeError(
+                    'Jira API请求失败 (POST https://jira.tinno.com/rest/api/2/issue), status=400, body={"errorMessages":[],"errors":{"assignee":"User \'tao.wang1\' cannot be assigned issues."}}'
+                )
+
+        jira = _RetryJira()
+        result = self.module.execute_decision(
+            jira_client=jira,
+            row=pd.Series({"PS": ""}),
+            issue_fields={
+                "project": {"key": "VFFCA"},
+                "summary": "demo",
+                "assignee": {"name": "tao.wang1"},
+                "components": [{"name": "Wall Paper"}],
+            },
+            decision=SimpleNamespace(
+                action="CREATE_NEW",
+                manual_review=False,
+                update_jira=False,
+                recreate_issue=True,
+                comment_required=False,
+            ),
+            matched_row=None,
+            args=Namespace(add_comments=False),
+            row_number=2,
+            module_assignee_mapping={"VFFCA": {"System Stability": "xiaopeng.wang"}},
+        )
+
+        self.assertEqual("FAILED", result["status"])
+        self.assertEqual(2, len(jira.calls))
+        self.assertEqual("xiaopeng.wang", jira.calls[1]["assignee"]["name"])
+        self.assertEqual([{"name": "Wall Paper"}], jira.calls[1]["components"])
 
     def test_run_excel_mode_create_only_skips_regression_and_syncs_project_db(self) -> None:
         excel_df = pd.DataFrame(
