@@ -1829,11 +1829,11 @@ class ScanBase(ABC):
         TEST_LOGGER.info("******************** 解压tne文件已完成 ********************\n")
 
     @staticmethod
-    def _analyse_aee(exp_main_file_list, to_recognize_except=True, extra_jira_tag=None):
+    def _analyse_aee(exp_main_file_list, to_recognize_except=True, extra_jira_tag=None, use_bi_hash=False):
         TEST_LOGGER.info("******************** 开始进行aee解析 ********************")
         aee_result_list = []
         with ThreadPoolExecutor(max_workers=5) as executor:
-            aee_analyse_thread = [executor.submit(analyse_aee, exp_main_file, to_recognize_except, extra_jira_tag) for exp_main_file in exp_main_file_list]
+            aee_analyse_thread = [executor.submit(analyse_aee, exp_main_file, to_recognize_except, extra_jira_tag, use_bi_hash) for exp_main_file in exp_main_file_list]
             for future in as_completed(aee_analyse_thread):
                 rlt, exp_main_file, aee, error_type, error_detail = future.result()
                 if aee:

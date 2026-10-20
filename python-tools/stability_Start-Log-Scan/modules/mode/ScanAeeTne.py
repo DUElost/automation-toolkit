@@ -130,7 +130,9 @@ class ScanAeeTne(ScanBase):
                 exp_main_file_count = len(exp_main_file_list) if exp_main_file_list else 0
                 if exp_main_file_list:
                     TEST_LOGGER.info(f"找到 {len(exp_main_file_list)} 个 exp_main 文件")
-                    aee_result_list = self._analyse_aee(exp_main_file_list, self._to_recognize_except, self._extra_jira_tag)
+                    use_bi_hash = self._scan_mode == SCAN_MODE_TRANSSION
+                    aee_result_list = self._analyse_aee(
+                        exp_main_file_list, self._to_recognize_except, self._extra_jira_tag, use_bi_hash=use_bi_hash)
                 else:
                     TEST_LOGGER.info("未找到 exp_main 文件")
                     aee_result_list = []

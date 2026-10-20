@@ -46,10 +46,24 @@ if __name__ == "__main__":
      SCAN_MODE_VIDEO_PLATFORM, SCAN_MODE_SUNMAO_PLATFORM, SCAN_MODE_FREEZE, 
      SCAN_MODE_HWASAN_PLATFORM, 
      SCAN_MODE_FUZZ, SCAN_MODE_FUZZ_PLATFORM, SCAN_MODE_OTA_DAILY, SCAN_MODE_INDEPENDENT, 
-     SCAN_MODE_DAEMON_CRASH, SCAN_MODE_SUBSYSTEM_CRASH, SCAN_MODE_UPLOAD_TNE]
-    parser.add_argument("-m", "--mode", dest="scan_mode", metavar="扫描模式", type=int, choices=choices_list, default=0,
+     SCAN_MODE_DAEMON_CRASH, SCAN_MODE_SUBSYSTEM_CRASH, SCAN_MODE_UPLOAD_TNE,
+     SCAN_MODE_TRANSSION]
+
+    def parse_scan_mode(value):
+        text = str(value).strip().lower()
+        if text in SCAN_MODE_NAME_ALIASES:
+            return SCAN_MODE_NAME_ALIASES[text]
+        try:
+            mode = int(text)
+        except (TypeError, ValueError):
+            raise argparse.ArgumentTypeError("无效扫描模式：{}".format(value))
+        if mode not in choices_list:
+            raise argparse.ArgumentTypeError("无效扫描模式：{}".format(value))
+        return mode
+
+    parser.add_argument("-m", "--mode", dest="scan_mode", metavar="扫描模式", type=parse_scan_mode, default=0,
       nargs="?",
-      help="0：Aee & Tne | 1：Aee | 2：Tne | 3：Fans | 4：Usic | 5：Platform Monkey | 6：Daily | 7：Jenkins | 8：HWAsan | 9：Platform MTBF | 10：StuckLogo | 11：Platform Camera | 12：Platform Video | 13：Platform Sunmao | 14：Freeze | 15：Platform HWASan | 16：Fuzz | 17：Platform Fuzz | 18：OTA Daily | 19：INDEPENDENT | 20：DAEMON CRASH | 21：SUBSYSTEM CRASH | 22：UPLOAD TNE")
+      help="0：Aee & Tne | 1：Aee | 2：Tne | 3：Fans | 4：Usic | 5：Platform Monkey | 6：Daily | 7：Jenkins | 8：HWAsan | 9：Platform MTBF | 10：StuckLogo | 11：Platform Camera | 12：Platform Video | 13：Platform Sunmao | 14：Freeze | 15：Platform HWASan | 16：Fuzz | 17：Platform Fuzz | 18：OTA Daily | 19：INDEPENDENT | 20：DAEMON CRASH | 21：SUBSYSTEM CRASH | 22：UPLOAD TNE | 23/transsion：Transsion(CausedBy=BIHash)")
     parser.add_argument("-b", "--before", dest="days_before", metavar="指定扫描往前第?天的日志", type=int, default=(-1), nargs="?",
       help="扫描现在开始往前第几天的日志，默认-1：扫描所有的日志")
     parser.add_argument("-d", "--dir", dest="scan_root_dir", metavar="待扫描日志根目录", type=str, default=None, help="待扫描日志根目录")
@@ -81,7 +95,6 @@ if __name__ == "__main__":
     parser.add_argument("-merge_priority", "--merge_priority", dest="merge_priority", action="store_const", const=True, default=False, metavar="是否判断优先级",
       help="是否判断优先级")
     parser.add_argument("-merge_files", dest="merge_files", metavar="合并多个已生成的xls文件", type=str, default=None, nargs="+", help="合并多个已生成的xls结果文件（_org.xls或final.xls），去重汇总输出")
-    parser.add_argument("-merge_files_list", dest="merge_files_list", metavar="文件列表路径（一行一个xls）", type=str, default=None, nargs="?", help="从文件读取待合并的xls路径列表（一行一个），适用于大量文件命令行超长场景")
     try:
         args = parser.parse_args()
         show_version = args.show_version
@@ -111,10 +124,6 @@ if __name__ == "__main__":
                 pass
 
         merge_files = args.merge_files
-        if args.merge_files_list:
-            with open(args.merge_files_list, encoding="utf-8") as _f:
-                _list_entries = [line.strip() for line in _f if line.strip()]
-            merge_files = (merge_files or []) + _list_entries
         merge_factory = args.merge_factory
         merge_excel_dir_list = args.merge_excel_dir
         merge_side = args.merge_side
@@ -239,7 +248,7 @@ if __name__ == "__main__":
     cur_tool_dir = os.path.abspath(os.path.curdir)
     TEST_LOGGER.info("工具当前目录：{}\n".format(cur_tool_dir))
     if scan_mode in [SCAN_MODE_AEE_TNE, SCAN_MODE_AEE, SCAN_MODE_TNE, SCAN_MODE_JENKINS, SCAN_MODE_HWASAN, 
-     SCAN_MODE_FUZZ]:
+     SCAN_MODE_FUZZ, SCAN_MODE_TRANSSION]:
         scanner = ScanAeeTne(scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir, skip_extract, skip_unzip, nas_address, task_tag, special_build_prefix, delete_logs, limit_dbg_count=limit_dbg_count)
         loggerName = datetime.datetime.now().strftime("LogScanAeeTne_%Y_%m_%d_%H_%M_%S.log")
         loggerPath = os.path.join(PathManager.log_folder, loggerName)

@@ -16,15 +16,16 @@ from modules.analyse.aee.files.sys_kernel_log import SysKernelLog
 from modules.analyse.aee.files.rom_ram import parse_rom_ram_from_dec_dir
 from modules.analyse.aee.files.sys_properties import SysProperties
 from modules.analyse.aee.recognize_exception import recognize_except
+from modules.analyse.tne.files.android_main_log import AndroidMainLog
 from modules.analyse.tne.files.pstore import Pstore
 from modules.analyse.tne.files.sys_last_cpu_bus import SysLastCpuBus
 from modules.analyse.tne.types.tne01 import Tne01
 from modules.common.Logger import TEST_LOGGER
 from modules.common.Utils import random_str
 
-def analyse_aee(exp_main_file, to_recognize_except=True, extra_jira_tag=None):
+def analyse_aee(exp_main_file, to_recognize_except=True, extra_jira_tag=None, use_bi_hash=False):
     TEST_LOGGER.debug("开始解析Aee文件：{}".format(exp_main_file))
-    aee = Aee(exp_main_file, to_recognize_except, extra_jira_tag)
+    aee = Aee(exp_main_file, to_recognize_except, extra_jira_tag, use_bi_hash=use_bi_hash)
     try:
         aee.analyse()
     except:
@@ -35,10 +36,11 @@ def analyse_aee(exp_main_file, to_recognize_except=True, extra_jira_tag=None):
 
 class Aee(object):
 
-    def __init__(self, exp_main_path, to_recognize_except=True, extra_jira_tag=None):
+    def __init__(self, exp_main_path, to_recognize_except=True, extra_jira_tag=None, use_bi_hash=False):
         self._Aee__exp_main_path = exp_main_path
         self._Aee__exp_main_build_version = None
         self._Aee__recognize_except = to_recognize_except
+        self._Aee__use_bi_hash = use_bi_hash
         if extra_jira_tag:
             self._Aee__extra_tag = extra_jira_tag
         else:
@@ -215,6 +217,13 @@ class Aee(object):
             self._Aee__detail = f"class:[{self._Aee__exp_class}] process:[{self._Aee__cur_process}] 当前类型没有获取详细信息方式，请自己查看日志文件，本内容只为了Jira不能去重：\n{random_str(slen=200)}"
         self._Aee__rom_ram = parse_rom_ram_from_dec_dir(self._Aee__aee_dir)
 
+        # transsion 模式：用 SYS_ANDROID_LOG 中的 BIHash 替换 CausedBy（__detail）
+        if self._Aee__use_bi_hash:
+            try:
+                self._Aee__check_hash_value()
+            except Exception:
+                TEST_LOGGER.warn("尝试获取BI Hash值时发生异常：\n{}".format(traceback.format_exc()))
+
     def get_aee_attrs(self):
         # 返回顺序：
         # [0] Path, [1] Version, [2] ExpTime, [3] ExpClass, [4] ExpType,
@@ -223,7 +232,7 @@ class Aee(object):
         # 
         # Excel 列映射：
         # - [7] → Detail 列：recognize_except 结果（Device_id、解析库版本、手机版本、异常包名等）
-        # - [8] → CausedBy 列：Activity + Subject + 堆栈信息
+        # - [8] → CausedBy 列：Activity + Subject + 堆栈信息；transsion 模式下为 BIHash
         #
         # 变量对应：
         # - __caused_by 存储 recognize_except 结果 → 对应 Detail 列
@@ -231,6 +240,51 @@ class Aee(object):
         return [
          self._Aee__exp_main_path, self._Aee__version, self._Aee__exp_time, self._Aee__exp_class, self._Aee__exp_type,
          self._Aee__cur_process, self._Aee__package, self._Aee__caused_by, self._Aee__detail, self._Aee__extra_tag, self._Aee__count, self._Aee__activity, self._Aee__device_id, self._Aee__fans_version, self._Aee__rom_ram]
+
+    def __check_hash_value(self):
+        if not os.path.isfile(self._Aee__sys_android_log_path):
+            TEST_LOGGER.info("SYS_ANDROID_LOG 文件不存在, 无法获取BiHash")
+            return
+        android_main_log = AndroidMainLog(self._Aee__sys_android_log_path)
+        if self._Aee__cur_process == "system_server" or self._Aee__package == "system_server":
+            hash_type = "system"
+        else:
+            hash_type = "apk"
+        closest_hash = android_main_log.get_hash_value(hash_type, self._Aee__exp_time, self._Aee__package)
+        if closest_hash:
+            TEST_LOGGER.info("获取到hash值，替换self.__detail为hash值:{}".format(closest_hash))
+            self._Aee__caused_by = (self._Aee__caused_by or "") + "\n" + (self._Aee__detail or "")
+            self._Aee__detail = closest_hash
+            return
+        if not self.get_bi_hash_by_main_log(hash_type):
+            TEST_LOGGER.info("获取到BI Hash 为空，不替换self.__detail")
+
+    def get_bi_hash_by_main_log(self, target_hash_type):
+        """
+        从 __exp_main.txt 同级 data 目录下的 mobilelog/main_log 中兜底获取 BIHash
+        """
+        data_path = os.path.dirname(os.path.dirname(os.path.dirname(self._Aee__aee_dir)))
+        mobile_log_path = os.path.join(data_path, "debuglogger", "mobilelog")
+        if not os.path.isdir(mobile_log_path):
+            TEST_LOGGER.info("尝试从数据目录下的mobile log的main log中获取：未找到mobile log")
+            return False
+        main_log_path_list = []
+        for root, dirs, files in os.walk(mobile_log_path):
+            for file in files:
+                if file.lower().startswith("main_log"):
+                    main_log_path_list.append(os.path.join(root, file))
+        for main_log_path in main_log_path_list:
+            android_main_log = AndroidMainLog(main_log_path)
+            closest_hash = android_main_log.get_hash_value(
+                target_hash_type, self._Aee__exp_time, self._Aee__package)
+            if closest_hash:
+                TEST_LOGGER.info(
+                    "尝试从数据目录下的mobile log的main log中获取，获取到hash值，替换self.__detail为hash值:{}".format(
+                        closest_hash))
+                self._Aee__caused_by = (self._Aee__caused_by or "") + "\n" + (self._Aee__detail or "")
+                self._Aee__detail = closest_hash
+                return True
+        return False
 
     @property
     def recognize_exception_rlt(self):

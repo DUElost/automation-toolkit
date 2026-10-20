@@ -37,6 +37,30 @@ class StartLogScanCliTest(unittest.TestCase):
 
         self.assertEqual(0, result.returncode)
         self.assertIn("-dedup_org", result.stdout)
+        self.assertIn("transsion", result.stdout.lower())
+
+    def test_mode_transsion_alias_reaches_scanaeetne(self):
+        scanner_instance = mock.Mock()
+        scanner_ctor = mock.Mock(return_value=scanner_instance)
+        with tempfile.TemporaryDirectory() as temp_dir:
+            argv = [
+                str(SCRIPT_PATH),
+                "-m",
+                "transsion",
+                "-d_abs",
+                temp_dir,
+                "-p",
+                "SH",
+                "-s",
+            ]
+            with mock.patch.object(sys, "argv", argv):
+                with mock.patch("modules.mode.ScanAeeTne.ScanAeeTne", scanner_ctor):
+                    with mock.patch("modules.mode.DedupOrgExcel.DedupOrgExcel"):
+                        runpy.run_path(str(SCRIPT_PATH), run_name="__main__")
+
+        self.assertTrue(scanner_ctor.called)
+        self.assertEqual(23, scanner_ctor.call_args[0][0])
+        scanner_instance.start_scan.assert_called_once_with()
 
     def test_dedup_org_mode_runs_dedup_and_exits_before_scan_path(self):
         with tempfile.TemporaryDirectory() as temp_dir:

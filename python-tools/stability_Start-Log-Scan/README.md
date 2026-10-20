@@ -49,6 +49,7 @@ python start_log_scan.py -m <模式> -d <日志目录> -p <地点>
 | 6 | Daily |
 | 7 | Jenkins |
 | 8 | HWAsan |
+| 23 / `transsion` | Transsion：CausedBy 使用 SYS_ANDROID_LOG 中的 BIHash |
 
 ## 使用示例
 
@@ -61,6 +62,9 @@ python start_log_scan.py -m 0 -d 2025-12-22 -p SH
 
 # 跳过解压步骤（已解压的日志）
 python start_log_scan.py -m 1 -d 2025-12-22 -p SH -s
+
+# Transsion 模式：CausedBy 填 BIHash（可用 -m 23 或 -m transsion）
+python start_log_scan.py -m transsion -d_abs "D:\logs\test" -p SH -s
 ```
 
 ## 离线 org 去重
@@ -174,6 +178,7 @@ start_log_scan_source/
   }
 }
 ```
+
 
 ## 常见问题
 
