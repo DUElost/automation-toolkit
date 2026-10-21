@@ -16,6 +16,15 @@ from modules.mode.BaseScan import ScanBase
 class ScanAeeTne(ScanBase):
     """AEE/TNE 日志扫描类"""
 
+    # 扫盘时跳过的重日志/无关目录（不包含 __exp_main / .dbg）
+    _WALK_SKIP_DIR_NAMES = frozenset({
+        "mobilelog", "debuglogger", "ap_log", "netlog", "gpslog", "btlog",
+        "mblog", "net_log", "gps_log", "btm_log", "wifi_log", "audio_log",
+        "__pycache__", ".git", ".svn", "node_modules",
+    })
+    _SCAN_PROGRESS_DIR_INTERVAL = 500
+    _SCAN_PROGRESS_TIME_INTERVAL_SEC = 60
+
     def __init__(self, scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir,
                  skip_extract, skip_unzip, nas_address=None, task_tag=None,
                  special_build_prefix=None, delete_logs=False, limit_dbg_count=0):
@@ -169,9 +178,24 @@ class ScanAeeTne(ScanBase):
     def __is_dbg_file(file_name):
         return file_name.endswith(".dbg") or (file_name.startswith("db.") and "_analyze_report" not in file_name and not file_name.endswith(".txt"))
 
+    @classmethod
+    def _prune_walk_dirs(cls, dirs, skip_dec_dirs=False):
+        """就地剪枝 os.walk 的 dirs，跳过重日志目录；可选跳过 *.DEC。"""
+        kept = []
+        for name in dirs:
+            lower = name.lower()
+            if lower in cls._WALK_SKIP_DIR_NAMES or name.startswith("."):
+                continue
+            if skip_dec_dirs and name.upper().endswith(".DEC"):
+                continue
+            kept.append(name)
+        dirs[:] = kept
+
     def __get_physical_dbg_file_list(self):
         physical_dbg_file_list = []
         for root, dirs, files in os.walk(self._scan_root_dir):
+            # dbg 本体不在 .DEC 内；直接不进入 .DEC / 重日志目录
+            self._prune_walk_dirs(dirs, skip_dec_dirs=True)
             if ".DEC" in root:
                 continue
             for file in files:
@@ -229,27 +253,54 @@ class ScanAeeTne(ScanBase):
         TEST_LOGGER.info(f"获取需要重新解析的 dbg 文件共：{len(dbg_file_list)} 个")
         return dbg_file_list
 
+    def __maybe_append_exp_main(self, file_path, exp_main_file_list):
+        """按既有过滤规则决定是否纳入 __exp_main.txt。"""
+        if not file_path or not os.path.isfile(file_path):
+            return
+        if self._scan_date_formatted_aee and self._scan_date_formatted_aee not in file_path:
+            return
+        dbg_file_path = self._get_dbg_file_from_dec_related_path(file_path)
+        if dbg_file_path and dbg_file_path in self._zero_size_dbg_set:
+            TEST_LOGGER.warn(f"__exp_main.txt 对应的 dbg 文件大小为 0，跳过正常解析且不写入报告：{file_path}")
+            return
+        if dbg_file_path and dbg_file_path in self._extract_failed_dbg_set:
+            missing = self._get_dbg_dec_missing_critical_files(dbg_file_path)
+            if missing:
+                TEST_LOGGER.warn(
+                    f"__exp_main.txt 所在 .DEC 目录仍缺少关键文件 {missing}，跳过正常解析并转入失败兜底链：{file_path}")
+                return
+        exp_main_file_list.append(file_path)
+        TEST_LOGGER.debug(f"获取 __exp_main.txt 文件：{file_path}")
+
     def __scan_exp_main_list(self):
-        """扫描目录下所有的 __exp_main.txt 文件"""
+        """扫描目录下所有的 __exp_main.txt 文件（方案B：剪枝 + DEC 短路 + 进度日志）"""
         TEST_LOGGER.info("******************** 开始扫描__exp_main.txt文件 ********************")
         exp_main_file_list = []
+        dir_count = 0
+        last_progress_t = time.time()
 
         for root, dirs, files in os.walk(self._scan_root_dir):
-            for file in files:
-                file_path = os.path.join(root, file)
-                if file == "__exp_main.txt":
-                    if not self._scan_date_formatted_aee or self._scan_date_formatted_aee in file_path:
-                        dbg_file_path = self._get_dbg_file_from_dec_related_path(file_path)
-                        if dbg_file_path and dbg_file_path in self._zero_size_dbg_set:
-                            TEST_LOGGER.warn(f"__exp_main.txt 对应的 dbg 文件大小为 0，跳过正常解析且不写入报告：{file_path}")
-                            continue
-                        if dbg_file_path and dbg_file_path in self._extract_failed_dbg_set:
-                            missing = self._get_dbg_dec_missing_critical_files(dbg_file_path)
-                            if missing:
-                                TEST_LOGGER.warn(f"__exp_main.txt 所在 .DEC 目录仍缺少关键文件 {missing}，跳过正常解析并转入失败兜底链：{file_path}")
-                                continue
-                        exp_main_file_list.append(file_path)
-                        TEST_LOGGER.debug(f"获取 __exp_main.txt 文件：{file_path}")
+            dir_count += 1
+            now = time.time()
+            if (dir_count % self._SCAN_PROGRESS_DIR_INTERVAL == 0
+                    or now - last_progress_t >= self._SCAN_PROGRESS_TIME_INTERVAL_SEC):
+                TEST_LOGGER.info(
+                    f"扫描进度：已遍历 {dir_count} 个目录，已找到 {len(exp_main_file_list)} 个 __exp_main.txt")
+                last_progress_t = now
+
+            self._prune_walk_dirs(dirs, skip_dec_dirs=False)
+
+            # .dbg.DEC / *.DEC：关键文件在目录根，直接取 __exp_main.txt 后不再下钻
+            if os.path.basename(root).upper().endswith(".DEC"):
+                self.__maybe_append_exp_main(
+                    os.path.join(root, "__exp_main.txt"), exp_main_file_list)
+                dirs.clear()
+                continue
+
+            # 兼容偶发不在 .DEC 下的 __exp_main.txt
+            if "__exp_main.txt" in files:
+                self.__maybe_append_exp_main(
+                    os.path.join(root, "__exp_main.txt"), exp_main_file_list)
 
         TEST_LOGGER.info(f"获取需要分析的 __exp_main.txt 文件共：{len(exp_main_file_list)} 个")
         return exp_main_file_list
