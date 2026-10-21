@@ -208,6 +208,14 @@ KNOWN_FTP_CREDENTIALS = {
         os.getenv("FTP_USER_113_140_11_141_21", "tianlong"),
         os.getenv("FTP_PASSWORD_113_140_11_141_21", "tianlong123"),
     ),
+    ("172.16.5.198", 21): (
+        os.getenv("FTP_USER_172_16_5_198_21", "scmread"),
+        os.getenv("FTP_PASSWORD_172_16_5_198_21", "scmread"),
+    ),
+    ("172.21.5.209", 21): (
+        os.getenv("FTP_USER_172_21_5_209_21", "ftpadmin"),
+        os.getenv("FTP_PASSWORD_172_21_5_209_21", "tinno@2024"),
+    ),
 }
 
 KNOWN_FTP_PATH_PREFIX_ALIASES = {
@@ -263,6 +271,17 @@ def apply_known_ftp_credentials(config: FTPConfig) -> FTPConfig:
     if config.username == known_user:
         return replace(config, password=known_pass)
     return config
+
+
+def format_ftp_login_failure(config: FTPConfig, exc: BaseException, extra_hint: str = "") -> str:
+    hint = extra_hint.strip()
+    if hint and not hint.startswith(" "):
+        hint = f" {hint}"
+    return (
+        f"FTP 登录失败（530）：{config.username}@{config.host}:{config.port}。"
+        f"可能是账号密码错误，或服务器认证服务暂时异常。{hint}"
+        f" 可使用 --user、--password 手动指定账号密码。详细：{exc}"
+    )
 
 
 def apply_known_ftp_path_aliases(config: FTPConfig, remote_path: str) -> str:
@@ -1393,7 +1412,27 @@ def normalize_command_name(command: Optional[str]) -> str:
     return alias_map.get(normalized, normalized)
 
 
+def apply_ftp_arg_defaults(args: argparse.Namespace) -> argparse.Namespace:
+    """Fill connection options omitted due to argparse.SUPPRESS (before/after subcommand)."""
+    if not hasattr(args, "ftp_host"):
+        args.ftp_host = DEFAULT_CONFIG.host
+    if not hasattr(args, "ftp_port"):
+        args.ftp_port = DEFAULT_CONFIG.port
+    if not hasattr(args, "ftp_username"):
+        args.ftp_username = DEFAULT_CONFIG.username
+    if not hasattr(args, "ftp_password"):
+        args.ftp_password = DEFAULT_CONFIG.password
+    if not hasattr(args, "ftp_encoding"):
+        args.ftp_encoding = DEFAULT_CONFIG.ftp_encoding
+    if not hasattr(args, "timeout"):
+        args.timeout = DEFAULT_CONFIG.timeout
+    if not hasattr(args, "debug"):
+        args.debug = False
+    return args
+
+
 def build_ftp_config_from_args(args: argparse.Namespace) -> FTPConfig:
+    args = apply_ftp_arg_defaults(args)
     return apply_known_ftp_credentials(FTPConfig(
         host=args.ftp_host,
         port=args.ftp_port,
@@ -1404,55 +1443,71 @@ def build_ftp_config_from_args(args: argparse.Namespace) -> FTPConfig:
     ))
 
 
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        description="FTP 文件读取脚本，支持列目录、读取文本文件、下载文件。"
-    )
-    parser.add_argument(
+def _build_common_ftp_arg_parser() -> argparse.ArgumentParser:
+    """Shared options usable before or after the subcommand."""
+    common = argparse.ArgumentParser(add_help=False)
+    common.add_argument(
         "--ftp-host",
         "--host",
         dest="ftp_host",
-        default=DEFAULT_CONFIG.host,
+        default=argparse.SUPPRESS,
         help="FTP 服务器 IP 或域名",
     )
-    parser.add_argument(
+    common.add_argument(
         "--ftp-port",
         "--port",
         dest="ftp_port",
         type=int,
-        default=DEFAULT_CONFIG.port,
+        default=argparse.SUPPRESS,
         help="FTP 端口号",
     )
-    parser.add_argument(
+    common.add_argument(
         "--ftp-username",
         "--user",
         dest="ftp_username",
-        default=DEFAULT_CONFIG.username,
+        default=argparse.SUPPRESS,
         help="FTP 账户名",
     )
-    parser.add_argument(
+    common.add_argument(
         "--ftp-password",
         "--password",
         dest="ftp_password",
-        default=DEFAULT_CONFIG.password,
+        default=argparse.SUPPRESS,
         help="FTP 密码",
     )
-    parser.add_argument(
+    common.add_argument(
         "--ftp-encoding",
-        default=DEFAULT_CONFIG.ftp_encoding,
+        dest="ftp_encoding",
+        default=argparse.SUPPRESS,
         help="FTP 控制连接编码，默认 auto，会依次尝试 utf-8、gbk、gb18030",
     )
-    parser.add_argument("--timeout", type=int, default=DEFAULT_CONFIG.timeout, help="连接超时秒数")
-    parser.add_argument(
+    common.add_argument(
+        "--timeout",
+        type=int,
+        default=argparse.SUPPRESS,
+        help="连接超时秒数",
+    )
+    common.add_argument(
         "--debug", "-d",
         action="store_true",
-        default=False,
+        default=argparse.SUPPRESS,
         help="启用 debug 日志输出，在 FTP 操作失败时打印详细错误信息",
+    )
+    return common
+
+
+def build_parser() -> argparse.ArgumentParser:
+    common = _build_common_ftp_arg_parser()
+    parser = argparse.ArgumentParser(
+        description="FTP 文件读取脚本，支持列目录、读取文本文件、下载文件。",
+        parents=[common],
     )
 
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    list_parser = subparsers.add_parser("list", aliases=["ls"], help="列出远程目录内容")
+    list_parser = subparsers.add_parser(
+        "list", aliases=["ls"], parents=[common], help="列出远程目录内容",
+    )
     list_parser.add_argument(
         "remote_dir",
         nargs="?",
@@ -1460,7 +1515,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="远程目录，默认 /；支持直接传入 主机/目录 或 ftp://主机/目录",
     )
 
-    read_parser = subparsers.add_parser("read", aliases=["cat"], help="读取远程文本文件内容")
+    read_parser = subparsers.add_parser(
+        "read", aliases=["cat"], parents=[common], help="读取远程文本文件内容",
+    )
     read_parser.add_argument(
         "remote_file",
         help="远程文件路径；支持直接传入 主机/文件路径 或 ftp://主机/文件路径",
@@ -1475,7 +1532,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="可选：将读取到的文件同时保存到本地，例如 .\\output.txt",
     )
 
-    download_parser = subparsers.add_parser("download", help="下载远程文件或目录到本地")
+    download_parser = subparsers.add_parser(
+        "download", parents=[common], help="下载远程文件或目录到本地",
+    )
     download_parser.add_argument(
         "remote_path",
         help="远程文件或目录路径；支持直接传入 主机/路径 或 ftp://主机/路径",
@@ -1504,7 +1563,9 @@ def build_parser() -> argparse.ArgumentParser:
         help=f"大文件分块数，默认 {DEFAULT_CHUNK_COUNT}，设为 1 禁用分块",
     )
 
-    upload_parser = subparsers.add_parser("upload", aliases=["put"], help="上传本地文件或目录到 FTP")
+    upload_parser = subparsers.add_parser(
+        "upload", aliases=["put"], parents=[common], help="上传本地文件或目录到 FTP",
+    )
     upload_parser.add_argument("local_path", help="本地文件或目录路径")
     upload_parser.add_argument(
         "remote_path",
@@ -1517,7 +1578,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def safe_main() -> int:
     parser = build_parser()
-    args = parser.parse_args()
+    args = apply_ftp_arg_defaults(parser.parse_args())
     setup_debug(args.debug)
     normalized_command = normalize_command_name(args.command)
 
@@ -1717,14 +1778,10 @@ def safe_main() -> int:
                 )
                 if candidate.is_file():
                     hint = (
-                        f" 本地已有同名文件 {_format_size(candidate.stat().st_size)}："
+                        f"本地已有同名文件 {_format_size(candidate.stat().st_size)}："
                         f"{candidate.resolve()}。若已下完可直接使用，无需重试。"
                     )
-            print(
-                f"FTP 登录失败（530）：{config.username}@{config.host}:{config.port}。"
-                f"可能是账号密码错误，或服务器认证服务暂时异常。{hint} 详细：{exc}",
-                file=sys.stderr,
-            )
+            print(format_ftp_login_failure(config, exc, hint), file=sys.stderr)
         else:
             print(f"FTP 操作失败：{exc}", file=sys.stderr)
         return 1
@@ -1743,7 +1800,7 @@ def safe_main() -> int:
 
 def main() -> int:
     parser = build_parser()
-    args = parser.parse_args()
+    args = apply_ftp_arg_defaults(parser.parse_args())
     normalized_command = normalize_command_name(args.command)
 
     config = build_ftp_config_from_args(args)
@@ -1803,7 +1860,10 @@ def main() -> int:
             "FTP 协议错误: %s | 主机: %s:%s | 用户: %s\n%s",
             exc, config.host, config.port, config.username, traceback.format_exc(),
         )
-        print(f"FTP 操作失败：{exc}", file=sys.stderr)
+        if "530" in str(exc):
+            print(format_ftp_login_failure(config, exc), file=sys.stderr)
+        else:
+            print(f"FTP 操作失败：{exc}", file=sys.stderr)
         return 1
     except OSError as exc:
         logger.debug("OS 错误: %s\n%s", exc, traceback.format_exc())
