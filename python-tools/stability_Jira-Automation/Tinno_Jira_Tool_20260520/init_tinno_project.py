@@ -90,10 +90,16 @@ def parse_args() -> argparse.Namespace:
 
 def parse_customer_projects(text: str) -> List[str]:
     projects: List[str] = []
+    seen: set[str] = set()
     for part in re.split(r"[,，;；\s]+", str(text or "").strip()):
-        token = str(part or "").strip().upper()
-        if token and token not in projects:
-            projects.append(token)
+        token = str(part or "").strip()
+        if not token:
+            continue
+        marker = token.upper()
+        if marker in seen:
+            continue
+        seen.add(marker)
+        projects.append(token)
     return projects
 
 
@@ -175,7 +181,7 @@ def update_affect_project_mapping(
     conflicts: List[str] = []
     replacements: Dict[str, Any] = {}
     for prefix in customer_projects:
-        existing_key = next((key for key in data if str(key).strip().upper() == prefix), None)
+        existing_key = next((key for key in data if str(key).strip().upper() == prefix.upper()), None)
         current_jira = _existing_jira_project(data.get(existing_key)) if existing_key else ""
         if current_jira and current_jira != jira_key and not force:
             conflicts.append(f"{prefix} 已映射到 {current_jira}")
@@ -192,6 +198,9 @@ def update_affect_project_mapping(
 def update_summary_product_mapping(path: Path, customer_projects: List[str], summary_product: str) -> None:
     data = {key: value for key, value in load_summary_product_mapping(path).items()}
     for prefix in customer_projects:
+        existing_key = next((key for key in list(data) if str(key).strip().upper() == prefix.upper()), None)
+        if existing_key and existing_key != prefix:
+            data.pop(existing_key, None)
         data[prefix] = summary_product
     _write_json_object(path, data)
 

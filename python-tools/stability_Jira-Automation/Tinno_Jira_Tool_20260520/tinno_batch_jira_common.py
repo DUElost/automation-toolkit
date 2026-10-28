@@ -921,11 +921,51 @@ def resolve_specialty_label(row: Any, defaults: Dict[str, Any]) -> str:
     return test_case
 
 
+MODEL_LABELS = {
+    "MLD-NX2": "NX2",
+    "MLD-NX3": "NX3",
+    "MLD-NX3Carrier": "NX3Carrier",
+    "MLD-LX1": "LX1",
+    "MLD-LX2": "LX2",
+    "MLD-LX3": "LX3",
+    "ELA-LX2": "LX2",
+    "ELA-LX3": "LX3",
+}
+
+
+def _version_text_for_model_label(row: Any) -> str:
+    version = str(clean_cell_value(find_first_value(row, "versions", "")) or "").strip()
+    if version:
+        return version
+    summary = str(find_first_value(row, "summary", "") or "")
+    for token in re.findall(r"\[([^\]]+)\]", summary):
+        if re.search(r"\d{6}V\d+", token, flags=re.IGNORECASE):
+            return token.strip()
+    return ""
+
+
+def resolve_model_label(row: Any) -> str:
+    """按出现版本前缀加型号标签。MLD-NX3 不会吃掉 MLD-NX3Carrier。"""
+    version = _version_text_for_model_label(row)
+    if not version:
+        return ""
+    from tinno_upload_template_common import match_version_prefix
+
+    prefix = match_version_prefix(version)
+    if not prefix:
+        return ""
+    for key, label in MODEL_LABELS.items():
+        if key.upper() == prefix.upper():
+            return label
+    return ""
+
+
 def resolve_issue_labels(row: Any, defaults: Dict[str, Any]) -> List[str]:
     """新建问题的 labels：保留该行对应的测试专项标签，并追加固定标签（默认 稳定性测试）。
 
     历史上这里直接使用配置里的静态 labels（全部为 MonkeyAEE），导致专项标签失真；
     现在按行解析专项标签，找不到专项信息时才回退到配置 labels。
+    出现版本前缀再追加型号标签：NX2、NX3、NX3Carrier、LX1、LX2、LX3。
     """
     labels: List[str] = []
     specialty_label = resolve_specialty_label(row, defaults)
@@ -939,6 +979,9 @@ def resolve_issue_labels(row: Any, defaults: Dict[str, Any]) -> List[str]:
             token = str(clean_cell_value(item) or "").strip()
             if token:
                 labels.append(token)
+    model_label = resolve_model_label(row)
+    if model_label:
+        labels.append(model_label)
     fixed_labels = defaults.get("fixed_labels", DEFAULT_FIXED_LABELS)
     if isinstance(fixed_labels, str):
         fixed_labels = [fixed_labels]

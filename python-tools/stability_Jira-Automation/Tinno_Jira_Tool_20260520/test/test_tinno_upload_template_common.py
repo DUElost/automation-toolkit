@@ -58,14 +58,47 @@ class TinnoUploadTemplateCommonTest(unittest.TestCase):
             {"project_key": "VCAME", "default_affect_project": ""},
             {
                 "MLD-NX3Carrier": {
-                    "jira_project": "PFDFAA",
+                    "jira_project": "PAANX",
                     "affect_project": "MLD-NX3Carrier",
+                    "monkey_project": "PAANX",
+                },
+                "MLD-NX2": {
+                    "jira_project": "PFDFAA",
+                    "affect_project": "MLD-NX2",
                     "monkey_project": "PFDFAA",
-                }
+                },
+                "MLD-NX3": {
+                    "jira_project": "PFDFAA",
+                    "affect_project": "MLD-NX3",
+                    "monkey_project": "PFDFAA",
+                },
             },
             None,
         )
-        self.assertEqual("PFDFAA", project)
+        self.assertEqual("PAANX", project)
+        nx2_project, _ = upload_common._resolve_project_and_affect_project(
+            {"version": "MLD-NX2-16-261013V21", "affect_project": ""},
+            {"project_key": "VCAME", "default_affect_project": ""},
+            {
+                "MLD-NX3Carrier": {
+                    "jira_project": "PAANX",
+                    "affect_project": "MLD-NX3Carrier",
+                    "monkey_project": "PAANX",
+                },
+                "MLD-NX2": {
+                    "jira_project": "PFDFAA",
+                    "affect_project": "MLD-NX2",
+                    "monkey_project": "PFDFAA",
+                },
+                "MLD-NX3": {
+                    "jira_project": "PFDFAA",
+                    "affect_project": "MLD-NX3",
+                    "monkey_project": "PFDFAA",
+                },
+            },
+            None,
+        )
+        self.assertEqual("PFDFAA", nx2_project)
 
     def test_load_test_case_summary_reads_excel(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

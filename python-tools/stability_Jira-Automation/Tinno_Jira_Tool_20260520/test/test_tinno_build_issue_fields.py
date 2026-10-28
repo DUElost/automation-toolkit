@@ -207,7 +207,7 @@ class TinnoBuildIssueFieldsTest(unittest.TestCase):
 
         fields = build_issue_fields(self.jira, row, self.defaults)
 
-        self.assertEqual(["MTBF", "稳定性测试"], fields["labels"])
+        self.assertEqual(["MTBF", "LX2", "稳定性测试"], fields["labels"])
 
     def test_build_issue_labels_ignores_unknown_summary_token(self) -> None:
         row = pd.Series(
@@ -237,6 +237,62 @@ class TinnoBuildIssueFieldsTest(unittest.TestCase):
         fields = build_issue_fields(self.jira, row, self.defaults)
 
         self.assertEqual(self.defaults.get("labels", ["MonkeyAEE"]) + self.defaults.get("fixed_labels", ["稳定性测试"]), fields["labels"])
+
+    def test_build_issue_labels_adds_535_model_label_from_version(self) -> None:
+        cases = [
+            ("PFDFAA", "MLD-NX2-16-261013V21", "NX2"),
+            ("PFDFAA", "MLD-NX3-16-261013V21", "NX3"),
+            ("PAANX", "MLD-NX3Carrier-16-261013V21", "NX3Carrier"),
+        ]
+        for project, version, model_label in cases:
+            with self.subTest(version=version):
+                row = pd.Series(
+                    {
+                        "Project": project,
+                        "Issue Type": "Bug",
+                        "Summary": f"[自动化][P535AA][Total Number 1][{version}][MonkeyAEE][Java (JE)]x发生Java (JE)",
+                        "Description": "description",
+                        "Test Case": "Monkey专项",
+                        "Versions": version,
+                    }
+                )
+                fields = build_issue_fields(self.jira, row, self.defaults)
+                self.assertEqual(["MonkeyAEE", model_label, "稳定性测试"], fields["labels"])
+
+    def test_build_issue_labels_adds_552_and_551_model_labels(self) -> None:
+        cases = [
+            ("VFFCA", "V552AA", "MLD-LX2-16-260518V3", "LX2"),
+            ("VFFCA", "V552AA", "MLD-LX3-16-260518V3", "LX3"),
+            ("VFFBA", "V551A", "ELA-LX2-15-250730V29", "LX2"),
+            ("VFFBA", "V551A", "ELA-LX3-15-250730V29", "LX3"),
+        ]
+        for project, product, version, model_label in cases:
+            with self.subTest(version=version):
+                row = pd.Series(
+                    {
+                        "Project": project,
+                        "Issue Type": "Bug",
+                        "Summary": f"[自动化][{product}][Total Number 1][{version}][MonkeyAEE][Java (JE)]x发生Java (JE)",
+                        "Description": "description",
+                        "Test Case": "Monkey专项",
+                        "Versions": version,
+                    }
+                )
+                fields = build_issue_fields(self.jira, row, self.defaults)
+                self.assertEqual(["MonkeyAEE", model_label, "稳定性测试"], fields["labels"])
+
+        product_only = pd.Series(
+            {
+                "Project": "VFFBA",
+                "Issue Type": "Bug",
+                "Summary": "[自动化][V551A][Total Number 1][V551A-15-250714V15][MonkeyAEE][Java (JE)]x发生Java (JE)",
+                "Description": "description",
+                "Test Case": "Monkey专项",
+                "Versions": "V551A-15-250714V15",
+            }
+        )
+        fields = build_issue_fields(self.jira, product_only, self.defaults)
+        self.assertEqual(["MonkeyAEE", "稳定性测试"], fields["labels"])
 
     def test_build_issue_labels_dedupes_fixed_label_with_specialty(self) -> None:
         row = pd.Series(

@@ -125,9 +125,10 @@ python ".\init_tinno_project.py" `
   --summary-product "P535AA"
 ```
 
-`MLD-NX2` 是 Monkey 版本前缀，标题产品名是 `P535AA`，Jira 关键字是 `PFDFAA`。
-`MLD-NX3`、`MLD-NX3Carrier` 也登记在同一个项目下。已登记的前缀按最长匹配，
-`MLD-NX3` 不会覆盖 `MLD-NX3Carrier`。未登记的版本仍按板型段（如 `LX2`、`NX2`）取前缀。
+`MLD-NX2`、`MLD-NX3` 是 Monkey 版本前缀，标题产品名是 `P535AA`，Jira 关键字是 `PFDFAA`。
+`MLD-NX3Carrier` 单独对应 `PAANX`（`P535AA-NX3-Carrier`），标题产品名仍是 `P535AA`。
+已登记的前缀按最长匹配，`MLD-NX3` 不会覆盖 `MLD-NX3Carrier`。
+未登记的版本仍按板型段（如 `LX2`、`NX2`）取前缀。
 
 工作区里会生成 `config/affect_project_mapping.json`、`config/summary_product_mapping.json`
 和 `config/module_assignee_mapping.json`。确认结果后再去掉 `--workspace` 写入正式配置。
@@ -181,7 +182,8 @@ python ".\create_tinno_jira_batch_from_excel.py" `
   - 仅在真实执行时生效
   - 新建问题单成功后，会把 Excel 中 `PS` 列追加为评论
 - labels 字段（新建问题时）
-  - labels = 该行测试专项标签 + 固定标签 `稳定性测试`，重复值自动去重
+  - labels = 该行测试专项标签 + 型号标签 + 固定标签 `稳定性测试`，重复值自动去重
+  - 出现版本前缀 `MLD-NX2`、`MLD-NX3`、`MLD-NX3Carrier` 追加 `NX2`、`NX3`、`NX3Carrier`；`MLD-LX1`、`MLD-LX2`、`MLD-LX3`、`ELA-LX2`、`ELA-LX3` 追加 `LX1`、`LX2`、`LX3`。`MLD-NX3` 不会覆盖 `MLD-NX3Carrier`。标题产品名 `V552AA`、`V551A` 不加型号标签
   - 专项标签按上传模板 `Test Case` 列经 `test_case_label_mapping` 解析（如 `MTBF专项`→`MTBF`、`Monkey专项`→`MonkeyAEE`）；无 `Test Case` 列时回退取 Summary 版本号后的专项 token；仍解析不到才使用配置 `labels` 的静态值
   - 固定标签可在配置 `fixed_labels` 中调整（默认 `["稳定性测试"]`）
   - 修复历史问题：此前 labels 始终取配置 `labels` 静态值，所有单均为 `MonkeyAEE`，未跟随对应专项
@@ -291,7 +293,7 @@ python ".\retro_patch_tinno_labels.py" `
 版本前缀在 `init_tinno_project.py` 写入 `affect_project_mapping.json`。
 Jira 项目本身已经隔开 535 / 552 / 551，提交、命中历史单和回归只再区分该项目里登记过的型号前缀。
 
-- `MLD-NX2`、`MLD-NX3`、`MLD-NX3Carrier` 同属 PFDFAA，彼此不命中、不回归
+- `MLD-NX2`、`MLD-NX3` 同属 PFDFAA，彼此不命中、不回归；`MLD-NX3Carrier` 单独在 PAANX
 - `MLD-LX2`、`MLD-LX3` 同属 VFFCA，彼此不命中、不回归
 - `ELA-LX2`、`ELA-LX3` 同属 VFFBA，标题产品名是 `V551A`，版本串仍保留 `ELA-LX2`、`ELA-LX3`
 - 同一前缀内仍按构建日期和 V 号比较新旧

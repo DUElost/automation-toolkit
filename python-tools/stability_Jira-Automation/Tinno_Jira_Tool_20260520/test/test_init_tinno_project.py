@@ -18,10 +18,14 @@ import tinno_upload_template_common as upload_common
 
 
 class InitTinnoProjectTest(unittest.TestCase):
-    def test_parse_customer_projects_splits_and_uppercases(self) -> None:
+    def test_parse_customer_projects_splits_and_keeps_first_casing(self) -> None:
         self.assertEqual(
-            ["PFDFAA", "MLD-LX2", "V552AA"],
+            ["pfdFAA", "MLD-LX2", "V552AA"],
             init_module.parse_customer_projects(" pfdFAA，MLD-LX2; V552AA pfdFAA "),
+        )
+        self.assertEqual(
+            ["MLD-NX3Carrier"],
+            init_module.parse_customer_projects("MLD-NX3Carrier,mld-nx3carrier"),
         )
 
     def test_infer_summary_product_prefers_product_code(self) -> None:
@@ -157,9 +161,9 @@ class InitTinnoProjectTest(unittest.TestCase):
     def test_collect_project_inputs_uses_cli_values_without_prompt(self) -> None:
         args = Namespace(customer_project="pfdFAA", jira_key="pfdFAA", summary_product=None)
         customer_projects, jira_key, summary_product = init_module.collect_project_inputs(args)
-        self.assertEqual(["PFDFAA"], customer_projects)
+        self.assertEqual(["pfdFAA"], customer_projects)
         self.assertEqual("PFDFAA", jira_key)
-        self.assertEqual("PFDFAA", summary_product)
+        self.assertEqual("pfdFAA", summary_product)
 
     def test_build_upload_rows_uses_jira_component_assignee(self) -> None:
         main_df = pd.DataFrame(
