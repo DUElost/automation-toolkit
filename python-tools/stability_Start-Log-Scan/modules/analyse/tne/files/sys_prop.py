@@ -19,6 +19,8 @@ class SysProp(object):
         self._SysProp__gms_serial = "undefined"
         self._SysProp__country = "undefined"
         self._SysProp__system_server_start_count = None
+        self._SysProp__is_factory_reset = False
+        self._SysProp__is_shell_reboot = False
         self._SysProp__analyse(self._SysProp__file_path)
 
     def __analyse(self, file_path):
@@ -47,6 +49,12 @@ class SysProp(object):
                     continue
                 if "[persist.user.root.support]: [1]" in line:
                     self._SysProp__is_root = True
+                    continue
+                if "persist.sys.boot.reason.history" in line:
+                    if "factory_reset" in line:
+                        self._SysProp__is_factory_reset = True
+                    if "shell" in line or "ota" in line:
+                        self._SysProp__is_shell_reboot = True
                     continue
                 if "[sys.system_server.start_count]" in line:
                     line = line.split(":")[1].strip()
@@ -107,6 +115,14 @@ class SysProp(object):
     @property
     def country(self):
         return self._SysProp__country
+
+    @property
+    def is_factory_reset(self):
+        return self._SysProp__is_factory_reset
+
+    @property
+    def is_shell_reboot(self):
+        return self._SysProp__is_shell_reboot
 
 
 if __name__ == "__main__":

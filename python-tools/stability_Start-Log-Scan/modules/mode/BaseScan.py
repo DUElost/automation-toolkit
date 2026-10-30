@@ -1855,6 +1855,10 @@ class ScanBase(ABC):
                 rlt, tne_dir_path, tne, error_type, error_detail = future.result()
                 if rlt and tne:
                     tne_result_list.append(tne)
+                    extras = getattr(tne, "_extra_results", None) or []
+                    for extra in extras:
+                        if extra:
+                            tne_result_list.append(extra)
 
         if tne_result_list:
             TEST_LOGGER.info("解析获取tne问题结果共：{}个".format(len(tne_result_list)))

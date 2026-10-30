@@ -6,11 +6,14 @@ ScanAeeTne - AEE/TNE 日志扫描模块
 import datetime
 import json
 import os
+import re
 import time
 import traceback
 from modules.common.Logger import TEST_LOGGER
 from modules.common.GlobalAttrs import *
+from modules.common.Utils import get_str_similar
 from modules.mode.BaseScan import ScanBase
+from modules.analyse.tne.types.tne_base import TneBase
 
 
 class ScanAeeTne(ScanBase):
@@ -24,6 +27,11 @@ class ScanAeeTne(ScanBase):
     })
     _SCAN_PROGRESS_DIR_INTERVAL = 500
     _SCAN_PROGRESS_TIME_INTERVAL_SEC = 60
+    _TNE_DIR_RE = re.compile(r"^0x[a-fA-F0-9]{8}_(?:\d{4}(?:_\d{1,2}){5,6}|\d{16})$")
+    _TNE_VERSION_DATE_RE = re.compile(r"-(\d{6})V")
+    _TNE_NO_FORMAT_EXP_TYPES = ("0xffffff0d_hwt", "0xffffff0c_hang_detect")
+    _TNE_ABSOLUTE_EQUAL_EXP_TYPES = (
+        "0x007a0044", "0xffffff2c", "0xffffff3c", "0xffffff32", "0x007a0050")
 
     def __init__(self, scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir,
                  skip_extract, skip_unzip, nas_address=None, task_tag=None,
@@ -61,6 +69,9 @@ class ScanAeeTne(ScanBase):
 
     def _scan(self):
         """执行扫描"""
+        if self._scan_mode == SCAN_MODE_TNE:
+            self._scan_tne_summary()
+            return
         TEST_LOGGER.resetTag(__name__)
         TEST_LOGGER.info("开始执行 AEE/TNE 扫描")
         TEST_LOGGER.info("扫描目录: {}".format(self._scan_root_dir))
@@ -304,6 +315,254 @@ class ScanAeeTne(ScanBase):
 
         TEST_LOGGER.info(f"获取需要分析的 __exp_main.txt 文件共：{len(exp_main_file_list)} 个")
         return exp_main_file_list
+
+    def _scan_tne_summary(self):
+        """-m tne：扫描/解析 TNE，按官方规则汇总去重并出 org/final 表。"""
+        TEST_LOGGER.resetTag(__name__)
+        TEST_LOGGER.info("开始执行 TNE 汇总去重扫描")
+        TEST_LOGGER.info("扫描目录: {}".format(self._scan_root_dir))
+        TEST_LOGGER.info("相似度系数: {}".format(self._ratio_std_tne))
+        TEST_LOGGER.info("扫描日期: {}".format(self._scan_date_formatted_tne if self._scan_date_formatted_tne else "所有日期"))
+
+        if not self._scan_root_dir or not os.path.isdir(self._scan_root_dir):
+            TEST_LOGGER.error(f"扫描目录不存在: {self._scan_root_dir}")
+            return
+
+        try:
+            tne_file_list, tne_dir_list = self._collect_tne_files_and_dirs()
+            TEST_LOGGER.info("扫描获取tne文件共：{}个".format(len(tne_file_list)))
+            TEST_LOGGER.info("扫描获取tne目录共：{}个".format(len(tne_dir_list)))
+            if not self._skip_extract:
+                self._decompress_tne(tne_file_list)
+                _, tne_dir_list = self._collect_tne_files_and_dirs()
+                TEST_LOGGER.info("解压后tne目录共：{}个".format(len(tne_dir_list)))
+            else:
+                TEST_LOGGER.info("skip_extract: True，跳过 tne 解压，仅扫描已解压目录")
+
+            tne_result_list = []
+            if tne_dir_list:
+                tne_result_list = self._analyse_tne(tne_dir_list, extra_jira_tag=self._extra_jira_tag)
+            tne_rlt_list_org, tne_rlt_list_final = self._tne_to_org_final(tne_result_list, replace_path=True)
+            TEST_LOGGER.info("tne 合并后原始 {} 条，最终 {} 条".format(
+                len(tne_rlt_list_org), len(tne_rlt_list_final)))
+            summary_data = self.__build_tne_scan_summary(
+                tne_file_list, tne_dir_list, tne_result_list, tne_rlt_list_org, tne_rlt_list_final)
+            self.__generate_tne_result(tne_rlt_list_org, tne_rlt_list_final, summary_data)
+            TEST_LOGGER.info("TNE 汇总去重扫描完成")
+        except Exception:
+            TEST_LOGGER.error(f"TNE 扫描过程发生异常: {traceback.format_exc()}")
+
+    def _tne_file_matches_scan_date(self, name):
+        scan_date = self._scan_date_formatted_tne
+        if not scan_date:
+            return True
+        if scan_date in name:
+            return True
+        if len(scan_date) == 8:
+            dashed = "{}_{}_{}".format(scan_date[:4], scan_date[4:6], scan_date[6:8])
+            return dashed in name
+        return False
+
+    def _collect_tne_files_and_dirs(self):
+        """收集 .tne 文件与已解压的 0x* 目录。"""
+        TEST_LOGGER.info("******************** 开始扫描tne文件与目录 ********************")
+        tne_file_list = []
+        tne_dir_list = []
+        for root, dirs, files in os.walk(self._scan_root_dir):
+            self._prune_walk_dirs(dirs, skip_dec_dirs=True)
+            for dir_name in list(dirs):
+                if not self._TNE_DIR_RE.fullmatch(dir_name):
+                    continue
+                if not self._tne_file_matches_scan_date(dir_name):
+                    TEST_LOGGER.info("跳过tne目录（日期不符）：{}".format(os.path.join(root, dir_name)))
+                    continue
+                tne_dir_list.append(os.path.join(root, dir_name))
+                TEST_LOGGER.info("发现tne目录：{}".format(os.path.join(root, dir_name)))
+            for file_name in files:
+                if not file_name.lower().endswith(".tne"):
+                    continue
+                if not self._tne_file_matches_scan_date(file_name):
+                    TEST_LOGGER.info("跳过tne文件（日期不符）：{}".format(os.path.join(root, file_name)))
+                    continue
+                file_path = os.path.join(root, file_name)
+                tne_file_list.append(file_path)
+                TEST_LOGGER.info("发现tne文件：{}".format(file_path))
+        TEST_LOGGER.info("******************** 扫描tne文件与目录已完成 ********************")
+        return tne_file_list, tne_dir_list
+
+    def _tne_dedup_similarity_params(self, exp_type_org, caused_by_org):
+        format_str = True
+        absolute_equal = False
+        if exp_type_org in self._TNE_NO_FORMAT_EXP_TYPES:
+            format_str = False
+        freeze_list = getattr(self, "_freeze_tne_type_list", None) or []
+        subsystem_list = getattr(self, "_subsystem_crash_tne_type_list", None) or []
+        if exp_type_org in freeze_list or exp_type_org in subsystem_list:
+            absolute_equal = True
+        if exp_type_org in self._TNE_ABSOLUTE_EQUAL_EXP_TYPES:
+            absolute_equal = "***FoundStackInfo***" not in str(caused_by_org or "")
+        return format_str, absolute_equal
+
+    @staticmethod
+    def _as_count(value, default=1):
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return default
+
+    def _combine_tne_duplicate_row(self, exist, incoming):
+        """命中后次数相加，重复路径和设备号合并；较新版本覆盖 Version。"""
+        count = self._as_count(exist[11]) + self._as_count(incoming[11])
+        path_exist = str(exist[0] or "")
+        path_incoming = str(incoming[0] or "")
+        if path_incoming and path_incoming not in path_exist.split(" | "):
+            merged_path = path_exist + " | " + path_incoming if path_exist else path_incoming
+            if len(merged_path) > 10000:
+                merged_path = merged_path[:10000]
+            exist[0] = merged_path
+        device_exist = str(exist[10] or "").strip()
+        device_incoming = str(incoming[10] or "").strip()
+        if device_incoming and device_incoming not in ("undefined", "None"):
+            exist_ids = []
+            if device_exist and device_exist not in ("undefined", "None"):
+                exist_ids = [item.strip() for item in device_exist.split(",") if item.strip()]
+            if device_incoming not in exist_ids:
+                exist[10] = ",".join(exist_ids + [device_incoming]) if exist_ids else device_incoming
+        try:
+            version_incoming = re.search(self._TNE_VERSION_DATE_RE, str(incoming[1])).group(1)
+            version_exist = re.search(self._TNE_VERSION_DATE_RE, str(exist[1])).group(1)
+            if version_incoming > version_exist:
+                exist[1] = incoming[1]
+                exist[2] = incoming[2]
+        except Exception:
+            pass
+        exist[11] = count
+        return exist
+
+    def _merge_tne_final_rows(self, base_list, incoming_list):
+        """分片最终行再去重。命中后次数相加，重复路径和设备次数合并。"""
+        for row in incoming_list:
+            exp_type = row[4]
+            caused_by = row[8]
+            if "TNE_ERROR_file_missing" in str(exp_type) and str(caused_by) == "undefined":
+                continue
+            if caused_by is None:
+                continue
+            format_str, absolute_equal = self._tne_dedup_similarity_params(exp_type, caused_by)
+            matched = False
+            for exist in base_list:
+                if exist[4] != exp_type or exist[6] != row[6]:
+                    continue
+                try:
+                    exist_caused_by = str(exist[8])
+                    incoming_caused_by = str(caused_by)
+                    ratio = get_str_similar(
+                        exist_caused_by, incoming_caused_by,
+                        format_str=format_str, absolute_equal=absolute_equal)
+                    if (ratio < self._ratio_std_tne and not absolute_equal
+                            and TneBase.transucc_stacks_equivalent(exist_caused_by, incoming_caused_by)):
+                        ratio = 100
+                except Exception:
+                    TEST_LOGGER.warn("TNE 去重相似度计算异常：\n{}".format(traceback.format_exc()))
+                    continue
+                if ratio >= self._ratio_std_tne:
+                    self._combine_tne_duplicate_row(exist, row)
+                    matched = True
+                    break
+            if not matched:
+                base_list.append(list(row))
+        return base_list
+
+    def _tne_to_org_final(self, tne_result_list, replace_path=False):
+        """将 TNE 解析结果转为原始表与去重后最终表。"""
+        tne_rlt_list_org = []
+        tne_rlt_list_final = []
+        if not tne_result_list:
+            return tne_rlt_list_org, tne_rlt_list_final
+        for tne_result in tne_result_list:
+            tne_result_attrs = list(tne_result.get_tne_attrs())
+            if replace_path:
+                tne_result_attrs[0] = self._convert_path_to_win(tne_result_attrs[0])
+            tne_result_attrs[8] = str(tne_result_attrs[8])
+            org_row = list(tne_result_attrs)
+            tne_rlt_list_org.append(org_row)
+            exp_type_org = tne_result_attrs[4]
+            caused_by_org = tne_result_attrs[8]
+            if "TNE_ERROR_file_missing" in str(exp_type_org) and caused_by_org == "undefined":
+                continue
+            if caused_by_org is None:
+                continue
+            self._merge_tne_final_rows(tne_rlt_list_final, [tne_result_attrs])
+        return tne_rlt_list_org, tne_rlt_list_final
+
+    def __generate_tne_result(self, tne_rlt_list_org, tne_rlt_list_final, summary_data=None):
+        TEST_LOGGER.info("******************** 开始生成TNE扫描结果 ********************")
+        try:
+            from modules.common.Excel import Excel
+            build_version = self._build_version
+            if tne_rlt_list_org:
+                for tne_rlt in tne_rlt_list_org:
+                    if len(tne_rlt) > 1 and tne_rlt[1] and tne_rlt[1] not in ("undefined",):
+                        build_version = tne_rlt[1]
+                        break
+            jira_repo = self._jira_repo if self._jira_repo else "None"
+            reporter = self._reporter if self._reporter else "None"
+            result_dir = self._scan_root_dir
+            timestamp = time.strftime("%H%M%S")
+            date_time_str = f"{self._report_date_formatted}_{timestamp}"
+            generated_files = {}
+            if not tne_rlt_list_org and not tne_rlt_list_final:
+                TEST_LOGGER.info("TNE org结果为空，跳过生成结果表")
+
+            if tne_rlt_list_org:
+                org_excel_name = f"Result_{jira_repo}_{reporter}_MonkeyTNE_{self._scan_place}_{date_time_str}_org.xls"
+                org_excel_path = os.path.join(result_dir, org_excel_name)
+                excel_org = Excel(org_excel_path)
+                excel_org.insertResultTne(tne_rlt_list_org)
+                TEST_LOGGER.info(f"TNE 原始结果Excel已生成：{org_excel_path}")
+                generated_files["org_excel"] = org_excel_path
+
+            if tne_rlt_list_final:
+                final_excel_name = f"Result_{jira_repo}_{reporter}_MonkeyTNE_{self._scan_place}_{date_time_str}.xls"
+                final_excel_path = os.path.join(result_dir, final_excel_name)
+                excel_final = Excel(final_excel_path)
+                excel_final.insertResultTne(tne_rlt_list_final)
+                TEST_LOGGER.info(f"TNE 去重后结果Excel已生成：{final_excel_path}")
+                generated_files["final_excel"] = final_excel_path
+
+            if summary_data is not None:
+                summary_json_name = f"Result_{jira_repo}_{reporter}_MonkeyTNE_{self._scan_place}_{date_time_str}_summary.json"
+                summary_json_path = os.path.join(result_dir, summary_json_name)
+                summary_data["generated_files"] = generated_files
+                summary_data["generated_files"]["summary_json"] = summary_json_path
+                summary_data["build_version"] = build_version if build_version else "VersionNone"
+                with open(summary_json_path, "w", encoding="utf-8") as f:
+                    json.dump(summary_data, f, ensure_ascii=False, indent=2)
+                TEST_LOGGER.info(f"TNE 扫描摘要 JSON 已生成：{summary_json_path}")
+        except Exception:
+            TEST_LOGGER.error(f"生成TNE结果时发生异常：{traceback.format_exc()}")
+        TEST_LOGGER.info("******************** TNE扫描结果生成完成 ********************")
+
+    def __build_tne_scan_summary(self, tne_file_list, tne_dir_list, tne_result_list,
+                                 tne_rlt_list_org, tne_rlt_list_final):
+        return {
+            "tool": "stability_Start-Log-Scan",
+            "scan_mode": self._scan_mode,
+            "scan_mode_name": SCAN_MODE_DICT.get(self._scan_mode, "未知"),
+            "scan_place": self._scan_place,
+            "scan_root_dir": self._scan_root_dir,
+            "scan_date": self._scan_date_formatted_tne if self._scan_date_formatted_tne else "ALL",
+            "report_date": self._report_date_formatted,
+            "generated_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "skip_extract": self._skip_extract,
+            "counts": {
+                "tne_file_count": len(tne_file_list),
+                "tne_dir_count": len(tne_dir_list),
+                "tne_result_count": len(tne_result_list),
+                "tne_result_org_count": len(tne_rlt_list_org),
+                "tne_result_final_count": len(tne_rlt_list_final)
+            }
+        }
 
     def __generate_result(self, aee_rlt_list_org, aee_rlt_list_final, summary_data=None):
         """生成扫描结果"""

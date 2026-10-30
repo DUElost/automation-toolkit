@@ -63,7 +63,7 @@ if __name__ == "__main__":
 
     parser.add_argument("-m", "--mode", dest="scan_mode", metavar="扫描模式", type=parse_scan_mode, default=0,
       nargs="?",
-      help="0：Aee & Tne | 1：Aee | 2：Tne | 3：Fans | 4：Usic | 5：Platform Monkey | 6：Daily | 7：Jenkins | 8：HWAsan | 9：Platform MTBF | 10：StuckLogo | 11：Platform Camera | 12：Platform Video | 13：Platform Sunmao | 14：Freeze | 15：Platform HWASan | 16：Fuzz | 17：Platform Fuzz | 18：OTA Daily | 19：INDEPENDENT | 20：DAEMON CRASH | 21：SUBSYSTEM CRASH | 22：UPLOAD TNE | 23/transsion：Transsion(CausedBy=BIHash)")
+      help="0：Aee & Tne | 1：Aee | 2/tne：Tne汇总去重 | 3：Fans | 4：Usic | 5：Platform Monkey | 6：Daily | 7：Jenkins | 8：HWAsan | 9：Platform MTBF | 10：StuckLogo | 11：Platform Camera | 12：Platform Video | 13：Platform Sunmao | 14：Freeze | 15：Platform HWASan | 16：Fuzz | 17：Platform Fuzz | 18：OTA Daily | 19：INDEPENDENT | 20：DAEMON CRASH | 21：SUBSYSTEM CRASH | 22：UPLOAD TNE | 23/transsion：Transsion(CausedBy=BIHash)")
     parser.add_argument("-b", "--before", dest="days_before", metavar="指定扫描往前第?天的日志", type=int, default=(-1), nargs="?",
       help="扫描现在开始往前第几天的日志，默认-1：扫描所有的日志")
     parser.add_argument("-d", "--dir", dest="scan_root_dir", metavar="待扫描日志根目录", type=str, default=None, help="待扫描日志根目录")

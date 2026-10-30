@@ -53,5 +53,8 @@ VERSION = "V2.0.6_20240325"
 VERSION = "V2.0.7_20240328"
 VERSION = "V2.0.8_20240419"
 VERSION = "V2.0.9_20240509"
+VERSION = "V2.0.9_20261027"
+VERSION = "V2.0.10_20261027"
+VERSION = "V2.0.11_20261028"
 
 # okay decompiling extracted_pyz_modules\modules\common\Version.pyc

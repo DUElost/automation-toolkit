@@ -2,8 +2,12 @@
 # Python bytecode version base 3.7.0 (3394)
 # Decompiled from: Python 3.8.3 (tags/v3.8.3:6f8c832, May 13 2020, 22:37:02) [MSC v.1924 64 bit (AMD64)]
 # Embedded file name: modules\analyse\tne\types\tne_base.py
-import os, re
+import os
+import re
 from abc import ABC, abstractmethod
+from modules.analyse.tne.files.android_crash_log import AndroidCrashLog
+from modules.analyse.tne.files.android_main_log import AndroidMainLog
+from modules.analyse.tne.files.anr import Anr
 from modules.analyse.tne.files.sys_log_dur_lkdump import SysLogDurLkdump
 from modules.analyse.tne.files.sys_version_br import SysVersionBr
 from modules.common.Logger import TEST_LOGGER
@@ -228,4 +232,287 @@ class TneBase(ABC):
         if self._anr_file_list:
             self._anr_file_list.sort()
 
-# okay decompiling extracted_pyz_modules\modules\analyse\tne\types\tne_base.pyc
+    def _apply_transucc_if_possible(self):
+        if self.try_analyse_transucc_crash():
+            if self._exp_type_set:
+                self._exp_type = self._exp_type + "\n" + "\n".join(self._exp_type_set)
+            self._detail_to_random()
+            return True
+        return False
+
+    def try_analyse_transucc_crash(self):
+        """
+        用 TranSucc. 简易堆栈对齐 crash_log/anr 完整段。
+        命中后：_detail 写入清洗后的完整堆栈（结果表 CausedBy / 去重键），
+        _caused_by 写入 BIHash（结果表 Detail）。对不上则返回 False，调用方走旧解析。
+        """
+        groups = self._collect_transucc_groups()
+        if not groups:
+            return False
+        chosen = self._pick_transucc_group(groups)
+        if not chosen:
+            TEST_LOGGER.info("TranSucc. 未找到可对齐的一组，走旧解析", tag=self.tne_dir_name)
+            return False
+        stack_key = (chosen.get("stack") or "").strip()
+        if not stack_key:
+            TEST_LOGGER.info("TranSucc. 简易堆栈为空，走旧解析", tag=self.tne_dir_name)
+            return False
+        mode, match_text = self._transucc_stack_match(stack_key)
+        if mode == "empty":
+            TEST_LOGGER.info("TranSucc. 简易堆栈为空，走旧解析", tag=self.tne_dir_name)
+            return False
+        crash_type = (chosen.get("crash_type") or "").strip().lower()
+        proc_name = (chosen.get("procName") or "").strip()
+        pkg_name = (chosen.get("pkgName") or "").strip()
+        process_name = proc_name or pkg_name
+        prefer_time = chosen.get("time") or self._prefer_time_from_tne_dir()
+        if mode == "truncated":
+            TEST_LOGGER.info(
+                "TranSucc. 简易堆栈被截断，按异常首行和进程 {} 匹配".format(process_name),
+                tag=self.tne_dir_name)
+            if not process_name:
+                TEST_LOGGER.info("TranSucc. 截断堆栈缺少进程名，走旧解析", tag=self.tne_dir_name)
+                return False
+        section_time, stack_detail = (None, None)
+        if crash_type == "anr":
+            section_time, stack_detail = self._detail_from_anr_by_stack(
+                match_text, process_name, prefer_time)
+        else:
+            section_time, stack_detail = self._detail_from_crash_by_stack(
+                match_text, process_name, prefer_time)
+        if not stack_detail:
+            TEST_LOGGER.info(
+                "TranSucc. crash_type={} 未匹配到 detail，走旧解析".format(crash_type),
+                tag=self.tne_dir_name)
+            return False
+        bi_hash = (chosen.get("BIHash") or "").strip()
+        if process_name:
+            self._cur_process = process_name
+        if pkg_name:
+            self._package = pkg_name
+        self._detail = stack_detail
+        if section_time:
+            self._exp_time = section_time
+        elif prefer_time:
+            self._exp_time = prefer_time
+        if bi_hash:
+            self._caused_by = bi_hash
+            TEST_LOGGER.info("TranSucc. BIHash 写入 _caused_by(结果表Detail)：{}".format(bi_hash), tag=self.tne_dir_name)
+        TEST_LOGGER.info(
+            "TranSucc. 命中 crash_type={} proc={} pkg={} time={}".format(
+                crash_type, proc_name, pkg_name, self._exp_time),
+            tag=self.tne_dir_name)
+        return True
+
+    def _list_files_with_prefix(self, prefix):
+        """目录下指定前缀的日志文件。轮转文件无后缀的在前，随后按 .N 从小到大。"""
+        names = []
+        if not os.path.isdir(self._path):
+            return names
+        for name in os.listdir(self._path):
+            if name.endswith(".zs"):
+                continue
+            if not name.startswith(prefix):
+                continue
+            path = os.path.join(self._path, name)
+            if os.path.isfile(path):
+                names.append(name)
+
+        def _sort_key(name):
+            rest = name[len(prefix):]
+            rotated = re.match(r"\.(\d+)$", rest)
+            return (1, int(rotated.group(1))) if rotated else (0, 0)
+
+        names.sort(key=_sort_key)
+        return [os.path.join(self._path, name) for name in names]
+
+    def _collect_transucc_groups(self):
+        groups = []
+        for path in self._list_files_with_prefix("android_main_log"):
+            groups.extend(AndroidMainLog(path).analyse_transucc())
+        return groups
+
+    def _hash_from_tne_name(self):
+        hash_re = re.compile(r"(?<![0-9a-fA-F])([0-9a-fA-F]{32})(?![0-9a-fA-F])")
+        match = hash_re.search(self.tne_dir_name or "")
+        if match:
+            return match.group(1).lower()
+        parent = os.path.dirname(self._path)
+        if not os.path.isdir(parent):
+            return None
+        for name in os.listdir(parent):
+            if not name.lower().endswith(".tne"):
+                continue
+            match = hash_re.search(name)
+            if match:
+                return match.group(1).lower()
+        return None
+
+    def _prefer_time_from_tne_dir(self):
+        name = self.tne_dir_name or ""
+        match = re.search(
+            r"(\d{4})_(\d{1,2})_(\d{1,2})_(\d{1,2})_(\d{1,2})_(\d{1,2})_(\d+)", name)
+        if match:
+            frac = match.group(7).ljust(3, "0")[:6]
+            return "{:02d}-{:02d} {:02d}:{:02d}:{:02d}.{}".format(
+                int(match.group(2)), int(match.group(3)), int(match.group(4)),
+                int(match.group(5)), int(match.group(6)), frac)
+        match = re.search(r"_(\d{8})(\d{6})(\d{2,})$", name)
+        if match:
+            day, clock, frac = match.group(1), match.group(2), match.group(3)
+            return "{}-{} {}:{}:{}.{}".format(
+                day[4:6], day[6:8], clock[0:2], clock[2:4], clock[4:6],
+                frac.ljust(3, "0")[:6])
+        return None
+
+    def _pick_transucc_group(self, groups):
+        file_hash = self._hash_from_tne_name()
+        if file_hash:
+            for group in groups:
+                bi_hash = str(group.get("BIHash") or "").strip().lower()
+                if bi_hash == file_hash:
+                    TEST_LOGGER.info(
+                        "文件名 hash 命中 TranSucc.：hash={} time={} crash_type={}".format(
+                            file_hash, group.get("time"), group.get("crash_type")),
+                        tag=self.tne_dir_name)
+                    return group
+        prefer_time = self._prefer_time_from_tne_dir()
+        if prefer_time:
+            parsed = []
+            for group in groups:
+                delta = AndroidCrashLog.log_clock_delta(group.get("time"), prefer_time)
+                parsed.append((delta, group))
+            timed = [item for item in parsed if item[0] is not None]
+            if timed:
+                timed.sort(key=lambda item: item[0])
+                return timed[0][1]
+        return groups[-1] if groups else None
+
+    def _anr_files_newest_first(self):
+        anr_name_re = re.compile(
+            r"^anr_(\d{4})-(\d{2})-(\d{2})-(\d{2})-(\d{2})-(\d{2})-(\d{3})(?:[._].*)?$")
+        dated = []
+        undated = []
+        if not os.path.isdir(self._path):
+            return []
+        for name in os.listdir(self._path):
+            if not name.startswith("anr_") or name.startswith("anr_bn"):
+                continue
+            path = os.path.join(self._path, name)
+            if not os.path.isfile(path):
+                continue
+            match = anr_name_re.match(name)
+            if not match:
+                undated.append(path)
+                continue
+            try:
+                anr_dt = (
+                    int(match.group(1)), int(match.group(2)), int(match.group(3)),
+                    int(match.group(4)), int(match.group(5)), int(match.group(6)),
+                    int(match.group(7)))
+            except ValueError:
+                undated.append(path)
+                continue
+            dated.append((anr_dt, path))
+        dated.sort(reverse=True)
+        return [item[1] for item in dated] + undated
+
+    @staticmethod
+    def _anr_subject_line(anr_path):
+        try:
+            with open(anr_path, "r", encoding="utf-8", errors="ignore") as f:
+                for line in f:
+                    if line.strip().startswith("Subject:"):
+                        return line.strip()
+        except Exception:
+            return None
+        return None
+
+    @staticmethod
+    def _transucc_stack_match(stack):
+        """
+        单行或后续帧完整时，用整段简易堆栈做包含匹配。
+        后续帧被截断（如 at andro）时，只用异常首行，并交给调用方加上进程名。
+        return: (mode, match_text)，mode 为 full / truncated / empty
+        """
+        text = (stack or "").strip()
+        lines = [line.strip() for line in text.splitlines() if line.strip()]
+        if not lines:
+            return ("empty", "")
+        if len(lines) == 1:
+            return ("full", text)
+        for frame in lines[1:]:
+            lowered = frame.lower()
+            body = frame[3:].strip() if lowered.startswith("at ") else frame
+            incomplete_at = lowered.startswith("at ") and "(" not in frame
+            if "." not in body or incomplete_at or frame.endswith("..."):
+                return ("truncated", lines[0])
+        return ("full", text)
+
+    @staticmethod
+    def transucc_stacks_equivalent(stack_a, stack_b):
+        """截断堆栈与完整堆栈：核验异常首行后视为同一问题。"""
+        mode_a, key_a = TneBase._transucc_stack_match(stack_a)
+        mode_b, key_b = TneBase._transucc_stack_match(stack_b)
+        if mode_a == "empty" or mode_b == "empty":
+            return False
+        if mode_a != "truncated" and mode_b != "truncated":
+            return False
+        first_a = key_a if mode_a == "truncated" else (stack_a or "").strip().splitlines()[0].strip()
+        first_b = key_b if mode_b == "truncated" else (stack_b or "").strip().splitlines()[0].strip()
+        if not first_a or not first_b:
+            return False
+        if first_a == first_b:
+            return True
+        if first_a in (stack_b or "") or first_b in (stack_a or ""):
+            return True
+        return False
+
+    def _detail_from_anr_by_stack(self, stack_key, process_name, prefer_time):
+        best_detail = None
+        best_delta = None
+        for anr_path in self._anr_files_newest_first():
+            subject = self._anr_subject_line(anr_path)
+            if not subject or stack_key not in subject:
+                continue
+            if process_name and not AndroidCrashLog.process_name_matched(
+                    process_name, [subject, os.path.basename(anr_path)]):
+                if process_name not in subject:
+                    continue
+            detail_msg = Anr(anr_path).analyse_tne13()
+            if not detail_msg:
+                continue
+            delta = AndroidCrashLog.log_clock_delta(self._anr_clock_text(anr_path), prefer_time)
+            if best_detail is None or (delta is not None and (best_delta is None or delta < best_delta)):
+                best_detail = detail_msg
+                best_delta = delta
+                TEST_LOGGER.info("anr Subject 命中简易堆栈：{}".format(os.path.basename(anr_path)), tag=self.tne_dir_name)
+                if delta is None:
+                    break
+        return (None, best_detail)
+
+    @staticmethod
+    def _anr_clock_text(anr_path):
+        match = re.match(
+            r"^anr_(\d{4})-(\d{2})-(\d{2})-(\d{2})-(\d{2})-(\d{2})-(\d{3})",
+            os.path.basename(anr_path))
+        if not match:
+            return None
+        return "{}-{} {}:{}:{}.{}".format(
+            match.group(2), match.group(3), match.group(4),
+            match.group(5), match.group(6), match.group(7))
+
+    def _detail_from_crash_by_stack(self, stack_key, process_name, prefer_time):
+        best_time = None
+        best_detail = None
+        best_delta = None
+        for crash_path in self._list_files_with_prefix("android_crash_log"):
+            exp_time, detail = AndroidCrashLog(crash_path).analyse_fatal_by_stack(
+                stack_key, process_name, prefer_time)
+            if not detail:
+                continue
+            delta = AndroidCrashLog.log_clock_delta(exp_time, prefer_time)
+            if best_detail is None or (delta is not None and (best_delta is None or delta < best_delta)):
+                best_time, best_detail, best_delta = exp_time, detail, delta
+                TEST_LOGGER.info("crash_log 命中简易堆栈：{}".format(os.path.basename(crash_path)), tag=self.tne_dir_name)
+        return (best_time, best_detail)

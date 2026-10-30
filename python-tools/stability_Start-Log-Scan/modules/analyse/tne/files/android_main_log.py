@@ -18,6 +18,13 @@ class AndroidMainLog(object):
     REGEX_PKG_NAME = re.compile("pkgName = (.*?),")
     REGEX_TIME_ONLY = re.compile("(\\d{1,2}:\\d{1,2}:\\d{1,2}(?:\\.\\d+)?)")
     REGEX_DATE_TIME = re.compile("(\\d{1,2}-\\d{1,2}\\s+\\d{1,2}:\\d{1,2}:\\d{1,2}(?:\\.\\d+)?)")
+    REGEX_TRANSUCC_LINE = re.compile(
+        r"TranSucc\..*?procName\s*=\s*([^,]+?)\s*,\s*pkgName\s*=\s*([^,]+?)\s*,\s*BIHash\s*=\s*([0-9a-fA-F]+)")
+    REGEX_TRANSUCC_CRASH_TYPE = re.compile(r"crash_type\s*=\s*([^,\s]+)")
+    REGEX_TRANSUCC_STACK = re.compile(r"stack\s*=\s*'([^']*)'")
+    REGEX_TRANSUCC_STACK_OPEN = re.compile(r"stack\s*=\s*'")
+    REGEX_TRANSUCC_LOG_HEAD = re.compile(
+        r"^(?P<ts>\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\.\d{3})\s+(?P<pid>\d+)\s+(?P<tid>\d+)\s+\S+\s+(?P<tag>[^:]*):\s?(?P<body>.*)$")
 
     def __init__(self, file_path):
         super(AndroidMainLog, self).__init__()
@@ -240,6 +247,104 @@ class AndroidMainLog(object):
             last_crash_detail = re.search(regex_crash_detail, last_app_entity_line).group(1)
         TEST_LOGGER.info(f"获取到的最后一次崩溃信息: {last_crash_time}, {last_crash_detail}, {pkg}, {build_version}")
         return (last_crash_time, last_crash_detail, pkg, build_version)
+
+    @staticmethod
+    def _normalize_transucc_stack(raw_stack):
+        """引号内原文去掉末尾省略号。"""
+        stack = (raw_stack or "").strip()
+        if stack.endswith("..."):
+            stack = stack[:-3].rstrip()
+        return stack
+
+    def _read_transucc_stack(self, first_line, next_line, push_back):
+        """
+        同一行引号闭合时取引号内全文。
+        未闭合时，继续拼接同一 pid/tid 的后续 TranSucc. 行，直到结束引号。
+        """
+        closed = self.REGEX_TRANSUCC_STACK.search(first_line)
+        if closed:
+            return self._normalize_transucc_stack(closed.group(1))
+        opened = self.REGEX_TRANSUCC_STACK_OPEN.search(first_line)
+        if not opened:
+            return ""
+        parts = [first_line[opened.end():].rstrip("\n")]
+        head = self.REGEX_TRANSUCC_LOG_HEAD.match(first_line.rstrip("\n"))
+        if not head:
+            return self._normalize_transucc_stack("\n".join(parts))
+        for _ in range(30):
+            nxt = next_line()
+            if nxt is None:
+                break
+            if self.REGEX_TRANSUCC_LINE.search(nxt):
+                push_back(nxt)
+                break
+            nxt_head = self.REGEX_TRANSUCC_LOG_HEAD.match(nxt.rstrip("\n"))
+            same_record = (
+                nxt_head
+                and nxt_head.group("pid") == head.group("pid")
+                and nxt_head.group("tid") == head.group("tid")
+                and "TranSucc" in nxt_head.group("tag")
+            )
+            if not same_record:
+                push_back(nxt)
+                break
+            body = nxt_head.group("body").rstrip("\n")
+            quote = body.find("'")
+            if quote >= 0:
+                parts.append(body[:quote])
+                break
+            parts.append(body)
+        return self._normalize_transucc_stack("\n".join(parts))
+
+    def analyse_transucc(self):
+        """
+        从 android_main_log 提取全部 TranSucc. 记录。
+        同一行必须同时匹配 TranSucc. + procName + pkgName + BIHash，缺一不可。
+        同时提取行首时间、crash_type、简易堆栈（引号内并去掉末尾 ...）。
+        引号跨行时，拼接同一 pid/tid 的后续 TranSucc. 行。
+        return: list[dict]，无命中返回 []
+        """
+        self._common_analyse()
+        groups = []
+        if not os.path.isfile(self._AndroidMainLog__file_path):
+            return groups
+        with open(self._AndroidMainLog__file_path, errors="ignore", encoding="utf-8") as f:
+            buffered = []
+            iterator = iter(f)
+
+            def next_line():
+                if buffered:
+                    return buffered.pop(0)
+                return next(iterator, None)
+
+            def push_back(line):
+                buffered.append(line)
+
+            while True:
+                line = next_line()
+                if line is None:
+                    break
+                m = self.REGEX_TRANSUCC_LINE.search(line)
+                if not m:
+                    continue
+                time_m = re.match(self.REGEX_TIME, line)
+                type_m = self.REGEX_TRANSUCC_CRASH_TYPE.search(line)
+                groups.append({
+                    "procName": m.group(1).strip(),
+                    "pkgName": m.group(2).strip(),
+                    "BIHash": m.group(3).strip(),
+                    "time": time_m.group() if time_m else None,
+                    "crash_type": type_m.group(1).strip() if type_m else "",
+                    "stack": self._read_transucc_stack(line, next_line, push_back),
+                })
+        if groups:
+            last = groups[-1]
+            TEST_LOGGER.info(
+                "TranSucc. 共 {} 组，末组 proc={} pkg={} crash_type={} BIHash={}".format(
+                    len(groups), last.get("procName"), last.get("pkgName"),
+                    last.get("crash_type"), last.get("BIHash")),
+                tag=self._AndroidMainLog__tne_dir_name)
+        return groups
 
 
 if __name__ == "__main__":

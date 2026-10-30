@@ -17,6 +17,8 @@ class Tne13(TneBase):
         self._exp_type = "0xffffff13_ANR"
 
     def analyse(self):
+        if self._apply_transucc_if_possible():
+            return True
         if not os.path.isfile(self._android_main_log_path):
             TEST_LOGGER.debug(("android_main_log 文件不存在：{}".format(self._android_main_log_path)), tag=(self.tne_dir_name))
         else:

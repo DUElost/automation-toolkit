@@ -1,0 +1,9 @@
+system
+com.android.fanstrace
+com.android.rkpdapp
+vStudio.Android.Camera360
+com.transsion.atomicbrain
+com.transsion.mediaeditor
+/vendor/bin/hw/vendor.transsion.hardware.tranthp-service
+/system_ext/bin/loc_sys_service
+/vendor/bin/imsdaemon

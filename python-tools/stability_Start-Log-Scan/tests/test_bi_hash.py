@@ -9,12 +9,15 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from modules.analyse.tne.files.android_main_log import AndroidMainLog
-from modules.common.GlobalAttrs import SCAN_MODE_NAME_ALIASES, SCAN_MODE_TRANSSION
+from modules.common.GlobalAttrs import SCAN_MODE_NAME_ALIASES, SCAN_MODE_TNE, SCAN_MODE_TRANSSION
 
 
 class BiHashTest(unittest.TestCase):
     def test_mode_alias_transsion(self):
         self.assertEqual(SCAN_MODE_TRANSSION, SCAN_MODE_NAME_ALIASES["transsion"])
+
+    def test_mode_alias_tne(self):
+        self.assertEqual(SCAN_MODE_TNE, SCAN_MODE_NAME_ALIASES["tne"])
 
     def test_get_hash_value_from_crashlytics_line(self):
         log_line = (

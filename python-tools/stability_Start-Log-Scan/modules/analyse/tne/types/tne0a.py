@@ -18,6 +18,8 @@ class Tne0a(TneBase):
         self._package = "3RD Application"
 
     def analyse(self):
+        if self._apply_transucc_if_possible():
+            return True
         if not os.path.isfile(self._android_crash_log_path):
             TEST_LOGGER.debug(("android_crash_log 文件不存在：{}".format(self._android_crash_log_path)), tag=(self.tne_dir_name))
             self._exp_type_set.add("TNE_ERROR_file_missing: android_crash_log")

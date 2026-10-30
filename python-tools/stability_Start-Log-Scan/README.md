@@ -42,7 +42,7 @@ python start_log_scan.py -m <模式> -d <日志目录> -p <地点>
 |------|------|
 | 0 | AEE + TNE |
 | 1 | 仅 AEE |
-| 2 | 仅 TNE |
+| 2 / `tne` | TNE 汇总去重（扫描 .tne、解析、org/final 去重出表） |
 | 3 | Fans |
 | 4 | Usic |
 | 5 | Platform Monkey |
@@ -65,6 +65,9 @@ python start_log_scan.py -m 1 -d 2025-12-22 -p SH -s
 
 # Transsion 模式：CausedBy 填 BIHash（可用 -m 23 或 -m transsion）
 python start_log_scan.py -m transsion -d_abs "D:\logs\test" -p SH -s
+
+# TNE 汇总去重（可用 -m 2 或 -m tne；默认模式与 transsion 不变）
+python start_log_scan.py -m tne -d .\test2\ -p SH -s
 ```
 
 ## 离线 org 去重
