@@ -204,6 +204,10 @@ KNOWN_FTP_CREDENTIALS = {
         os.getenv("FTP_USER_172_20_11_240_21", "xasoftware"),
         os.getenv("FTP_PASSWORD_172_20_11_240_21", "Tinno@2022"),
     ),
+    ("172.20.7.173", 21): (
+        os.getenv("FTP_USER_172_20_7_173_21", "xasoftware"),
+        os.getenv("FTP_PASSWORD_172_20_7_173_21", "Tinno@2022"),
+    ),
     ("113.140.11.141", 21): (
         os.getenv("FTP_USER_113_140_11_141_21", "tianlong"),
         os.getenv("FTP_PASSWORD_113_140_11_141_21", "tianlong123"),
