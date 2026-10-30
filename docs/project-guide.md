@@ -11,6 +11,7 @@
 
 | 日期 | 变更内容 |
 |------|----------|
+| 2026-10-21 | 新增 windows-tools/system_mouse_without_borders：基于 PowerToys MWB，修单向剪切板、传速缓冲、文件上限 1GB |
 | 2026-10-13 | windows-scheduler 支持 `DailyAt` 多时间点（单任务多触发器）；新增 WSL 定时执行用法与 `wsl -e`/`bash -lc` 调用形态对照 |
 | 2026-10-13 | 文档重构：全景内容由根 CLAUDE.md 迁入本文档；根 CLAUDE.md / AGENTS.md 瘦身为薄壳与最小契约 |
 | 2026-10-13 | Tinno Jira 工具 labels 修复：建单保留测试专项标签并追加固定标签「稳定性测试」；新增历史单补打脚本 `retro_patch_tinno_labels.py` |
@@ -43,6 +44,8 @@ automation-toolkit/
 ├── linux-tools/
 │   └── system_Task-Scheduler/ # systemd taskmgr
 ├── windows-scheduler/         # Windows taskmgr
+├── windows-tools/
+│   └── system_mouse_without_borders/  # MWB 剪切板/传文件定制
 ├── shared/
 │   └── python-utils/
 ├── docs/                      # 项目全景文档（本文件）
@@ -99,6 +102,7 @@ graph TD
 | [macos-tools/system_Task-Scheduler](../macos-tools/system_Task-Scheduler/) | Bash | launchd 定时任务管理器 | 活跃 |
 | [linux-tools/system_Task-Scheduler](../linux-tools/system_Task-Scheduler/) | Bash | systemd 用户定时任务管理器 | 活跃 |
 | [windows-scheduler](../windows-scheduler/) | PowerShell | Windows 任务计划程序定时管理 | 活跃 |
+| [windows-tools/system_mouse_without_borders](../windows-tools/system_mouse_without_borders/) | C# / PowerToys | MWB 定制：单向剪切板修复、传速、1GB 上限 | 活跃 |
 
 ---
 

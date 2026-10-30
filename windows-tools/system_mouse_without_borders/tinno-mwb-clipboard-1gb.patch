@@ -1,0 +1,270 @@
+﻿diff --git a/src/modules/MouseWithoutBorders/App/Class/SocketStuff.cs b/src/modules/MouseWithoutBorders/App/Class/SocketStuff.cs
+index 575c958..8611ea6 100644
+--- a/src/modules/MouseWithoutBorders/App/Class/SocketStuff.cs
++++ b/src/modules/MouseWithoutBorders/App/Class/SocketStuff.cs
+@@ -1280,8 +1280,10 @@ namespace MouseWithoutBorders.Class
+ 
+             try
+             {
+-                currentSocket.SendBufferSize = Package.PACKAGE_SIZE * 10000;
+-                currentSocket.ReceiveBufferSize = Package.PACKAGE_SIZE * 10000;
++                // Tinno patch: larger TCP buffers for faster bulk clipboard/file transfer on LAN
++                // (was PACKAGE_SIZE * 10000 鈮?320KB). Mouse/keyboard packages remain small.
++                currentSocket.SendBufferSize = Common.NETWORK_STREAM_BUF_SIZE;
++                currentSocket.ReceiveBufferSize = Common.NETWORK_STREAM_BUF_SIZE;
+                 currentSocket.NoDelay = true; // This is very interesting to know:(
+                 currentSocket.SendTimeout = 500;
+                 d.MachineName = Common.MachineName;
+@@ -1814,6 +1816,19 @@ namespace MouseWithoutBorders.Class
+         {
+             try
+             {
++                // Tinno patch: relax socket timeout and buffers for multi-hundred-MB / 1GB transfers.
++                try
++                {
++                    s.SendTimeout = 120000;
++                    s.ReceiveTimeout = 120000;
++                    s.SendBufferSize = Common.NETWORK_STREAM_BUF_SIZE;
++                    s.ReceiveBufferSize = Common.NETWORK_STREAM_BUF_SIZE;
++                }
++                catch (Exception e)
++                {
++                    Logger.Log(e);
++                }
++
+                 using (FileStream f = File.OpenRead(fileName))
+                 {
+                     byte[] buf = new byte[Common.NETWORK_STREAM_BUF_SIZE];
+diff --git a/src/modules/MouseWithoutBorders/App/Core/Clipboard.cs b/src/modules/MouseWithoutBorders/App/Core/Clipboard.cs
+index 9e53417..3b98600 100644
+--- a/src/modules/MouseWithoutBorders/App/Core/Clipboard.cs
++++ b/src/modules/MouseWithoutBorders/App/Core/Clipboard.cs
+@@ -39,9 +39,11 @@ internal static class Clipboard
+     private static readonly char[] Star = new char[] { '*' };
+     private static readonly char[] NullSeparator = new char[] { '\0' };
+ 
+-    internal const uint BIG_CLIPBOARD_DATA_TIMEOUT = 30000;
++    // Tinno patch: allow up to ~10 min for large (鈮?GB) clipboard/file transfers on LAN.
++    internal const uint BIG_CLIPBOARD_DATA_TIMEOUT = 600000;
+     private const uint MAX_CLIPBOARD_DATA_SIZE_CAN_BE_SENT_INSTANTLY_TCP = 1024 * 1024; // 1MB
+-    private const uint MAX_CLIPBOARD_FILE_SIZE_CAN_BE_SENT = 100 * 1024 * 1024; // 100MB
++    // Tinno patch: raise clipboard file transfer limit from 100MB to 1GB.
++    private const uint MAX_CLIPBOARD_FILE_SIZE_CAN_BE_SENT = 1024u * 1024 * 1024; // 1GB
+     private const int TEXT_HEADER_SIZE = 12;
+     private const int DATA_SIZE = 48;
+     private const string TEXT_TYPE_SEP = "{4CFF57F7-BEDD-43d5-AE8F-27A61E886F2F}";
+@@ -92,6 +94,10 @@ internal static class Clipboard
+             return false;
+         }
+ 
++        // Tinno patch: ensure Helper is alive before outbound clipboard/file share.
++        // Fixes one-way clipboard (local鈫抮emote fails) when Helper died after UAC/lock/desktop switch.
++        Helper.EnsureClipboardHelperAlive();
++
+         if (Common.RunWithNoAdminRight && Setting.Values.OneWayClipboardMode)
+         {
+             return false;
+@@ -171,7 +177,7 @@ internal static class Clipboard
+                                 }
+                                 else
+                                 {
+-                                    LastDragDropFile = filePath + " - File too big (greater than 100MB), please drag and drop the file instead!";
++                                    LastDragDropFile = filePath + " - File too big (greater than 1GB), please drag and drop the file instead!";
+                                     Common.SendClipboardBeat();
+                                     Logger.Log("Clipboard: File too big: " + filePath);
+                                 }
+@@ -960,10 +966,12 @@ internal static class Clipboard
+ 
+     internal static bool ShakeHand(ref string remoteName, Socket s, out Stream enStream, out Stream deStream, ref bool clientPushData, ref ClipboardPostAction postAction)
+     {
+-        const int CLIPBOARD_HANDSHAKE_TIMEOUT = 30;
++        // Tinno patch: longer I/O timeout and larger buffers for 鈮?GB LAN transfers (was 30s / ~1MB).
++        const int CLIPBOARD_HANDSHAKE_TIMEOUT = 600;
+         s.ReceiveTimeout = CLIPBOARD_HANDSHAKE_TIMEOUT * 1000;
++        s.SendTimeout = CLIPBOARD_HANDSHAKE_TIMEOUT * 1000;
+         s.NoDelay = true;
+-        s.SendBufferSize = s.ReceiveBufferSize = 1024000;
++        s.SendBufferSize = s.ReceiveBufferSize = Common.NETWORK_STREAM_BUF_SIZE;
+ 
+         bool handShaken = false;
+         enStream = deStream = null;
+diff --git a/src/modules/MouseWithoutBorders/App/Core/Common.cs b/src/modules/MouseWithoutBorders/App/Core/Common.cs
+index 7b92ff6..3cd7605 100644
+--- a/src/modules/MouseWithoutBorders/App/Core/Common.cs
++++ b/src/modules/MouseWithoutBorders/App/Core/Common.cs
+@@ -109,7 +109,8 @@ internal static class Common
+     internal const int ICON_ERROR = 4;
+     internal const int JUST_GOT_BACK_FROM_SCREEN_SAVER = 9999;
+ 
+-    internal const int NETWORK_STREAM_BUF_SIZE = 1024 * 1024;
++    // Tinno patch: 8MB app-level buffer for faster LAN file/clipboard transfer (was 1MB).
++    internal const int NETWORK_STREAM_BUF_SIZE = 8 * 1024 * 1024;
+     internal static readonly EventWaitHandle EvSwitch = new(false, EventResetMode.AutoReset);
+     private static Point lastPos;
+ #pragma warning disable SA1307 // Accessible fields should begin with upper-case names
+diff --git a/src/modules/MouseWithoutBorders/App/Core/Helper.cs b/src/modules/MouseWithoutBorders/App/Core/Helper.cs
+index df750f9..e658c57 100644
+--- a/src/modules/MouseWithoutBorders/App/Core/Helper.cs
++++ b/src/modules/MouseWithoutBorders/App/Core/Helper.cs
+@@ -264,6 +264,61 @@ internal static class Helper
+         }
+     }
+ 
++    /// <summary>
++    /// Tinno patch: ensure Helper process is running before outbound clipboard/file share.
++    /// Stale helper windows (FindWindow hit but process dead) are cleaned and restarted.
++    /// </summary>
++    internal static void EnsureClipboardHelperAlive()
++    {
++        if (Common.RunOnLogonDesktop || Common.RunOnScrSaverDesktop)
++        {
++            return;
++        }
++
++        try
++        {
++            Process[] processes = Process.GetProcessesByName(HelperProcessName);
++            IntPtr h = (IntPtr)NativeMethods.FindWindow(null, HELPER_FORM_TEXT);
++            bool processAlive = processes is { Length: > 0 };
++            bool windowAlive = h.ToInt32() > 0;
++
++            if (processAlive && windowAlive)
++            {
++                return;
++            }
++
++            Logger.Log($"EnsureClipboardHelperAlive: processAlive={processAlive}, windowAlive={windowAlive}. Restarting helper.");
++
++            // Stale window without process 鈥?ask it to quit if possible, then force-kill leftovers.
++            if (windowAlive && !processAlive)
++            {
++                _ = SendMessageToHelper(SharedConst.QUIT_CMD, IntPtr.Zero, IntPtr.Zero, wait: false, log: false);
++            }
++
++            if (processAlive)
++            {
++                foreach (Process p in processes)
++                {
++                    try
++                    {
++                        p.KillProcess();
++                    }
++                    catch (Exception e)
++                    {
++                        Logger.Log(e);
++                    }
++                }
++            }
++
++            RunDDHelper();
++        }
++        catch (Exception e)
++        {
++            Logger.Log(e);
++            RunDDHelper();
++        }
++    }
++
+     internal static void RunDDHelper(bool cleanUp = false)
+     {
+         if (Common.RunOnLogonDesktop || Common.RunOnScrSaverDesktop)
+@@ -308,9 +363,17 @@ internal static class Helper
+         }
+ 
+         IntPtr h = (IntPtr)NativeMethods.FindWindow(null, Helper.HELPER_FORM_TEXT);
++        var existingProcesses = Process.GetProcessesByName(HelperProcessName);
++        bool processAlive = existingProcesses is { Length: > 0 };
+ 
+-        if (h.ToInt32() <= 0)
++        // Tinno patch: treat "window exists but process dead" as needing restart.
++        if (h.ToInt32() <= 0 || !processAlive)
+         {
++            if (h.ToInt32() > 0 && !processAlive)
++            {
++                Logger.Log("RunDDHelper: stale helper window without process; restarting.");
++            }
++
+             _ = Launch.CreateProcessInInputDesktopSession(
+                 $"\"{Path.GetDirectoryName(Application.ExecutablePath)}\\{HelperProcessName}.exe\"",
+                 string.Empty,
+@@ -333,16 +396,7 @@ internal static class Helper
+         }
+         else
+         {
+-            var processes = Process.GetProcessesByName(HelperProcessName);
+-            if (processes?.Length > 0)
+-            {
+-                Logger.Log("Helper process found running.");
+-            }
+-            else
+-            {
+-                Logger.Log("Invalid helper process found running.");
+-                Common.ShowToolTip("Error finding Mouse Without Borders Helper, clipboard sharing will not work!", 5000, ToolTipIcon.Error);
+-            }
++            Logger.Log("Helper process found running.");
+         }
+     }
+ 
+diff --git a/src/modules/MouseWithoutBorders/App/Form/frmMatrix.Designer.cs b/src/modules/MouseWithoutBorders/App/Form/frmMatrix.Designer.cs
+index 189503e..8af3b48 100644
+--- a/src/modules/MouseWithoutBorders/App/Form/frmMatrix.Designer.cs
++++ b/src/modules/MouseWithoutBorders/App/Form/frmMatrix.Designer.cs
+@@ -644,7 +644,7 @@ namespace MouseWithoutBorders
+             this.checkBoxTransferFile.Size = new System.Drawing.Size(81, 17);
+             this.checkBoxTransferFile.TabIndex = 178;
+             this.checkBoxTransferFile.Text = "&Transfer file";
+-            this.toolTip.SetToolTip(this.checkBoxTransferFile, "If a file (<100MB) is copied, it will be transferred to the remote machine clipbo" +
++            this.toolTip.SetToolTip(this.checkBoxTransferFile, "If a file (<1GB) is copied, it will be transferred to the remote machine clipbo" +
+         "ard.");
+             this.checkBoxTransferFile.UseVisualStyleBackColor = true;
+             this.checkBoxTransferFile.CheckedChanged += new System.EventHandler(this.CheckBoxTransferFile_CheckedChanged);
+diff --git a/src/modules/MouseWithoutBorders/MouseWithoutBorders.UnitTests/Core/Logger.PrivateDump.expected.txt b/src/modules/MouseWithoutBorders/MouseWithoutBorders.UnitTests/Core/Logger.PrivateDump.expected.txt
+index 0b83e39..95bd05e 100644
+--- a/src/modules/MouseWithoutBorders/MouseWithoutBorders.UnitTests/Core/Logger.PrivateDump.expected.txt
++++ b/src/modules/MouseWithoutBorders/MouseWithoutBorders.UnitTests/Core/Logger.PrivateDump.expected.txt
+@@ -25,9 +25,9 @@ ClipboardThreadOldLock = Lock
+ --s_contentionCount = 0
+ --s_maxSpinCount = 22
+ --s_minSpinCountForAdaptiveSpin = -100
+-BIG_CLIPBOARD_DATA_TIMEOUT = 30000
++BIG_CLIPBOARD_DATA_TIMEOUT = 600000
+ MAX_CLIPBOARD_DATA_SIZE_CAN_BE_SENT_INSTANTLY_TCP = 1048576
+-MAX_CLIPBOARD_FILE_SIZE_CAN_BE_SENT = 104857600
++MAX_CLIPBOARD_FILE_SIZE_CAN_BE_SENT = 1073741824
+ TEXT_HEADER_SIZE = 12
+ DATA_SIZE = 48
+ TEXT_TYPE_SEP = {4CFF57F7-BEDD-43d5-AE8F-27A61E886F2F}
+@@ -82,7 +82,7 @@ ICON_SMALL_CLIPBOARD = 2
+ ICON_BIG_CLIPBOARD = 3
+ ICON_ERROR = 4
+ JUST_GOT_BACK_FROM_SCREEN_SAVER = 9999
+-NETWORK_STREAM_BUF_SIZE = 1048576
++NETWORK_STREAM_BUF_SIZE = 8388608
+ [DragDrop]
+ ===============
+ isDragging = False
+diff --git a/src/modules/MouseWithoutBorders/MouseWithoutBorders.UnitTests/Core/Logger.PrivateDump.original.txt b/src/modules/MouseWithoutBorders/MouseWithoutBorders.UnitTests/Core/Logger.PrivateDump.original.txt
+index 04346ea..3997396 100644
+--- a/src/modules/MouseWithoutBorders/MouseWithoutBorders.UnitTests/Core/Logger.PrivateDump.original.txt
++++ b/src/modules/MouseWithoutBorders/MouseWithoutBorders.UnitTests/Core/Logger.PrivateDump.original.txt
+@@ -350,9 +350,9 @@ p = {X=0,Y=0}
+ --y = 0
+ --Empty = {X=0,Y=0}
+ <IpcChannelCreated>k__BackingField = False
+-BIG_CLIPBOARD_DATA_TIMEOUT = 30000
++BIG_CLIPBOARD_DATA_TIMEOUT = 600000
+ MAX_CLIPBOARD_DATA_SIZE_CAN_BE_SENT_INSTANTLY_TCP = 1048576
+-MAX_CLIPBOARD_FILE_SIZE_CAN_BE_SENT = 104857600
++MAX_CLIPBOARD_FILE_SIZE_CAN_BE_SENT = 1073741824
+ TEXT_HEADER_SIZE = 12
+ DATA_SIZE = 48
+ TEXT_TYPE_SEP = {4CFF57F7-BEDD-43d5-AE8F-27A61E886F2F}
+@@ -363,7 +363,7 @@ ICON_SMALL_CLIPBOARD = 2
+ ICON_BIG_CLIPBOARD = 3
+ ICON_ERROR = 4
+ JUST_GOT_BACK_FROM_SCREEN_SAVER = 9999
+-NETWORK_STREAM_BUF_SIZE = 1048576
++NETWORK_STREAM_BUF_SIZE = 8388608
+ SymAlBlockSize = 16
+ PW_LENGTH = 16
+ HELPER_FORM_TEXT = Mouse without Borders Helper

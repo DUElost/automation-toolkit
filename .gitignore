@@ -106,6 +106,10 @@ windows-scheduler/logs/
 windows-scheduler/runtime/
 linux-tools/system_Task-Scheduler/tasks/
 
+# windows-tools: nested PowerToys clone (keep README/PATCHES/patch only)
+windows-tools/system_mouse_without_borders/PowerToys/
+windows-tools/system_mouse_without_borders/_tinno_mwb_src_backup/
+
 # Generated manpower exports under examples/ (keep *.example.json)
 **/examples/manpower*
 !**/examples/manpower*.example.json

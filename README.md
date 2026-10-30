@@ -23,6 +23,8 @@ automation-toolkit/
 ├── linux-tools/                           # Linux 专属工具
 │   └── system_Task-Scheduler/            # systemd 定时任务管理器
 ├── windows-scheduler/                     # Windows 定时任务管理器
+├── windows-tools/                         # Windows 专属工具
+│   └── system_mouse_without_borders/      # MWB 剪切板/传文件定制（基于 PowerToys）
 ├── android-tools/                         # Android 工具集
 │   ├── vendor/                            # apktool / jadx / APK 签名工具
 │   ├── apps/                              # APK 源码与构建
@@ -71,6 +73,7 @@ automation-toolkit/
 | 工具名称 | 说明 |
 |---------|------|
 | [windows-scheduler](windows-scheduler/) | 任务计划程序定时任务管理器 |
+| [system_mouse_without_borders](windows-tools/system_mouse_without_borders/) | Mouse Without Borders 定制：修单向剪切板、传速、1GB 上限 |
 
 ### Android 工具
 
