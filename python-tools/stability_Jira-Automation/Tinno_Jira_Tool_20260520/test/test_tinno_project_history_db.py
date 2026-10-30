@@ -178,6 +178,128 @@ class TinnoProjectHistoryDbTest(unittest.TestCase):
 
         self.assertEqual("V552AA-16-260511V17", merged["build_version"])
 
+    def test_fetch_issue_snapshot_fields_does_not_parse_build_version_from_jira(self) -> None:
+        class FakeJira:
+            def get_issue(self, issue_key: str):
+                return {
+                    "key": issue_key,
+                    "fields": {
+                        "summary": "[自动化][P535AA][Total Number 1][MLD-NX2-16-260928V9][MonkeyAEE][Java (JE)]x",
+                        "status": {"name": "Open"},
+                        "resolution": None,
+                        "fixVersions": [],
+                        "environment": "*ExpClass:* Java (JE)",
+                        "description": (
+                            "解析库版本：recognizeexception 1.0.8\n"
+                            "手机版本：['MLD-NX2-16-260928V9']\n"
+                            "*Version:* MLD-NX2-16-260928V9"
+                        ),
+                        "project": {"key": "PFDFAA"},
+                    },
+                }
+
+        from tinno_batch_jira_common import fetch_issue_snapshot_fields
+
+        snapshot = fetch_issue_snapshot_fields(FakeJira(), "PFDFAA-920")
+        self.assertEqual("", snapshot["build_version"])
+
+    def test_bind_local_build_versions_uses_project_db_only(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "PFDFAA.db"
+            db = DatabaseManager({"type": "sqlite", "path": str(db_path)})
+            try:
+                db.insert_issue(
+                    {
+                        "jira_key": "PFDFAA-920",
+                        "status": "Open",
+                        "summary": "summary",
+                        "normalized_summary": "summary",
+                        "test_environment": "",
+                        "raw_caused_by": "",
+                        "assignee": "dai.lv",
+                        "bug_severity": "B",
+                        "priority": "Medium",
+                        "description": "解析库版本：recognizeexception 1.0.8",
+                        "resolution": "",
+                        "package_name": "pkg",
+                        "exp_class": "Crash",
+                        "exp_type": "",
+                        "cur_process": "",
+                        "version": "MLD-NX2-16-261013V21",
+                        "count": 1,
+                        "device_count": 1,
+                        "source_file": "",
+                        "raw_data": {},
+                        "fix_version": "",
+                        "build_version": "MLD-NX2-16-260928V9",
+                    }
+                )
+                snapshot_rows = [
+                    {
+                        "jira_key": "PFDFAA-920",
+                        "build_version": "recognizeexception",
+                        "summary": "[自动化][P535AA][MLD-NX2-16-260928V9][MonkeyAEE]",
+                    }
+                ]
+                bound = self.module.bind_local_build_versions(snapshot_rows, db)
+            finally:
+                _close_db(db)
+
+            self.assertEqual("MLD-NX2-16-260928V9", bound[0]["build_version"])
+
+    def test_bind_local_build_versions_raises_when_local_build_version_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "PFDFAA.db"
+            db = DatabaseManager({"type": "sqlite", "path": str(db_path)})
+            try:
+                snapshot_rows = [{"jira_key": "PFDFAA-999", "build_version": ""}]
+                with self.assertRaises(self.module.MissingLocalBuildVersionError) as ctx:
+                    self.module.bind_local_build_versions(snapshot_rows, db)
+            finally:
+                _close_db(db)
+
+            self.assertIn("PFDFAA-999", str(ctx.exception))
+            self.assertIn("build_version", str(ctx.exception))
+
+    def test_bind_local_build_versions_raises_when_local_build_version_invalid(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "PFDFAA.db"
+            db = DatabaseManager({"type": "sqlite", "path": str(db_path)})
+            try:
+                db.insert_issue(
+                    {
+                        "jira_key": "PFDFAA-920",
+                        "status": "Open",
+                        "summary": "summary",
+                        "normalized_summary": "summary",
+                        "test_environment": "",
+                        "raw_caused_by": "",
+                        "assignee": "dai.lv",
+                        "bug_severity": "B",
+                        "priority": "Medium",
+                        "description": "desc",
+                        "resolution": "",
+                        "package_name": "pkg",
+                        "exp_class": "Crash",
+                        "exp_type": "",
+                        "cur_process": "",
+                        "version": "MLD-NX2-16-261013V21",
+                        "count": 1,
+                        "device_count": 1,
+                        "source_file": "",
+                        "raw_data": {},
+                        "fix_version": "",
+                        "build_version": "recognizeexception",
+                    }
+                )
+                snapshot_rows = [{"jira_key": "PFDFAA-920", "build_version": ""}]
+                with self.assertRaises(self.module.MissingLocalBuildVersionError) as ctx:
+                    self.module.bind_local_build_versions(snapshot_rows, db)
+            finally:
+                _close_db(db)
+
+            self.assertIn("PFDFAA-920", str(ctx.exception))
+
     def test_backfill_issue_state_from_project_history_repairs_stale_build_version(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             db_path = Path(temp_dir) / "VFFCA.db"

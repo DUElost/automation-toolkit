@@ -220,6 +220,7 @@ python main.py
    - 统一两阶段：原始 Excel → 上传模板 → 建单/回归
    - Tinno 建单 labels = 测试专项映射标签 + 固定标签「稳定性测试」（专项不可识别时回退 legacy 默认）
    - Tinno VFFCA 严格版本比较：涉及 Jira `fix_version` 时忽略 LX 板型，仅 `current_version`↔`build_version` 区分 LX2/LX3
+   - Tinno 出现版本（`build_version`）一律以本地项目库为准，不从 Jira 解析；本地缺失或非法则报错退出
    - 详见 [stability_Jira-Automation/CLAUDE.md](../python-tools/stability_Jira-Automation/CLAUDE.md)
 
 ### AI 辅助开发建议

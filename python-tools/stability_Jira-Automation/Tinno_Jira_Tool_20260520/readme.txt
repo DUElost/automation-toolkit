@@ -265,7 +265,7 @@ python ".\retro_patch_tinno_labels.py" `
   Tinno 本地项目缓存库
   - 历史单同步快照
   - 建单成功记录
-  - `build_version`
+  - `build_version`（出现版本权威来源）
   - 回归 PASS 次数与已验证版本
 
 
@@ -274,6 +274,7 @@ python ".\retro_patch_tinno_labels.py" `
 - 已支持
   - 新问题创建
   - build_version 随建单成功记录落库
+  - 出现版本一律以本地项目库 `jira_issues_main.build_version` 为准，不从 Jira 标题/描述/备注解析；本地缺失或非法则直接报错退出
   - 历史单导出并回填到本地项目缓存库
   - 混合专项上传时，历史单匹配按专项隔离，避免不同专项之间串命中
   - `resolution=重复问题` 时按 `当前提单版本 > 历史建单版本` 判断

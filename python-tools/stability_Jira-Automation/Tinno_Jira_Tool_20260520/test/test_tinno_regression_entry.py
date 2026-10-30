@@ -453,6 +453,42 @@ class TinnoRegressionEntryTest(unittest.TestCase):
                 wait_between_issues=0.0,
             )
 
+            project_db_path = self.module.build_project_history_db_path(
+                "https://jira.tinno.com",
+                "VCAME",
+                sqlite_path_setting=str(temp_path / "cache"),
+            )
+            project_db = self.module.DatabaseManager({"type": "sqlite", "path": str(project_db_path)})
+            try:
+                project_db.insert_issue(
+                    {
+                        "jira_key": "VCAME-100",
+                        "status": "Open",
+                        "summary": "[自动化][V551A][Total Number 7][V551A-15-250905V60][MonkeyAEE][Java (JE)]com.android.settings发生Java (JE)",
+                        "normalized_summary": "[自动化][V551A][Total Number 7][V551A-15-250905V60][MonkeyAEE][Java (JE)]com.android.settings发生Java (JE)",
+                        "test_environment": "*Package:* com.android.settings\n*ExpClass:* Java (JE)\n*ExpType:* Crash\n*CurProcess:* com.android.settings",
+                        "raw_caused_by": "java.lang.RuntimeException: test",
+                        "assignee": "dai.lv",
+                        "bug_severity": "B",
+                        "priority": "Medium",
+                        "description": "description",
+                        "resolution": "",
+                        "package_name": "com.android.settings",
+                        "exp_class": "Java (JE)",
+                        "exp_type": "Crash",
+                        "cur_process": "com.android.settings",
+                        "version": "V551A-15-250905V60",
+                        "count": 7,
+                        "device_count": 1,
+                        "source_file": "",
+                        "raw_data": {},
+                        "fix_version": "",
+                        "build_version": "V551A-15-250905V60",
+                    }
+                )
+            finally:
+                project_db.close()
+
             with mock.patch.object(self.module, "RESULT_DIR", temp_path / "result"):
                 with mock.patch.object(self.module, "read_excel_smart", return_value=excel_df):
                     with mock.patch.object(self.module, "load_regression_rules", return_value=fake_rules):

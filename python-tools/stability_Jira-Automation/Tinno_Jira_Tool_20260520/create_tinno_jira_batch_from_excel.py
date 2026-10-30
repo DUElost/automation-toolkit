@@ -394,6 +394,50 @@ def get_project_history_issue(project_db: DatabaseManager | None, jira_key: str)
     return project_db.get_issue_by_key(issue_key)
 
 
+class MissingLocalBuildVersionError(ValueError):
+    """本地项目库缺少可用的出现版本 build_version。"""
+
+
+def _is_usable_local_build_version(value: Any) -> bool:
+    text = str(value or "").strip()
+    if not text:
+        return False
+    return bool(re.search(r"\d{6}V\d+", text, flags=re.IGNORECASE))
+
+
+def bind_local_build_versions(
+    snapshot_rows: List[Dict[str, Any]],
+    project_db: DatabaseManager | None,
+) -> List[Dict[str, Any]]:
+    """用本地项目库出现版本覆盖快照；缺失或非法时直接报错。"""
+    if not snapshot_rows:
+        return snapshot_rows
+    if project_db is None:
+        raise MissingLocalBuildVersionError("项目本地 SQL 库不可用，无法读取出现版本 build_version")
+
+    missing_keys: List[str] = []
+    for row in snapshot_rows:
+        jira_key = str(row.get("jira_key") or "").strip()
+        if not jira_key:
+            continue
+        local_row = get_project_history_issue(project_db, jira_key) or {}
+        build_version = str(local_row.get("build_version") or "").strip()
+        if not _is_usable_local_build_version(build_version):
+            missing_keys.append(jira_key)
+            continue
+        row["build_version"] = build_version
+
+    if missing_keys:
+        unique_missing = list(dict.fromkeys(missing_keys))
+        preview = ", ".join(unique_missing[:20])
+        suffix = f" 等共 {len(unique_missing)} 条" if len(unique_missing) > 20 else ""
+        raise MissingLocalBuildVersionError(
+            "本地项目库缺少可用的出现版本 build_version，无法继续回归匹配/验证: "
+            f"{preview}{suffix}"
+        )
+    return snapshot_rows
+
+
 def backfill_issue_state_from_project_history(store: RegressionStore | None, project_db: DatabaseManager | None) -> int:
     if store is None or project_db is None:
         return 0
@@ -2453,6 +2497,11 @@ def run_excel_mode(args: argparse.Namespace) -> int:
                 field_mapping=build_snapshot_field_mapping(defaults),
             )
             snapshot_rows = deduplicate_snapshot_rows_by_jira_key(snapshot_rows)
+            try:
+                snapshot_rows = bind_local_build_versions(snapshot_rows, project_db)
+            except MissingLocalBuildVersionError as exc:
+                logger.error("%s", exc)
+                return 1
             store.save_sync_run(
                 {
                     "run_id": run_id,
@@ -2844,6 +2893,11 @@ def run_regression_verify_mode(args: argparse.Namespace) -> int:
             )
         snapshot_rows = all_snapshot_rows
         snapshot_rows = deduplicate_snapshot_rows_by_jira_key(snapshot_rows)
+        try:
+            snapshot_rows = bind_local_build_versions(snapshot_rows, project_db)
+        except MissingLocalBuildVersionError as exc:
+            logger.error("%s", exc)
+            return 1
         store.save_sync_run(
             {
                 "run_id": run_id,

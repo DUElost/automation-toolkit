@@ -54,7 +54,6 @@ PREVIOUS_VERSION_STATUS_VALUES = {
     "Previous version does't exist",
 }
 RECURRENCE_PROBABILITY_VALUES = {"100%", ">50%", ">10%", ">1%"}
-VERSION_PREFIXES = ("*version:*", "版本：", "版本:")
 # 与第一阶段 tinno_upload_template_common.DEFAULT_TEST_CASE_LABEL_MAPPING 保持一致；
 # 配置项 test_case_label_mapping 优先于此内置映射。
 DEFAULT_TEST_CASE_LABEL_MAPPING = {
@@ -350,51 +349,9 @@ def fetch_issue_snapshot_fields(
             return normalized_tokens[version_index + 2]
         return ""
 
-    def _summary_tokens(summary_text: Any) -> List[str]:
-        return [item.strip() for item in re.findall(r"\[([^\]]+)\]", str(summary_text or "")) if item.strip()]
-
-    def _looks_like_build_version(token: Any) -> bool:
-        text = str(token or "").strip()
-        if not text:
-            return False
-        patterns = (
-            r"\d{6}V\d+",
-            r"user(?:debug)?",
-            r"Daily_user",
-            r"Release_user",
-            r"_sign\b",
-            r"_FLASH\b",
-            r"\bFTM\b",
-        )
-        return any(re.search(pattern, text, flags=re.IGNORECASE) for pattern in patterns)
-
-    def _extract_build_version_from_text(text: Any) -> str:
-        for line in str(text or "").splitlines():
-            normalized = str(line or "").strip()
-            normalized_lower = normalized.lower()
-            if normalized_lower.startswith(VERSION_PREFIXES):
-                return re.sub(r"^(?:\*version:\*|版本：|版本:)\s*", "", normalized, flags=re.IGNORECASE).strip()
-        match = re.search(r"版本[：:]\s*([^\s,，；;]+)", str(text or ""), flags=re.IGNORECASE)
-        if match:
-            return str(match.group(1) or "").strip()
-        return ""
-
-    def _extract_build_version(summary_text: Any, environment_text: Any, description_text: Any) -> str:
-        for text in (environment_text, description_text):
-            candidate = _extract_build_version_from_text(text)
-            if candidate:
-                return candidate
-
-        tokens = _summary_tokens(summary_text)
-        for token in tokens:
-            if _looks_like_build_version(token):
-                return token
-        return ""
-
     project_value = fields.get("project") if isinstance(fields.get("project"), dict) else {}
     normalized_summary = _normalize_name(fields.get("summary"))
     normalized_environment = _normalize_name(_pick("environment"))
-    normalized_description = _normalize_name(fields.get("description"))
 
     return {
         "jira_key": payload.get("key", issue_key),
@@ -402,7 +359,8 @@ def fetch_issue_snapshot_fields(
         "status": _normalize_name((fields.get("status") or {}).get("name") if isinstance(fields.get("status"), dict) else fields.get("status")),
         "resolution": _normalize_name((fields.get("resolution") or {}).get("name") if isinstance(fields.get("resolution"), dict) else fields.get("resolution")),
         "fix_version": _normalize_name(fields.get("fixVersions")),
-        "build_version": _extract_build_version(normalized_summary, normalized_environment, normalized_description),
+        # 出现版本一律以本地项目库为准，不从 Jira 标题/描述/备注解析。
+        "build_version": "",
         "affect_project": _normalize_name(_pick("affect_project")) or _normalize_name(project_value.get("key") if isinstance(project_value, dict) else project_value),
         "environment": normalized_environment,
         "exp_class": _normalize_name(_pick("exp_class")) or _extract_exp_class(normalized_environment, normalized_summary),
