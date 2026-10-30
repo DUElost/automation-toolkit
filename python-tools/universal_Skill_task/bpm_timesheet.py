@@ -24,6 +24,8 @@ MAX_ITEMS = 30
 DEDUCTION_RULE_CALENDAR = "calendar"  # 法定工作日/补班扣 0.5；周末/节假日不扣
 DEDUCTION_RULE_HOURS_BAND = "hours_band"  # 工作日&周末：≤8 扣 0.5，>8 扣 1
 DEDUCTION_RULE = DEDUCTION_RULE_HOURS_BAND
+# 提交到含这些标记的项目时不扣工时，按原工作时数填写（如 P535AA）。
+NO_DEDUCTION_PROJECT_MARKERS = ("535",)
 
 
 class TimesheetError(RuntimeError):
@@ -95,13 +97,27 @@ def deduction_for_hours_band(raw_hours: float) -> float:
     return HOURS_DEDUCTION
 
 
+def project_skips_deduction(project: Optional[str]) -> bool:
+    """True when timesheet is filed to a no-deduction project (e.g. P535AA)."""
+    name = (project or "").strip().upper()
+    if not name:
+        return False
+    return any(marker.upper() in name for marker in NO_DEDUCTION_PROJECT_MARKERS)
+
+
 def resolve_deduction(
     raw_hours: float,
     day: date,
     *,
     rule: Optional[str] = None,
+    project: Optional[str] = None,
 ) -> float:
-    """Resolve deduction by active rule; default is DEDUCTION_RULE."""
+    """Resolve deduction by active rule; default is DEDUCTION_RULE.
+
+    Project override: 535-family projects skip deduction and keep raw hours.
+    """
+    if project_skips_deduction(project):
+        return 0.0
     active = (rule or DEDUCTION_RULE or "").strip() or DEDUCTION_RULE_HOURS_BAND
     if active == DEDUCTION_RULE_CALENDAR:
         return deduction_for_date(day)
@@ -684,11 +700,13 @@ def fill_timesheet_detail(
     Deduction calendar uses the list row's missed_date (source of truth), not
     the form workweekDate field which can be stale across successive opens.
     When project is set: 研发项目 → project name (clears taskName) → task/hours.
+    535-family projects skip deduction and fill raw 工作时数.
     """
     grid_id = _find_detail_grid_id(page)
     raw_hours = _read_workday_ttl(page)
     target = date.fromisoformat(str(missed_date).strip().replace("/", "-")[:10])
-    deduction = resolve_deduction(raw_hours, target)
+    proj = (project or "").strip() or None
+    deduction = resolve_deduction(raw_hours, target, project=proj)
     kind = workday_kind(target)
     if not hours_adjustment_is_valid(raw_hours, deduction):
         raise TimesheetSkipItem(
@@ -696,7 +714,6 @@ def fill_timesheet_detail(
         )
     hours = adjusted_work_hours(raw_hours, deduction)
     task = (reason or "").strip() or "待确认"
-    proj = (project or "").strip() or None
     if proj:
         # 1) 研发项目  2) P535AA  3) 工时+任务详情（下方写入）
         select_timesheet_project(page, proj, grid_id=grid_id)

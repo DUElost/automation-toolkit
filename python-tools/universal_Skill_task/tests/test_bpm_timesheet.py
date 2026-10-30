@@ -15,6 +15,7 @@ from bpm_timesheet import (
     deduction_for_date,
     deduction_for_hours_band,
     hours_adjustment_is_valid,
+    project_skips_deduction,
     resolve_deduction,
 )
 from workday_calendar import (
@@ -62,6 +63,26 @@ def test_resolve_deduction_calendar_rule_still_available():
     # Legacy: weekend/holiday 0; workday/makeup 0.5 (ignores raw hours band).
     assert resolve_deduction(9.0, date(2026, 9, 19), rule=DEDUCTION_RULE_CALENDAR) == 0.0
     assert resolve_deduction(4.0, date(2026, 9, 14), rule=DEDUCTION_RULE_CALENDAR) == 0.5
+
+
+def test_project_skips_deduction_for_535():
+    assert project_skips_deduction("P535AA") is True
+    assert project_skips_deduction("p535aa") is True
+    assert project_skips_deduction("V552AA") is False
+    assert project_skips_deduction("") is False
+    assert project_skips_deduction(None) is False
+
+
+def test_resolve_deduction_skips_for_535_project():
+    # 535 projects keep raw hours regardless of hours_band / calendar.
+    assert resolve_deduction(8.0, date(2026, 9, 14), project="P535AA") == 0.0
+    assert resolve_deduction(9.0, date(2026, 9, 14), project="P535AA") == 0.0
+    assert resolve_deduction(
+        4.0, date(2026, 9, 14), rule=DEDUCTION_RULE_CALENDAR, project="P535AA"
+    ) == 0.0
+    # Non-535 still uses active rule.
+    assert resolve_deduction(8.0, date(2026, 9, 14), project="V552AA") == 0.5
+    assert resolve_deduction(9.0, date(2026, 9, 14), project="V552AA") == 1.0
 
 
 def test_2026_national_day_makeup_and_weekend():
