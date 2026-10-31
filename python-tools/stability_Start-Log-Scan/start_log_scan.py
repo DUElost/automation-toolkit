@@ -37,6 +37,8 @@ if __name__ == "__main__":
     parser.add_argument("-del", "--delete", dest="delete_logs", action="store_const", const=True, default=False, metavar="删除不提交的log目录", help="删除不提交的log目录")
     parser.add_argument("-s", "--skip", dest="skip_extract", action="store_const", const=True, default=False, metavar="跳过解压", help="跳过所有解压步骤")
     parser.add_argument("-sz", "--skip_unzip", dest="skip_unzip", action="store_const", const=True, default=False, metavar="跳过解压", help="跳过解压zip文件")
+    parser.add_argument("-inc", "--incremental", dest="incremental", action="store_const", const=True, default=False,
+      help="增量扫描：仍生成全量_org.xls；去重报告仅保留相对同目录上次_org.xls的新增Path")
     choices_list = [
      SCAN_MODE_AEE_TNE, SCAN_MODE_AEE, SCAN_MODE_TNE, SCAN_MODE_FANS, 
      SCAN_MODE_USIC, SCAN_MODE_PLATFORM, 
@@ -186,10 +188,12 @@ if __name__ == "__main__":
             utp_tcid = args.utp_tcid
             utp_taskid = args.utp_taskid
             limit_dbg_count = args.limit_dbg_count
+            incremental = args.incremental
             TEST_LOGGER.info("获取输入参数：")
             TEST_LOGGER.info("-del [删除不提交日志目录]：{}".format(delete_logs))
             TEST_LOGGER.info("-s [跳过所有解压步骤]：{}".format(skip_extract))
             TEST_LOGGER.info("-sz [跳过解压zip文件]：{}".format(skip_unzip))
+            TEST_LOGGER.info("-inc [增量Path差集]：{}".format(incremental))
             TEST_LOGGER.info("-m [扫描模式]：{}".format(scan_mode))
             TEST_LOGGER.info("-b [指定日期]：{}".format(days_before))
             TEST_LOGGER.info("-d [扫描目录]：{}".format(scan_root_dir))
@@ -233,6 +237,8 @@ if __name__ == "__main__":
             task_tag = None
             special_build_prefix = False
             delete_logs = False
+            incremental = False
+            limit_dbg_count = 0
             TEST_LOGGER.info("默认扫描模式：0，扫描路径：{}".format(scan_root_dir))
         else:
             sys.exit(0)
@@ -249,7 +255,7 @@ if __name__ == "__main__":
     TEST_LOGGER.info("工具当前目录：{}\n".format(cur_tool_dir))
     if scan_mode in [SCAN_MODE_AEE_TNE, SCAN_MODE_AEE, SCAN_MODE_TNE, SCAN_MODE_JENKINS, SCAN_MODE_HWASAN, 
      SCAN_MODE_FUZZ, SCAN_MODE_TRANSSION]:
-        scanner = ScanAeeTne(scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir, skip_extract, skip_unzip, nas_address, task_tag, special_build_prefix, delete_logs, limit_dbg_count=limit_dbg_count)
+        scanner = ScanAeeTne(scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir, skip_extract, skip_unzip, nas_address, task_tag, special_build_prefix, delete_logs, limit_dbg_count=limit_dbg_count, incremental=incremental)
         loggerName = datetime.datetime.now().strftime("LogScanAeeTne_%Y_%m_%d_%H_%M_%S.log")
         loggerPath = os.path.join(PathManager.log_folder, loggerName)
         TEST_LOGGER.resetLogFile(loggerPath)

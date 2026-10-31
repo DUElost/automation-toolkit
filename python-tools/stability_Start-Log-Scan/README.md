@@ -33,6 +33,7 @@ python start_log_scan.py -m <模式> -d <日志目录> -p <地点>
 | `-p` | 扫描地点标识 | `SH` |
 | `-s` | 跳过所有解压步骤 | 无参数 |
 | `-sz` | 跳过解压 zip 文件 | 无参数 |
+| `-inc` | 增量扫描：全量写 `_org.xls`，去重报告仅保留相对上次 `_org.xls` 的新增 Path | 无参数 |
 | `-b` | 指定扫描往前第几天的日志，-1 表示所有 | `-1` |
 | `-del` | 删除不提交的 log 目录 | 无参数 |
 
@@ -68,6 +69,44 @@ python start_log_scan.py -m transsion -d_abs "D:\logs\test" -p SH -s
 
 # TNE 汇总去重（可用 -m 2 或 -m tne；默认模式与 transsion 不变）
 python start_log_scan.py -m tne -d .\test2\ -p SH -s
+
+# Monkey 长稳每隔若干天增量扫（防同一 Path 重复提单）
+python3 start_log_scan.py -d /path/to/MonkeyAEEinfo/ -sz -inc
+```
+
+## 增量扫描（`-inc`）
+
+用于 Monkey 多日测试、每隔几天扫描并提单的场景：避免同一物理 dump（同一 Path）重复进入去重报告。
+
+### 行为
+
+| 输出 | 内容 |
+|------|------|
+| `*_org.xls` | 始终全量 |
+| `*.xls`（去重） | 仅「本次 org Path − 同目录最新一份 `*_org.xls` 的 Path」，再走原有去重 |
+| `*_summary.json` | 含 `incremental` 字段（基准 org、差集数量等） |
+
+### 差集规则
+
+- 基准：结果目录中文件名时间戳**最新**的 `*_org.xls`（本次写出之前已存在的那份）
+- 比较键：Excel 中的 **Path** 列（精确字符串匹配）
+- 只挡同一 Path；同类问题的新 dump / 新机器仍会进入去重报告
+- 无历史 `*_org.xls` 时：与不加 `-inc` 相同（全量去重）
+- 第 N 次只需对比最新一份全量 org：因每次 org 都是全量，已包含此前所有 Path，效果等价于排除历史已扫过的 Path
+
+### 使用注意
+
+1. 需要作为基准的报告必须保留标准命名的 `*_org.xls`；改名或删除后不会被当作基准。
+2. 若某次中间结果不想参与后续差集，可将该次 `*_org.xls` 改名（例如加后缀 `AAA`），工具只会认仍符合 `*_org.xls` 命名的文件。
+3. 两次扫描的 Path 形态需一致（同一路径视角，如都是 Linux `/home/...`）；`-b` 按日期过滤**不能**替代 `-inc`。
+4. summary 中可核对：`incremental.prev_org_excel`、`prev_path_count`、`delta_org_count`、`aee_result_final_count`。
+
+### 示例时间线
+
+```text
+第1次（可不加 -inc）：生成 ..._20261016_113849_org.xls + 去重报告 → 提单
+第2次 -inc：相对最新 *_org.xls 做 Path 差集 → 只提新增
+第3次 -inc：相对第2次全量 org 做差集（其中已含第1次 Path）→ 只提相对第2次的新增
 ```
 
 ## 离线 org 去重
@@ -93,8 +132,9 @@ python start_log_scan.py -dedup_org "F:\path\Result_xxx_org.xls" -side factory
 
 报告生成在 `-d` 参数指定的目录下：
 
-- `Result_{jira}_{reporter}_MonkeyAEE_{place}_{YYYYMMDD}_{HHMMSS}_org.xls` - 原始结果
-- `Result_{jira}_{reporter}_MonkeyAEE_{place}_{YYYYMMDD}_{HHMMSS}.xls` - 去重后结果
+- `Result_{jira}_{reporter}_MonkeyAEE_{place}_{YYYYMMDD}_{HHMMSS}_org.xls` - 原始结果（全量；`-inc` 时仍为全量）
+- `Result_{jira}_{reporter}_MonkeyAEE_{place}_{YYYYMMDD}_{HHMMSS}.xls` - 去重后结果（`-inc` 时为 Path 差集后再去重，用于提单）
+- `Result_{jira}_{reporter}_MonkeyAEE_{place}_{YYYYMMDD}_{HHMMSS}_summary.json` - 扫描摘要
 
 ## 支持的异常类型
 
@@ -189,7 +229,10 @@ start_log_scan_source/
 A: 使用 `-s` 参数跳过解压步骤，确保日志已手动解压到 `.DEC` 目录。
 
 ### Q: 如何只扫描特定日期的日志？
-A: 使用 `-b` 参数指定天数，如 `-b 0` 表示今天，`-b 1` 表示昨天。
+A: 使用 `-b` 参数指定天数，如 `-b 0` 表示今天，`-b 1` 表示昨天。注意：`-b` 只选「往前第 N 天」单日，不能解决多日测试每隔几天扫描时的重复提单问题；该场景请用 `-inc`。
+
+### Q: 每隔两天扫一次会不会重复提单？
+A: 加 `-inc`，用同目录上一份 `*_org.xls` 做 Path 差集。去重报告只含新增 Path。勿删/误改仍需作为基准的 `*_org.xls`。
 
 ### Q: Excel 文件被锁定无法写入？
 A: 关闭已打开的 Excel 文件，或等待工具自动添加时间戳后缀。

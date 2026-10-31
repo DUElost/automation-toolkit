@@ -14,6 +14,12 @@ from modules.common.GlobalAttrs import *
 from modules.common.Utils import get_str_similar
 from modules.mode.BaseScan import ScanBase
 from modules.analyse.tne.types.tne_base import TneBase
+from modules.mode.incremental_org import (
+    attrs_to_aee_excel_data,
+    filter_org_rows_by_new_paths,
+    find_latest_org_excel,
+    load_org_paths,
+)
 
 
 class ScanAeeTne(ScanBase):
@@ -35,7 +41,8 @@ class ScanAeeTne(ScanBase):
 
     def __init__(self, scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir,
                  skip_extract, skip_unzip, nas_address=None, task_tag=None,
-                 special_build_prefix=None, delete_logs=False, limit_dbg_count=0):
+                 special_build_prefix=None, delete_logs=False, limit_dbg_count=0,
+                 incremental=False):
         TEST_LOGGER.info("初始化 ScanAeeTne，传入的参数列表：")
         TEST_LOGGER.info("scan_mode：{}".format(scan_mode))
         TEST_LOGGER.info("scan_place：{}".format(scan_place))
@@ -49,12 +56,14 @@ class ScanAeeTne(ScanBase):
         TEST_LOGGER.info("special_build_prefix：{}".format(special_build_prefix))
         TEST_LOGGER.info("delete_logs：{}".format(delete_logs))
         TEST_LOGGER.info("limit_dbg_count：{}".format(limit_dbg_count))
+        TEST_LOGGER.info("incremental：{}".format(incremental))
         super(ScanAeeTne, self).__init__(scan_mode, scan_place, days_before,
                                           scan_root_dir, cur_tool_dir, skip_extract,
                                           skip_unzip, task_tag, delete_logs,
                                           limit_dbg_count=limit_dbg_count)
         self._nas_address = nas_address
         self._special_build_prefix = special_build_prefix
+        self._incremental = bool(incremental)
         self._extract_failed_dbg_set = set()
         self._zero_size_dbg_set = set()
 
@@ -170,12 +179,19 @@ class ScanAeeTne(ScanBase):
             if discard_dbg_info_list:
                 aee_rlt_list_org = self._save_discard_to_org(aee_rlt_list_org, discard_dbg_info_list)
 
+            # 增量：全量 org 保留；去重报告仅保留相对上次 _org.xls 的新 Path
+            incremental_info = None
+            if self._incremental:
+                aee_rlt_list_final, incremental_info = self.__apply_incremental_path_filter(
+                    aee_rlt_list_org, aee_rlt_list_final)
+
             # 生成结果
             scan_summary = self.__build_scan_summary(
                 unexpected_dbg_count, db_file_map_exception_zip_count, db_file_map_discard_count,
                 dbg_count, dbg_to_extract_count, pre_analysed_dbg_count, preanalyse_discard_count,
                 exp_main_file_count, extract_failed_dbg_list, fallback_aee_result_count,
-                aee_result_count_before_filter, aee_rlt_list_org, aee_rlt_list_final)
+                aee_result_count_before_filter, aee_rlt_list_org, aee_rlt_list_final,
+                incremental_info=incremental_info)
             self.__generate_result(aee_rlt_list_org, aee_rlt_list_final, scan_summary)
 
             TEST_LOGGER.info("AEE/TNE 扫描完成")
@@ -564,6 +580,45 @@ class ScanAeeTne(ScanBase):
             }
         }
 
+    def __apply_incremental_path_filter(self, aee_rlt_list_org, aee_rlt_list_final):
+        """
+        相对同目录最新一份 *_org.xls，按 Path 差集重算去重结果。
+        全量 org 不变；无历史 org 时回退为全量去重结果。
+        """
+        info = {
+            "enabled": True,
+            "prev_org_excel": None,
+            "prev_path_count": 0,
+            "org_count": len(aee_rlt_list_org) if aee_rlt_list_org else 0,
+            "delta_org_count": 0,
+            "skipped": False,
+            "skip_reason": None,
+        }
+        prev_org = find_latest_org_excel(self._scan_root_dir)
+        if not prev_org:
+            info["skipped"] = True
+            info["skip_reason"] = "no_previous_org"
+            TEST_LOGGER.info("增量模式：未找到历史 *_org.xls，按全量去重结果输出")
+            return aee_rlt_list_final, info
+
+        prev_paths = load_org_paths(prev_org)
+        info["prev_org_excel"] = prev_org
+        info["prev_path_count"] = len(prev_paths)
+        delta_org = filter_org_rows_by_new_paths(aee_rlt_list_org, prev_paths, exclude_discard=True)
+        info["delta_org_count"] = len(delta_org)
+        TEST_LOGGER.info(
+            "增量模式：相对历史 org={}，prev_paths={}，delta_org={}/{}".format(
+                prev_org, len(prev_paths), len(delta_org), info["org_count"]))
+        if not delta_org:
+            TEST_LOGGER.info("增量模式：无新增 Path，去重报告为空")
+            return [], info
+
+        delta_objs = [attrs_to_aee_excel_data(row) for row in delta_org]
+        # Path 已在全量阶段转换过，这里不再 replace_path；也不再叠加 special_build_prefix
+        _, delta_final, _ = self._aee_to_data_list(delta_objs, replace_path=False, special_build_prefix=None)
+        TEST_LOGGER.info("增量模式：差集去重后结果数: {}".format(len(delta_final)))
+        return delta_final, info
+
     def __generate_result(self, aee_rlt_list_org, aee_rlt_list_final, summary_data=None):
         """生成扫描结果"""
         TEST_LOGGER.info("******************** 开始生成扫描结果 ********************")
@@ -721,7 +776,17 @@ class ScanAeeTne(ScanBase):
                 "fallback_aee_result_count": "因解析失败而使用兜底逻辑写入报告的结果数量",
                 "aee_result_count_before_filter": "进入最终过滤前的 AEE 结果总数，含正常解析和兜底结果",
                 "aee_result_org_count": "原始报告中的结果数量",
-                "aee_result_final_count": "去重后最终报告中的结果数量"
+                "aee_result_final_count": "去重后最终报告中的结果数量",
+                "incremental_delta_org_count": "增量模式下相对上次 org 的新增 Path 数量（排除 discard）"
+            },
+            "incremental": {
+                "enabled": "是否启用 -inc 增量 Path 差集",
+                "prev_org_excel": "作为差集基准的上一次 *_org.xls 路径",
+                "prev_path_count": "基准 org 中的 Path 数量",
+                "org_count": "本次全量 org 行数",
+                "delta_org_count": "本次新增 Path 行数",
+                "skipped": "是否因无历史 org 等原因跳过差集，回退全量去重",
+                "skip_reason": "跳过差集的原因码，如 no_previous_org"
             },
             "failure_reason_counts": "按失败原因码聚合的 dbg 数量统计；同一个 dbg 命中多个原因码时会分别计数",
             "invalid_dbg": {
@@ -745,9 +810,27 @@ class ScanAeeTne(ScanBase):
     def __build_scan_summary(self, unexpected_dbg_count, db_file_map_exception_zip_count, db_file_map_discard_count,
                              dbg_count, dbg_to_extract_count, pre_analysed_dbg_count, preanalyse_discard_count,
                              exp_main_file_count, extract_failed_dbg_list, fallback_aee_result_count,
-                             aee_result_count_before_filter, aee_rlt_list_org, aee_rlt_list_final):
+                             aee_result_count_before_filter, aee_rlt_list_org, aee_rlt_list_final,
+                             incremental_info=None):
         extract_failed_dbg_summary_list = self.__build_extract_failed_dbg_summary_list(aee_rlt_list_org, aee_rlt_list_final)
-        return {
+        counts = {
+            "db_file_map_exception_zip_count": db_file_map_exception_zip_count,
+            "db_file_map_discard_count": db_file_map_discard_count,
+            "dbg_count": dbg_count,
+            "zero_size_dbg_count": len(self._zero_size_dbg_set),
+            "dbg_to_extract_count": dbg_to_extract_count,
+            "pre_analysed_dbg_count": pre_analysed_dbg_count,
+            "preanalyse_discard_count": preanalyse_discard_count,
+            "exp_main_file_count": exp_main_file_count,
+            "extract_failed_dbg_count": len(set(extract_failed_dbg_list)),
+            "fallback_aee_result_count": fallback_aee_result_count,
+            "aee_result_count_before_filter": aee_result_count_before_filter,
+            "aee_result_org_count": len(aee_rlt_list_org),
+            "aee_result_final_count": len(aee_rlt_list_final)
+        }
+        if incremental_info is not None:
+            counts["incremental_delta_org_count"] = incremental_info.get("delta_org_count", 0)
+        summary = {
             "field_comments": self.__build_scan_summary_field_comments(),
             "tool": "stability_Start-Log-Scan",
             "scan_mode": self._scan_mode,
@@ -760,24 +843,13 @@ class ScanAeeTne(ScanBase):
             "skip_extract": self._skip_extract,
             "skip_unzip": self._skip_unzip,
             "unexpected_dbg_count": unexpected_dbg_count,
-            "counts": {
-                "db_file_map_exception_zip_count": db_file_map_exception_zip_count,
-                "db_file_map_discard_count": db_file_map_discard_count,
-                "dbg_count": dbg_count,
-                "zero_size_dbg_count": len(self._zero_size_dbg_set),
-                "dbg_to_extract_count": dbg_to_extract_count,
-                "pre_analysed_dbg_count": pre_analysed_dbg_count,
-                "preanalyse_discard_count": preanalyse_discard_count,
-                "exp_main_file_count": exp_main_file_count,
-                "extract_failed_dbg_count": len(set(extract_failed_dbg_list)),
-                "fallback_aee_result_count": fallback_aee_result_count,
-                "aee_result_count_before_filter": aee_result_count_before_filter,
-                "aee_result_org_count": len(aee_rlt_list_org),
-                "aee_result_final_count": len(aee_rlt_list_final)
-            },
+            "counts": counts,
             "invalid_dbg": {
                 "zero_size_dbg_files": sorted(self._zero_size_dbg_set)
             },
             "failure_reason_counts": self.__get_extract_failed_dbg_reason_count_dict(),
             "extract_failed_dbg": extract_failed_dbg_summary_list
         }
+        if incremental_info is not None:
+            summary["incremental"] = incremental_info
+        return summary
