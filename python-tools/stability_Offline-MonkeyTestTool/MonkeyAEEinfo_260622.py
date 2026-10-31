@@ -2434,7 +2434,27 @@ def _get_remote_file_count(device_id, remote_path):
     return count
 
 
-def _verify_pulled_aee_log_strict(local_dir, remote_path, device_id):
+def _update_task_expected_remote_stats(task, remote_file_count, remote_total_size):
+    """Record the largest remote stats observed for a pending pull task."""
+    if task is None or remote_file_count is None or remote_file_count <= 0:
+        return
+    prev_count = task.get("expected_remote_file_count")
+    if prev_count is None or remote_file_count > prev_count:
+        task["expected_remote_file_count"] = remote_file_count
+    if remote_total_size is not None and remote_total_size > 0:
+        prev_size = int(task.get("expected_remote_total_size") or 0)
+        task["expected_remote_total_size"] = max(prev_size, remote_total_size)
+
+
+def _snapshot_task_remote_stats(task, device_id, remote_path):
+    """Capture remote file stats before pull when the device directory still has data."""
+    if task is None:
+        return
+    remote_file_count, remote_total_size = _get_remote_file_stats(device_id, remote_path)
+    _update_task_expected_remote_stats(task, remote_file_count, remote_total_size)
+
+
+def _verify_pulled_aee_log_strict(local_dir, remote_path, device_id, task=None):
     """
     返回 (success: bool, message: str, remote_verified: bool)
     [CIFS 防护版] 用 find+stat 替代 os.walk/os.path.getsize，带超时保护。
@@ -2492,6 +2512,9 @@ def _verify_pulled_aee_log_strict(local_dir, remote_path, device_id):
             return False, "所有文件大小为0", False
 
         remote_file_count, remote_total_size = _get_remote_file_stats(device_id, remote_path)
+        _update_task_expected_remote_stats(task, remote_file_count, remote_total_size)
+        expected_remote_file_count = task.get("expected_remote_file_count") if task else None
+        expected_remote_total_size = task.get("expected_remote_total_size") if task else None
 
         if remote_file_count is None:
             size_kb = total_size / 1024
@@ -2499,7 +2522,33 @@ def _verify_pulled_aee_log_strict(local_dir, remote_path, device_id):
 
         if remote_file_count == 0:
             size_kb = total_size / 1024
-            return True, f"设备端目录已清理，本地数据视为最终版本 (文件数:{file_count}, 大小:{size_kb:.1f}KB)", True
+            if expected_remote_file_count is not None and expected_remote_file_count > 0:
+                if file_count < expected_remote_file_count:
+                    return (
+                        False,
+                        f"设备端已清理但本地文件数不足 (本地:{file_count}, 曾观测远程:{expected_remote_file_count})",
+                        True,
+                    )
+                if (
+                    expected_remote_total_size is not None
+                    and expected_remote_total_size > 0
+                    and total_size < expected_remote_total_size * 0.9
+                ):
+                    return (
+                        False,
+                        f"设备端已清理但本地大小不足 (本地:{total_size}, 曾观测远程:{expected_remote_total_size})",
+                        True,
+                    )
+                return (
+                    True,
+                    f"设备端目录已清理，本地数据与历史观测一致 (文件数:{file_count}/{expected_remote_file_count}, 大小:{size_kb:.1f}KB)",
+                    True,
+                )
+            return (
+                True,
+                f"设备端目录已清理，本地数据待远程确认 (文件数:{file_count}, 大小:{size_kb:.1f}KB)",
+                False,
+            )
 
         if file_count < remote_file_count:
             return False, f"文件数量不完整 (本地:{file_count}, 远程:{remote_file_count})", True
@@ -2700,7 +2749,7 @@ def process_device_logs(device_id, whitelist, base_output_dir):
                                     pass
 
                         verify_success, verify_msg, remote_verified = _verify_pulled_aee_log_strict(
-                            local_target_dir, parsed['db_path'], device_id)
+                            local_target_dir, parsed['db_path'], device_id, task=task)
 
                         if verify_success and remote_verified:
                             successfully_processed_lines.add(line)
@@ -2720,11 +2769,12 @@ def process_device_logs(device_id, whitelist, base_output_dir):
                     
                     # 拉取日志
                     if not local_target_dir_exists:
+                        _snapshot_task_remote_stats(task, device_id, parsed['db_path'])
                         pull_result = run_adb_command(["pull", parsed['db_path'], local_target_dir], device_id=device_id, timeout=300)
                         
                         if pull_result is not None:
                             verify_success, verify_msg, remote_verified = _verify_pulled_aee_log_strict(
-                                local_target_dir, parsed['db_path'], device_id)
+                                local_target_dir, parsed['db_path'], device_id, task=task)
 
                             if verify_success and remote_verified:
                                 APP_LOGGER.info(f"成功拉取并验证AEE日志: {new_dirname} - {verify_msg}")
