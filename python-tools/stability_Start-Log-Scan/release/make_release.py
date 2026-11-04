@@ -19,6 +19,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 
@@ -71,8 +72,13 @@ def main():
         fail("{} 已存在；已发布版本不可原地修改".format(dest))
 
     rel_prefix = git("rev-parse", "--show-prefix")
-    files = [f[len(rel_prefix):] for f in git("ls-files", "--", ".").splitlines()]
+    listed = subprocess.check_output(["git", "-C", TOOL_DIR, "ls-files", "-z", "--full-name", "--", "."])
+    files = [f[len(rel_prefix):] for f in listed.decode("utf-8").split("\0") if f.startswith(rel_prefix)]
     files = [f for f in files if f and not f.startswith("tests/")]
+    final_dest = dest
+    dest = final_dest + ".partial"
+    if os.path.exists(dest):
+        shutil.rmtree(dest)
     os.makedirs(dest)
     hashes = {}
     for rel in sorted(files):
@@ -95,7 +101,8 @@ def main():
     }
     with open(os.path.join(dest, "release.json"), "w", encoding="utf-8") as f:
         json.dump(release, f, ensure_ascii=False, indent=1, sort_keys=True)
-    print(dest)
+    os.rename(dest, final_dest)
+    print(final_dest)
 
 
 if __name__ == "__main__":
