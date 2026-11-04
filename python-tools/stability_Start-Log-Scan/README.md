@@ -13,8 +13,10 @@
 
 ## 安装依赖
 
+`-match_issues` 只需标准库；扫描与测试需要以下依赖（`modules/common/Db.py` 导入 pymysql）：
+
 ```bash
-pip install xlwt xlrd
+pip install xlwt xlrd pymysql
 ```
 
 ## 基本用法
