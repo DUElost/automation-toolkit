@@ -1,6 +1,6 @@
 # 日志扫描工具 (Log Scan Tool)
 
-版本：V2.0.9_20240509（反编译修复版）
+版本：V2.1.0（反编译修复版；版本历史见 `modules/common/Version.py`）
 
 ## 简介
 
@@ -13,8 +13,10 @@
 
 ## 安装依赖
 
+`-match_issues` 只需标准库；扫描与测试需要以下依赖（`modules/common/Db.py` 导入 pymysql）：
+
 ```bash
-pip install xlwt xlrd
+pip install xlwt xlrd pymysql
 ```
 
 ## 基本用法
@@ -36,6 +38,9 @@ python start_log_scan.py -m <模式> -d <日志目录> -p <地点>
 | `-inc` | 增量扫描：全量写 `_org.xls`，去重报告仅保留相对上次 `_org.xls` 的新增 Path | 无参数 |
 | `-b` | 指定扫描往前第几天的日志，-1 表示所有 | `-1` |
 | `-del` | 删除不提交的 log 目录 | 无参数 |
+| `-merge_files` | 合并多个已生成的 xls（`_org.xls` 或去重 xls） | `a_org.xls b_org.xls` |
+| `-merge_files_list` | 从文件读取待合并 xls 列表（一行一个，追加在 `-merge_files` 之后） | `files.txt` |
+| `-match_issues` | 对已有问题代表做归并匹配（只读，配合 `-o`），见「成员关系与问题匹配」 | `req.json -o out.json` |
 
 ### 扫描模式
 
@@ -135,6 +140,47 @@ python start_log_scan.py -dedup_org "F:\path\Result_xxx_org.xls" -side factory
 - `Result_{jira}_{reporter}_MonkeyAEE_{place}_{YYYYMMDD}_{HHMMSS}_org.xls` - 原始结果（全量；`-inc` 时仍为全量）
 - `Result_{jira}_{reporter}_MonkeyAEE_{place}_{YYYYMMDD}_{HHMMSS}.xls` - 去重后结果（`-inc` 时为 Path 差集后再去重，用于提单）
 - `Result_{jira}_{reporter}_MonkeyAEE_{place}_{YYYYMMDD}_{HHMMSS}_summary.json` - 扫描摘要
+
+## 成员关系与问题匹配（V2.1.0 起）
+
+供 STP 平台读取问题归并结果。合并规则只在工具端维护（`modules/dedup/aee_rule.py`），平台不复刻比较逻辑。
+
+### 去重规则（rule `mtk-aee-dedup` v1）
+
+- **singleton**：Path 含 `fatal` 且 CausedBy 含 `detailToBeDone`，直接成为新组代表，自身不比较；后续行仍可并入它。
+- **similarity**：ExpClass 完全相等，Package 完全相等，CausedBy 相似度 ≥ `ratio_std_aee`（默认 90）；按去重列表顺序取首个命中。
+  - 相似度为 `difflib.SequenceMatcher.quick_ratio() × 100`，比较前去掉 `0x…`、`@…` 与所有数字；CausedBy 先截断到 10000 字符。
+- **filtered**：白名单、关键字等过滤，不进入去重表。
+
+### 成员关系文件 `*_members.json`
+
+每次 AEE 扫描（`ScanAeeTne` 路径）与 `-dedup_org` 都在报表旁写一份，前缀与 `_org.xls` 相同。xls 格式不变。
+
+- `rows[]`：org.xls 每行一条，`org_row`（= Id + 1，即数据行序号）、`path`（Path 列原文）、`branch`、`filter_reason`、`group`、`is_representative`、`similarity_to_rep`、签名 hash；
+- `groups[]`：`final_row`（去重表行号）、`representative_row`、`member_rows`、`count`、`device_ids`、代表签名原文；
+- `meta`：工具版本与 commit、解析库版本、规则 id/version/参数、白名单 sha256、两份 xls 的文件名与 sha256；
+- schema：`stp.scan_membership` 1.0；`filter_reason` 新增取值只增不改。
+
+`-inc` 下，未进入差集的行记为 `filtered` / `incremental_prev_path`。
+
+### 对已有问题匹配 `-match_issues`
+
+```bash
+python start_log_scan.py -match_issues req.json -o result.json
+```
+
+- 只依赖标准库，在加载扫描依赖前分流；不联网、不写 `report_history`；Python 3.7+。
+- 输入 `stp.issue_match_request`：`existing[]`（`issue_id`、`exp_class`、`package`、`caused_by`）与 `rows[]`（`ref`、`exp_class`、`package`、`caused_by`、`path`），顺序由调用方固定。
+- 每行先依次比 `existing`，未命中再比本次新开的组，仍未命中则开新组 `n{k}`；singleton 行不比较，总是新组。
+- 输出 `stp.issue_match_result`：`results[]` 含 `matched_issue_id` 或 `new_group`、`similarity`、`branch`，以及与 sidecar 相同的 `meta`。
+- 退出码：0 成功，2 输入不合法，1 内部错误。
+
+### 发布
+
+- tag：`start-log-scan/vX.Y.Z`，与 `Version.py` 的 `VERSION = "VX.Y.Z_YYYYMMDD"` 一致；
+- `python release/make_release.py --tag start-log-scan/vX.Y.Z --out <dist>` 导出到 `<dist>/X.Y.Z/` 并写 `release.json`（commit、文件 sha256）；
+- 已发布版本不可原地修改；规则语义变化必须提升 `aee_rule.RULE_VERSION`；
+- `tests/test_aee_dedup_golden.py` 保证去重输出与基线逐字节一致，改动规则时需同时更新基线并说明原因。
 
 ## 支持的异常类型
 

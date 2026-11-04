@@ -3,6 +3,7 @@
 工具函数模块 - 已禁用网络上报功能
 """
 import difflib
+from modules.dedup.aee_rule import str_similar as _rule_str_similar
 import hashlib
 import os
 import platform
@@ -139,28 +140,8 @@ def walk_with_max_depth(topdir, max_depth):
 
 
 def get_str_similar(str_1, str_2, format_str=True, absolute_equal=False):
-    """计算两个字符串的相似度"""
-    if absolute_equal:
-        return 100 if str_1 == str_2 else 0
-    
-    if "*** sprd minidump ke ***" in str_1 and "*** sprd minidump ke ***" in str_2:
-        if "exception_reboot_reason: kernel_crash" in str_1 and "exception_reboot_reason: kernel_crash" in str_2:
-            return 100 if str_1 == str_2 else 0
-        return 0
-    
-    if "*** sprd minidump ke ***" in str_1 or "*** sprd minidump ke ***" in str_2:
-        return 0
-    
-    if format_str:
-        str_1 = re.sub(r'0x[a-zA-Z0-9]+', '', str_1)
-        str_2 = re.sub(r'0x[a-zA-Z0-9]+', '', str_2)
-        str_1 = re.sub(r'@[a-zA-Z0-9]+', '', str_1)
-        str_2 = re.sub(r'@[a-zA-Z0-9]+', '', str_2)
-        str_1 = re.sub(r'\d', '', str_1)
-        str_2 = re.sub(r'\d', '', str_2)
-    
-    ratio = difflib.SequenceMatcher(None, str_1, str_2).quick_ratio() * 100
-    return ratio
+    """计算两个字符串的相似度。实现唯一放在 modules/dedup/aee_rule.py。"""
+    return _rule_str_similar(str_1, str_2, format_str=format_str, absolute_equal=absolute_equal)
 
 
 def is_network_connected():

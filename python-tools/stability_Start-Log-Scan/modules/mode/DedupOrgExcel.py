@@ -1,10 +1,14 @@
 import datetime
 import os
+import traceback
 from pathlib import Path
 
 from modules.common.Excel import Excel, read_aee_rlt_excel
 from modules.common.GlobalAttrs import SCAN_MODE_AEE
 from modules.mode.BaseScan import ScanBase
+from modules.common.Logger import TEST_LOGGER
+from modules.dedup import membership
+from modules.dedup.membership import members_path_for
 
 
 class DedupOrgExcel(ScanBase):
@@ -80,8 +84,27 @@ class DedupOrgExcel(ScanBase):
         self._validate_input()
         self._prepare_context()
         aee_rlt_list = read_aee_rlt_excel(self._org_excel_path)
-        _, aee_rlt_list_final, _ = self._aee_to_data_list(aee_rlt_list)
+        aee_rlt_list_org, aee_rlt_list_final, _ = self._aee_to_data_list(aee_rlt_list)
         output_path = self._build_output_path()
         excel = Excel(output_path)
         excel.insertResultAee(aee_rlt_list_final, deduplicated=True)
+        self._write_dedup_membership(output_path, aee_rlt_list_org, aee_rlt_list_final)
         return output_path
+
+    def _write_dedup_membership(self, output_path, aee_rlt_list_org, aee_rlt_list_final):
+        """离线去重的成员关系：org_row 指输入 _org.xls 的行，final_row 指本次输出 xls 的行。"""
+        try:
+            members_json_path = members_path_for(output_path)
+            config_meta = {
+                "scan_mode": self._scan_mode,
+                "scan_type": self._scan_type,
+                "config_file": None,
+                "pkglist_file": self._pkglist_file,
+                "pkglist_sha256": membership._file_sha256(self._get_config_file_path(self._pkglist_file)),
+                "blacklist_sha256": membership._file_sha256(self._get_config_file_path(self._blacklist_file)),
+            }
+            self._write_membership_sidecar(
+                members_json_path, aee_rlt_list_org, aee_rlt_list_final, self._last_aee_membership,
+                self._org_excel_path, output_path, None, config_meta=config_meta)
+        except Exception:
+            TEST_LOGGER.warn("成员关系文件生成失败：{}".format(traceback.format_exc()))

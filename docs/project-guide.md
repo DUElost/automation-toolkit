@@ -11,6 +11,7 @@
 
 | 日期 | 变更内容 |
 |------|----------|
+| 2026-11-04 | stability_Start-Log-Scan V2.1.0：去重规则抽为 `modules/dedup/aee_rule.py`；新增成员关系 `*_members.json`（stp.scan_membership 1.0）与 `-match_issues`，供 STP 平台读取问题归并；恢复 `-merge_files_list`；发布按 tag `start-log-scan/vX.Y.Z` |
 | 2026-10-21 | 新增 windows-tools/system_mouse_without_borders：基于 PowerToys MWB，修单向剪切板、传速缓冲、文件上限 1GB |
 | 2026-10-13 | windows-scheduler 支持 `DailyAt` 多时间点（单任务多触发器）；新增 WSL 定时执行用法与 `wsl -e`/`bash -lc` 调用形态对照 |
 | 2026-10-13 | 文档重构：全景内容由根 CLAUDE.md 迁入本文档；根 CLAUDE.md / AGENTS.md 瘦身为薄壳与最小契约 |
