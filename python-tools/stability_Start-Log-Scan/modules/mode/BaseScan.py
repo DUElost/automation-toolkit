@@ -17,6 +17,9 @@ from modules.common.Logger import TEST_LOGGER
 from modules.common.GlobalAttrs import *
 from modules.common.Utils import unzip, aee_extract, decompress_tne, get_report_history_online, get_package_white_list_online, get_monkey_blacklist_online, get_jira_project_online, post_report_history, sendMail, is_network_connected, extract_expdb, send_msg_by_feishu_robot, get_mixed_md5, walk_with_max_depth, get_str_similar, send_monkey_rlt_by_feishu_robot, get_freeze_version_from_feishu, get_top_app_list_from_feishu, get_tne_tag_info_from_feishu, random_str
 from modules.common.Version import VERSION
+from modules.dedup.aee_rule import find_first_match, is_singleton
+from modules.dedup import membership
+from modules.dedup.membership import AeeMembershipTrace
 PATTERN_MAIL = re.compile("[a-z0-9._%+-]+@[a-z0-9.-]+\\.[a-z]{2,4}")
 PATTERN_ANDROID_VERION = re.compile("-([L|M|N|O|P|Q|R|S|T|U|V])-")
 
@@ -90,6 +93,8 @@ class ScanBase(ABC):
         self._max_single_handle_dbg_number = 10
         self._max_dbg_number = 500
         self._ratio_std_aee = 90
+        self._last_aee_membership = None
+        self._run_started_at = datetime.datetime.now().astimezone().isoformat(timespec="seconds")
         self._ratio_std_tne = 90
         self._is_mp_block = False
         self._is_trunk = False
@@ -193,6 +198,43 @@ class ScanBase(ABC):
         self._init_scan_attrs()
         self._get_standard_info()
         self._scan()
+
+    def _membership_config_meta(self):
+        config_folder = PathManager.config_folder or ""
+
+        def file_sha(name):
+            return membership._file_sha256(os.path.join(config_folder, name)) if name else None
+
+        return {
+            "scan_mode": self._scan_mode,
+            "scan_type": self._scan_type,
+            "config_file": os.path.basename(self._config_file) if self._config_file else None,
+            "pkglist_file": self._pkglist_file,
+            "pkglist_sha256": file_sha(self._pkglist_file),
+            "blacklist_sha256": file_sha(self._blacklist_file),
+        }
+
+    def _write_membership_sidecar(self, members_json_path, aee_rlt_list_org, aee_rlt_list_final, trace,
+                                  org_excel_path=None, final_excel_path=None, incremental_info=None,
+                                  config_meta=None):
+        """写成员关系 sidecar（stp.scan_membership）。只读 org/final 列表，不修改它们。"""
+        reports = {
+            "org_xls": membership.report_entry(org_excel_path, len(aee_rlt_list_org or [])),
+            "final_xls": membership.report_entry(final_excel_path, len(aee_rlt_list_final or [])),
+        }
+        run = {
+            "started_at": self._run_started_at,
+            "finished_at": membership.now_iso(),
+            "scan_root": self._scan_root_dir,
+            "incremental": incremental_info,
+        }
+        meta = membership.build_meta(
+            self._ratio_std_aee,
+            config=config_meta if config_meta is not None else self._membership_config_meta(),
+            run=run, reports=reports)
+        sidecar = membership.build_sidecar(aee_rlt_list_org or [], aee_rlt_list_final or [], trace, meta,
+                                           final_written=bool(final_excel_path))
+        return membership.write_sidecar(members_json_path, sidecar)
 
     def _normalize_aee_device_id(self, device_id):
         if device_id is None:
@@ -650,6 +692,9 @@ class ScanBase(ABC):
         recognize_exception_list = []
         handle_recognize_failed_list = []
         top_apk_list = []
+        # 成员关系记录：只旁路记录，不影响 org/final 输出（见 modules/dedup/membership.py）
+        trace = AeeMembershipTrace(self._ratio_std_aee)
+        self._last_aee_membership = trace
         if aee_result_list:
             if self._scan_mode in [SCAN_MODE_HWASAN, SCAN_MODE_HWASAN_PLATFORM]:
                 top_apk_list = self._get_top_apk_list()
@@ -702,15 +747,19 @@ class ScanBase(ABC):
                 if not aee_result.handle_recognize_rlt:
                     handle_recognize_failed_list.append(attrs_path)
                 aee_rlt_list_org.append(list(aee_result_attrs))
+                org_index = len(aee_rlt_list_org) - 1
+                trace.add_row(org_index, attrs_path)
                 if self._scan_mode in [SCAN_MODE_HWASAN, SCAN_MODE_HWASAN_PLATFORM]:
                     if attrs_exp_class not in ('Native (NE)', 'Kernel (KE)'):
                         TEST_LOGGER.info(f"天网版本，AEE日志类型不符合要求，exp_class:{attrs_exp_class} Path: {attrs_path}")
                         to_be_deleted_file_list.append(to_be_deleted_file_path)
+                        trace.filtered(org_index, "hwasan_exp_class")
                         continue
                     if aee_result.is_ignore_ke_ne_hwasan():
                         TEST_LOGGER.info(f"天网版本，需要过滤的KE与NE，exp_class:{attrs_exp_class} Path: {attrs_path}")
                         to_be_deleted_file_list.append(to_be_deleted_file_path)
                         aee_result_attrs[3] = f"Ignored_hwasan_{attrs_exp_class}"
+                        trace.filtered(org_index, "hwasan_ignored")
                         continue
                     if attrs_cur_process not in self._pkglist:
                         if attrs_cur_process in top_apk_list:
@@ -719,9 +768,11 @@ class ScanBase(ABC):
                                     TEST_LOGGER.debug("Package：[{}] Path：[{}] 判定为3RD APK系统问题，计入提单".format(attrs_package, attrs_path))
                             else:
                                 to_be_deleted_file_list.append(to_be_deleted_file_path)
+                                trace.filtered(org_index, "hwasan_not_system")
                                 continue
                         else:
                             to_be_deleted_file_list.append(to_be_deleted_file_path)
+                            trace.filtered(org_index, "not_in_pkglist")
                             continue
                 elif self._scan_mode == SCAN_MODE_VIDEO_PLATFORM:
                     if any((substring in attrs_cur_process.lower() for substring in self._media_submit_key_list)):
@@ -729,6 +780,7 @@ class ScanBase(ABC):
                     elif any((exp_class_type in attrs_exp_class.lower() for exp_class_type in self._media_submit_exp_class_list)):
                         pass  # 继续处理
                     else:
+                        trace.filtered(org_index, "media_not_matched")
                         continue  # 跳过不符合条件的
                 # 检查白名单
                 if not self._ignore_pkglist and attrs_cur_process not in self._pkglist:
@@ -736,6 +788,7 @@ class ScanBase(ABC):
                     if self._scan_mode in [SCAN_MODE_PLATFORM, SCAN_MODE_DAILY]:
                         if "SIGSEGV" in attrs_exp_type:
                             to_be_deleted_file_list.append(to_be_deleted_file_path)
+                            trace.filtered(org_index, "platform_sigsegv")
                             continue
                         if "data_app" in attrs_exp_type:
                             # data_app 类型，检查是否是 transsion 应用
@@ -747,16 +800,20 @@ class ScanBase(ABC):
                                         self._report_history_list.append(attrs_cur_process)
                                     else:
                                         to_be_deleted_file_list.append(to_be_deleted_file_path)
+                                        trace.filtered(org_index, "platform_data_app")
                                         continue
                                 else:
                                     to_be_deleted_file_list.append(to_be_deleted_file_path)
+                                    trace.filtered(org_index, "platform_data_app")
                                     continue
                             else:
                                 to_be_deleted_file_list.append(to_be_deleted_file_path)
+                                trace.filtered(org_index, "platform_data_app")
                                 continue
                     else:
                         # 其他模式下，不在白名单中的直接跳过
                         to_be_deleted_file_list.append(to_be_deleted_file_path)
+                        trace.filtered(org_index, "not_in_pkglist")
                         continue
                 # 检查 com.android.emergency
                 if attrs_package == "com.android.emergency":
@@ -769,44 +826,54 @@ class ScanBase(ABC):
                     if self._android:
                         if self._android.upper() > "S":
                             TEST_LOGGER.info(f"当前版本：{self._android}，T版本后，com.android.emergency 不计入提单问题")
+                            trace.filtered(org_index, "emergency_after_s")
                             continue
                 # AD10 PR0 camera 问题过滤
                 if "AD10" in attrs_path and "PR0" in attrs_path and "camera" in attrs_package:
                     TEST_LOGGER.debug("AD10, PR0 机器，camera 问题不计入提单问题")
+                    trace.filtered(org_index, "ad10_pr0_camera")
                     continue
                 # 预分析丢弃问题过滤
                 if "discard_dbg" in attrs_package or "discard_db_file_map" in attrs_package:
                     TEST_LOGGER.debug(f"预分析丢弃问题，不计入去重后问题。Path:{attrs_path}")
+                    trace.filtered(org_index, "preanalyse_discard")
                     continue
                 # 无效问题过滤
                 if "invalid_combo_wifi" in attrs_caused_by:
                     TEST_LOGGER.warn("combo_wifi 无效问题，不计入去重后问题。Path:{}".format(attrs_path))
                     to_be_deleted_file_list.append(to_be_deleted_file_path)
+                    trace.filtered(org_index, "invalid_combo_wifi")
                     continue
                 if "unknown_app_crash" in attrs_caused_by:
                     TEST_LOGGER.warn("unknown_app_crash 问题，不计入去重后问题。Path:{}".format(attrs_path))
                     to_be_deleted_file_list.append(to_be_deleted_file_path)
+                    trace.filtered(org_index, "unknown_app_crash")
                     continue
                 if "nfc_too_close" in attrs_caused_by:
                     TEST_LOGGER.warn("nfc_too_close 问题，不计入去重后问题。Path:{}".format(attrs_path))
                     to_be_deleted_file_list.append(to_be_deleted_file_path)
                     nfc_too_close_file_list.append(attrs_path)
+                    trace.filtered(org_index, "nfc_too_close")
                     continue
                 if "anr when screen off" in attrs_caused_by:
                     TEST_LOGGER.warn("anr 灭屏问题，不计入去重后问题。Path:{}".format(attrs_path))
                     to_be_deleted_file_list.append(to_be_deleted_file_path)
+                    trace.filtered(org_index, "anr_screen_off")
                     continue
                 if "can not find pid" in attrs_caused_by:
                     TEST_LOGGER.warn("pid=0 问题，不计入去重后问题。Path:{}".format(attrs_path))
                     to_be_deleted_file_list.append(to_be_deleted_file_path)
+                    trace.filtered(org_index, "pid_not_found")
                     continue
                 # API 工厂模式过滤
                 if "API" in attrs_path and self._scan_type == "factory":
                     to_be_deleted_file_list.append(to_be_deleted_file_path)
+                    trace.filtered(org_index, "factory_api")
                     continue
                 # fatal 问题特殊处理
-                if "fatal" in attrs_path and "detailToBeDone" in attrs_caused_by:
+                if is_singleton(attrs_path, attrs_caused_by):
                     aee_rlt_list_final.append(self._build_aee_final_attrs(aee_result_attrs))
+                    trace.new_group(org_index, len(aee_rlt_list_final) - 1, "singleton")
                     continue
                 # FUZZ 模式过滤
                 if self._scan_mode in [SCAN_MODE_FUZZ, SCAN_MODE_FUZZ_PLATFORM]:
@@ -822,52 +889,26 @@ class ScanBase(ABC):
                             fuzz_error_flag = False
                     if fuzz_error_flag is False:
                         to_be_deleted_file_list.append(to_be_deleted_file_path)
+                        trace.filtered(org_index, "fuzz")
                         continue
                 # 去重逻辑
                 # 注意：原始代码使用 pass 而不是 continue，意味着即使条件不满足也会继续执行相似度计算
                 # 这里保持与原始 exe 一致的行为
-                if len(aee_rlt_list_final) == 0:
+                # 规则实现见 modules/dedup/aee_rule.py：ExpClass、Package 完全相等，
+                # CausedBy 相似度 >= 阈值，按去重列表顺序取首个命中。
+                match_index, ratio, compare_errors = find_first_match(
+                    ((final_attrs[3], final_attrs[6], final_attrs[8]) for final_attrs in aee_rlt_list_final),
+                    attrs_exp_class, attrs_package, attrs_caused_by, self._ratio_std_aee)
+                trace.compare_errors += compare_errors
+                if match_index is not None:
+                    aee_rlt_list_final[match_index][10] = aee_rlt_list_final[match_index][10] + 1
+                    self._merge_aee_final_device_id(aee_rlt_list_final[match_index], attrs_device_id)
+                    attrs_rom_ram = aee_result_attrs[14] if len(aee_result_attrs) > 14 else ""
+                    self._merge_aee_final_rom_ram(aee_rlt_list_final[match_index], attrs_rom_ram)
+                    trace.join_group(org_index, match_index, ratio)
+                else:
                     aee_rlt_list_final.append(self._build_aee_final_attrs(aee_result_attrs))
-                    continue
-                current_aee_final_length = len(aee_rlt_list_final)
-                is_duplicate = False
-                for j in range(current_aee_final_length):
-                    final_attrs = aee_rlt_list_final[j]
-                    final_exp_class = final_attrs[3]
-                    final_cur_process = final_attrs[5]
-                    final_package = final_attrs[6]
-
-                    if final_exp_class != attrs_exp_class:
-                        continue
-
-                    # 所有 AEE 类型去重前都必须同包名，避免跨应用误聚合。
-                    if final_package != attrs_package:
-                        continue
-
-                    # 版本不同则跳过（但原始代码用 pass，所以这里也不跳过）
-                    # 原始代码逻辑：if not attrs_version == "VersionNone": if attrs_version != ...: pass
-                    # 这意味着只有当 attrs_version == "VersionNone" 时才跳过版本检查
-                    # 否则如果版本不同，用 pass 继续执行
-                    
-                    # ANR 类型检查 activity（原始代码也用 pass）
-                    # 这里简化为：直接计算相似度，不做前置检查
-                    
-                    # 计算相似度
-                    try:
-                        str_1 = final_attrs[8]
-                        ratio = get_str_similar(str_1, attrs_caused_by)
-                        if ratio >= self._ratio_std_aee:
-                            aee_rlt_list_final[j][10] = aee_rlt_list_final[j][10] + 1
-                            self._merge_aee_final_device_id(aee_rlt_list_final[j], attrs_device_id)
-                            attrs_rom_ram = aee_result_attrs[14] if len(aee_result_attrs) > 14 else ""
-                            self._merge_aee_final_rom_ram(aee_rlt_list_final[j], attrs_rom_ram)
-                            is_duplicate = True
-                            break
-                    except:
-                        pass
-                # 如果不是重复，添加到最终列表
-                if not is_duplicate:
-                    aee_rlt_list_final.append(self._build_aee_final_attrs(aee_result_attrs))
+                    trace.new_group(org_index, len(aee_rlt_list_final) - 1, "similarity")
 
             if len(self._new_app_info_list) > 0:
                 try:

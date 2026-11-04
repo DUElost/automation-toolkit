@@ -3,6 +3,10 @@
 # Decompiled from: Python 3.8.3 (tags/v3.8.3:6f8c832, May 13 2020, 22:37:02) [MSC v.1924 64 bit (AMD64)]
 # Embedded file name: start_log_scan.py
 import argparse, datetime, os, sys, traceback
+if __name__ == "__main__" and "-match_issues" in sys.argv:
+    # 对已有问题匹配：只用标准库，不加载扫描依赖（xlrd/xlwt/pymysql 等）
+    from modules.dedup.match_cli import main as _match_main
+    sys.exit(_match_main(sys.argv[1:]))
 from modules.common.GlobalAttrs import *
 from modules.common.Logger import TEST_LOGGER
 from modules.common.Path import PathManager
@@ -97,6 +101,8 @@ if __name__ == "__main__":
     parser.add_argument("-merge_priority", "--merge_priority", dest="merge_priority", action="store_const", const=True, default=False, metavar="是否判断优先级",
       help="是否判断优先级")
     parser.add_argument("-merge_files", dest="merge_files", metavar="合并多个已生成的xls文件", type=str, default=None, nargs="+", help="合并多个已生成的xls结果文件（_org.xls或final.xls），去重汇总输出")
+    parser.add_argument("-merge_files_list", dest="merge_files_list", metavar="文件列表路径（一行一个xls）", type=str, default=None, nargs="?", help="从文件读取待合并的xls路径列表（一行一个），适用于大量文件命令行超长场景")
+    parser.add_argument("-match_issues", dest="match_issues", metavar="匹配请求JSON", type=str, default=None, nargs="?", help="对已有问题代表做归并匹配（只读，见 modules/dedup/match_cli.py），配合 -o 指定输出")
     try:
         args = parser.parse_args()
         show_version = args.show_version
@@ -126,6 +132,10 @@ if __name__ == "__main__":
                 pass
 
         merge_files = args.merge_files
+        if args.merge_files_list:
+            with open(args.merge_files_list, encoding="utf-8") as _f:
+                _list_entries = [line.strip() for line in _f if line.strip()]
+            merge_files = (merge_files or []) + _list_entries
         merge_factory = args.merge_factory
         merge_excel_dir_list = args.merge_excel_dir
         merge_side = args.merge_side

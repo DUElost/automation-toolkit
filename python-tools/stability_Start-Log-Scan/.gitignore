@@ -3,3 +3,4 @@ logs/
 tmp/
 result/
 .ace-tool/
+release.json

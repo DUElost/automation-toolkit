@@ -13,6 +13,7 @@ from modules.common.Logger import TEST_LOGGER
 from modules.common.GlobalAttrs import *
 from modules.common.Utils import get_str_similar
 from modules.mode.BaseScan import ScanBase
+from modules.dedup.membership import compose_incremental_trace, members_path_for
 from modules.analyse.tne.types.tne_base import TneBase
 from modules.mode.incremental_org import (
     attrs_to_aee_excel_data,
@@ -176,6 +177,8 @@ class ScanAeeTne(ScanBase):
             aee_rlt_list_org, aee_rlt_list_final, to_be_deleted = self._aee_to_data_list(
                 aee_result_list, True, self._special_build_prefix)
 
+            membership_trace = self._last_aee_membership
+
             if discard_dbg_info_list:
                 aee_rlt_list_org = self._save_discard_to_org(aee_rlt_list_org, discard_dbg_info_list)
 
@@ -184,6 +187,7 @@ class ScanAeeTne(ScanBase):
             if self._incremental:
                 aee_rlt_list_final, incremental_info = self.__apply_incremental_path_filter(
                     aee_rlt_list_org, aee_rlt_list_final)
+                membership_trace = self._incremental_membership_trace
 
             # 生成结果
             scan_summary = self.__build_scan_summary(
@@ -192,7 +196,8 @@ class ScanAeeTne(ScanBase):
                 exp_main_file_count, extract_failed_dbg_list, fallback_aee_result_count,
                 aee_result_count_before_filter, aee_rlt_list_org, aee_rlt_list_final,
                 incremental_info=incremental_info)
-            self.__generate_result(aee_rlt_list_org, aee_rlt_list_final, scan_summary)
+            self.__generate_result(aee_rlt_list_org, aee_rlt_list_final, scan_summary,
+                                   membership_trace=membership_trace, incremental_info=incremental_info)
 
             TEST_LOGGER.info("AEE/TNE 扫描完成")
             TEST_LOGGER.info(f"原始结果数: {len(aee_rlt_list_org)}")
@@ -594,6 +599,8 @@ class ScanAeeTne(ScanBase):
             "skipped": False,
             "skip_reason": None,
         }
+        full_trace = self._last_aee_membership
+        self._incremental_membership_trace = full_trace
         prev_org = find_latest_org_excel(self._scan_root_dir)
         if not prev_org:
             info["skipped"] = True
@@ -611,15 +618,20 @@ class ScanAeeTne(ScanBase):
                 prev_org, len(prev_paths), len(delta_org), info["org_count"]))
         if not delta_org:
             TEST_LOGGER.info("增量模式：无新增 Path，去重报告为空")
+            self._incremental_membership_trace = compose_incremental_trace(
+                aee_rlt_list_org, full_trace, [], None)
             return [], info
 
         delta_objs = [attrs_to_aee_excel_data(row) for row in delta_org]
         # Path 已在全量阶段转换过，这里不再 replace_path；也不再叠加 special_build_prefix
         _, delta_final, _ = self._aee_to_data_list(delta_objs, replace_path=False, special_build_prefix=None)
+        self._incremental_membership_trace = compose_incremental_trace(
+            aee_rlt_list_org, full_trace, delta_org, self._last_aee_membership)
         TEST_LOGGER.info("增量模式：差集去重后结果数: {}".format(len(delta_final)))
         return delta_final, info
 
-    def __generate_result(self, aee_rlt_list_org, aee_rlt_list_final, summary_data=None):
+    def __generate_result(self, aee_rlt_list_org, aee_rlt_list_final, summary_data=None,
+                          membership_trace=None, incremental_info=None):
         """生成扫描结果"""
         TEST_LOGGER.info("******************** 开始生成扫描结果 ********************")
 
@@ -682,6 +694,21 @@ class ScanAeeTne(ScanBase):
                     excel_final.insertResultAee(aee_rlt_list_final, deduplicated=True)
                     TEST_LOGGER.info(f"去重后结果Excel已生成（使用额外时间戳）：{final_excel_path}")
                 generated_files["final_excel"] = final_excel_path
+
+            # 成员关系 sidecar（stp.scan_membership）；失败只告警，不影响报表
+            try:
+                if generated_files.get("org_excel"):
+                    members_json_path = members_path_for(generated_files["org_excel"])
+                else:
+                    members_json_path = os.path.join(
+                        result_dir,
+                        f"Result_{jira_repo}_{reporter}_MonkeyAEE_{self._scan_place}_{date_time_str}_members.json")
+                generated_files["members_json"] = self._write_membership_sidecar(
+                    members_json_path, aee_rlt_list_org, aee_rlt_list_final, membership_trace,
+                    generated_files.get("org_excel"), generated_files.get("final_excel"), incremental_info)
+                TEST_LOGGER.info(f"成员关系文件已生成：{members_json_path}")
+            except Exception:
+                TEST_LOGGER.warn(f"成员关系文件生成失败：{traceback.format_exc()}")
 
             if summary_data is not None:
                 summary_json_name = f"Result_{jira_repo}_{reporter}_MonkeyAEE_{self._scan_place}_{date_time_str}_summary.json"
