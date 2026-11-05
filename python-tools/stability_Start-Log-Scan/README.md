@@ -187,7 +187,7 @@ python start_log_scan.py -match_issues req.json -o result.json
 解压失败的 dbg 会生成兜底行，其 DeviceId 与 Detail 中的 `Device_id:` 按以下规则取值：
 
 - 串号取 dbg 路径中 `aee_exp` 或 `vendor_aee_exp` 目录的上一级目录（取离 dbg 最近的一个），与扫描根布局无关。Owner 于 2026-11-05 核对 78,014 行历史 MTK 数据，均满足这条规则。
-- 该目录名须匹配 `^[A-Za-z0-9]{6,32}$` 且不是纯数字。路径中没有 `aee_exp` / `vendor_aee_exp`，或上一级形态不符时，记为 `unknown_device_id`，此时不读任何 `SYS_PROPERTIES`。不再从路径任意位置用正则兜底取值。
+- 该目录名须匹配 `^[A-Za-z0-9]{6,32}$`，且同时含字母和数字（排除时间戳目录与 `mtklog` 这类纯字母目录）。路径中没有 `aee_exp` / `vendor_aee_exp`，或上一级形态不符时，记为 `unknown_device_id`，此时不读任何 `SYS_PROPERTIES`。不再从路径任意位置用正则兜底取值。
 - `SYS_PROPERTIES` 只在该串号目录内查找。其中 `ro.serialno` 与路径串号不一致时，记为 `discard_device_id`；`ro.build.display.id` 照常使用。
 
 ### 外部工具自检（V2.1.1 起）

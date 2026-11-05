@@ -1748,12 +1748,15 @@ class ScanBase(ABC):
                 return True
         return False
 
-    # 串号目录名形态：6–32 位字母数字，不含 _ - .，且不是纯数字（排除时间戳目录）
+    # 串号目录名形态：6–32 位字母数字，不含 _ - .，且同时含字母和数字
+    # （排除纯数字的时间戳目录，以及 mtklog、aeelog 这类纯字母目录）
     _FAILED_DBG_SERIAL_PATTERN = re.compile(r"^[A-Za-z0-9]{6,32}$")
 
     @classmethod
     def _is_serial_like(cls, name):
-        return bool(name) and bool(cls._FAILED_DBG_SERIAL_PATTERN.match(name)) and not name.isdigit()
+        if not name or not cls._FAILED_DBG_SERIAL_PATTERN.match(name):
+            return False
+        return any(c.isalpha() for c in name) and any(c.isdigit() for c in name)
 
     _FAILED_DBG_EXP_DIR_NAMES = ("aee_exp", "vendor_aee_exp")
 

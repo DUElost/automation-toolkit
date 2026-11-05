@@ -158,6 +158,16 @@ class FailedDbgDeviceIdTest(unittest.TestCase):
         self._assert_unproven(self._dbg(PROJECT, "AYCG-NX6616", "aee_exp", "db.01.NE"))
         self._assert_unproven(self._dbg(PROJECT, "AYCG.NX6616", "aee_exp", "db.01.NE"))
 
+    def test_letters_only_dir_above_aee_exp_is_unproven(self):
+        # 串号须同时含字母和数字：aee_exp 上一级是 mtklog 这类纯字母目录时不证明
+        self._assert_unproven(self._dbg(SN_A, "mtklog", "aee_exp", "db.01.NE"))
+        self._assert_unproven(self._dbg(PROJECT, "mtklog", "aee_exp", "db.01.NE"))
+        self._assert_unproven(self._dbg(PROJECT, "aeelog", "vendor_aee_exp", "db.01.NE"))
+
+    def test_serial_dir_with_extra_level_above(self):
+        dbg = self._dbg(PROJECT, "mtklog", SN_A, "aee_exp", "db.01.NE")
+        self.assertEqual(SN_A, self._get(dbg)[1])
+
     def test_no_regex_fallback(self):
         # v2.1.0 会用 /([A-Za-z0-9]{10,})/ 从任意位置兜底取值
         outside = self.work / "elsewhere" / "ZZZZZZ9999999" / "db.01.NE"
