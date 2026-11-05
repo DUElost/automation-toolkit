@@ -66,16 +66,26 @@ class FailedDbgDeviceIdTest(unittest.TestCase):
 
     # 1. 反例：v2.1.0 得到项目目录名
     def test_serial_dir_under_project_dir(self):
-        dbg = self._dbg(PROJECT, SN_A, "2026_1022_133239", "1793871130516_db.01.NE")
+        dbg = self._dbg(PROJECT, SN_A, "aee_exp", "1793871130516_db.01.NE")
         build, device_id = self._get(dbg)
         self.assertEqual(SN_A, device_id)
         self.assertNotEqual(PROJECT, device_id)
         self.assertEqual("VersionNone", build)
 
+    def test_vendor_aee_exp(self):
+        dbg = self._dbg(PROJECT, SN_A, "vendor_aee_exp", "2026_1022_133239_000_db.01.NE")
+        self.assertEqual(SN_A, self._get(dbg)[1])
+
+    def test_rule_independent_of_scan_root(self):
+        # 串号取 aee_exp 上一级，与扫描根层级无关
+        self.scanner._scan_root_dir = str(self.work / "unrelated_root")
+        dbg = self._dbg(PROJECT, "extra_level", SN_A, "aee_exp", "db.01.NE")
+        self.assertEqual(SN_A, self._get(dbg)[1])
+
     # 2. 不读同项目其他设备的属性
     def test_does_not_read_other_device_properties(self):
-        self._write_props(PROJECT, SN_B, "2026_1022_000000", device_id=SN_B, build="Bver")
-        dbg_a = self._dbg(PROJECT, SN_A, "1793871130516_db.01.NE")
+        self._write_props(PROJECT, SN_B, "aee_exp", "db.00.NE.DEC", device_id=SN_B, build="Bver")
+        dbg_a = self._dbg(PROJECT, SN_A, "aee_exp", "1793871130516_db.01.NE")
         from modules.mode import BaseScan as base_scan
         real = base_scan.SysProperties
         constructed = []
@@ -93,15 +103,15 @@ class FailedDbgDeviceIdTest(unittest.TestCase):
             self.assertTrue(str(path).startswith(sn_a_dir + os.sep), path)
 
     def test_reads_own_properties(self):
-        self._write_props(PROJECT, SN_A, "2026_1022_000000", device_id=SN_A, build="Aver")
-        dbg_a = self._dbg(PROJECT, SN_A, "1793871130516_db.01.NE")
+        self._write_props(PROJECT, SN_A, "aee_exp", "db.00.NE.DEC", device_id=SN_A, build="Aver")
+        dbg_a = self._dbg(PROJECT, SN_A, "aee_exp", "1793871130516_db.01.NE")
         self.assertEqual(("Aver", SN_A), self._get(dbg_a))
 
     # 3. 不复用错误缓存（两种顺序）
     def _two_devices(self):
-        self._write_props(PROJECT, SN_B, "2026_1022_000000", device_id=SN_B, build="Bver")
-        dbg_a = self._dbg(PROJECT, SN_A, "1793871130516_db.01.NE")
-        dbg_b = self._dbg(PROJECT, SN_B, "2026_1022_133239_000_db.01.NE")
+        self._write_props(PROJECT, SN_B, "aee_exp", "db.00.NE.DEC", device_id=SN_B, build="Bver")
+        dbg_a = self._dbg(PROJECT, SN_A, "aee_exp", "1793871130516_db.01.NE")
+        dbg_b = self._dbg(PROJECT, SN_B, "aee_exp", "2026_1022_133239_000_db.01.NE")
         return dbg_a, dbg_b
 
     def test_cache_b_then_a(self):
@@ -130,21 +140,26 @@ class FailedDbgDeviceIdTest(unittest.TestCase):
         self.assertEqual(UNKNOWN, device_id)
         self.assertEqual("VersionNone", build)
 
-    def test_dbg_directly_under_project_dir(self):
+    def test_no_aee_exp_dir(self):
         self._write_props(PROJECT, SN_B, "x", device_id=SN_B, build="Bver")
         self._assert_unproven(self._dbg(PROJECT, "1793871130516_db.01.NE"))
+        self._assert_unproven(self._dbg(PROJECT, SN_A, "1793871130516_db.01.NE"))
+
+    def test_aee_exp_directly_under_project_dir(self):
+        self._assert_unproven(self._dbg(PROJECT, "aee_exp", "db.01.NE"))
 
     def test_serial_dir_with_underscore(self):
-        self._assert_unproven(self._dbg(PROJECT, "AYCG_NX6616", "db.01.NE"))
+        self._assert_unproven(self._dbg(PROJECT, "AYCG_NX6616", "aee_exp", "db.01.NE"))
 
     def test_serial_dir_all_digits(self):
-        self._assert_unproven(self._dbg(PROJECT, "1793871130516", "db.01.NE"))
+        self._assert_unproven(self._dbg(PROJECT, "1793871130516", "aee_exp", "db.01.NE"))
 
     def test_serial_dir_with_dash_or_dot(self):
-        self._assert_unproven(self._dbg(PROJECT, "AYCG-NX6616", "db.01.NE"))
-        self._assert_unproven(self._dbg(PROJECT, "AYCG.NX6616", "db.01.NE"))
+        self._assert_unproven(self._dbg(PROJECT, "AYCG-NX6616", "aee_exp", "db.01.NE"))
+        self._assert_unproven(self._dbg(PROJECT, "AYCG.NX6616", "aee_exp", "db.01.NE"))
 
-    def test_no_regex_fallback_outside_scan_root(self):
+    def test_no_regex_fallback(self):
+        # v2.1.0 会用 /([A-Za-z0-9]{10,})/ 从任意位置兜底取值
         outside = self.work / "elsewhere" / "ZZZZZZ9999999" / "db.01.NE"
         outside.parent.mkdir(parents=True)
         outside.write_bytes(b"")
@@ -162,30 +177,63 @@ class FailedDbgDeviceIdTest(unittest.TestCase):
 
     # 5. 冲突：路径串号 A，属性 device_id B
     def test_properties_conflict(self):
-        self._write_props(PROJECT, SN_A, "x", device_id=SN_B, build="Aver")
-        dbg = self._dbg(PROJECT, SN_A, "db.01.NE")
+        self._write_props(PROJECT, SN_A, "aee_exp", "db.00.NE.DEC", device_id=SN_B, build="Aver")
+        dbg = self._dbg(PROJECT, SN_A, "aee_exp", "db.01.NE")
         self.assertEqual(("Aver", DISCARD), self._get(dbg))
 
     # 6. 旧布局：扫描根就是项目目录
     def test_legacy_layout_scan_root_is_project(self):
         self.scanner._scan_root_dir = str(self.root / PROJECT)
-        self._write_props(PROJECT, SN_A, "2026_1022_000000", device_id=SN_A, build="Aver")
-        dbg = self._dbg(PROJECT, SN_A, "2026_1022_133239", "db.01.NE")
+        self._write_props(PROJECT, SN_A, "aee_exp", "db.00.NE.DEC", device_id=SN_A, build="Aver")
+        dbg = self._dbg(PROJECT, SN_A, "aee_exp", "db.01.NE")
         self.assertEqual(("Aver", SN_A), self._get(dbg))
 
-    def test_legacy_layout_dbg_directly_in_serial_dir(self):
-        self.scanner._scan_root_dir = str(self.root / PROJECT)
-        dbg = self._dbg(PROJECT, SN_A, "db.01.NE")
-        self.assertEqual(SN_A, self._get(dbg)[1])
-
-    def test_ambiguous_both_levels_serial_shaped(self):
-        # 第一级与第二级都像串号，无法判断布局 → 不证明
-        self._assert_unproven(self._dbg("ABCDEF123456", SN_A, "db.01.NE"))
-
     def test_windows_separators(self):
-        dbg = self._dbg(PROJECT, SN_A, "db.01.NE")
-        self.scanner._scan_root_dir = str(self.root).replace("/", "\\")
+        dbg = self._dbg(PROJECT, SN_A, "aee_exp", "db.01.NE")
         self.assertEqual(SN_A, self._get(dbg.replace("/", "\\"))[1])
+
+
+def _aee_extract_runnable():
+    tool = PROJECT_ROOT / "tools" / "aee_extract" / "aee_extract"
+    return sys.platform.startswith("linux") and tool.is_file() and os.access(str(tool), os.X_OK)
+
+
+@unittest.skipUnless(_aee_extract_runnable(), "需要 Linux 且 aee_extract 可执行")
+class CorruptDbgFallbackTest(unittest.TestCase):
+    """用人为损坏的 dbg 走真实 aee_extract → failed-dbg 兜底，检查兜底行的 DeviceId 与 Detail。"""
+
+    def test_corrupt_dbg_fallback_row(self):
+        with tempfile.TemporaryDirectory() as d:
+            work = Path(d)
+            cfg = work / "cfg"
+            cfg.mkdir()
+            corpus.write_config(cfg)
+            scanner = corpus.make_scanner(str(cfg), "SCAN_MODE_AEE", "shanghai")
+            root = work / "scan_root"
+            scanner._scan_root_dir = str(root)
+            scanner._build_version = None
+            scanner._failed_dbg_info_cache = {}
+            scanner._aee_extract = str(PROJECT_ROOT / "tools" / "aee_extract" / "aee_extract")
+            scanner._extract_dbg_time_out = 60
+            scanner._ignore_pkglist = True
+            scanner._archive_address = None
+            scanner._replace_index = None
+            dbg_files = []
+            for sn, name in ((SN_A, "1793871130516_db.01.NE"), (SN_B, "2026_1022_133239_000_db.01.NE")):
+                dbg = root / PROJECT / sn / "aee_exp" / name
+                dbg.parent.mkdir(parents=True)
+                dbg.write_bytes(os.urandom(4096))  # 人为损坏
+                dbg_files.append(str(dbg))
+            failed = scanner._extract_dbg(dbg_files)
+            self.assertEqual(sorted(dbg_files), sorted(failed))
+            rows = scanner._build_extract_failed_aee_result_list(failed)
+            by_path = {r.get_aee_attrs()[0]: r.get_aee_attrs() for r in rows}
+            self.assertEqual(2, len(by_path))
+            for sn, dbg in zip((SN_A, SN_B), dbg_files):
+                attrs = by_path[dbg]
+                self.assertEqual(sn, attrs[12])
+                self.assertIn("Device_id: {}".format(sn), attrs[7])
+                self.assertNotIn(PROJECT, attrs[7])
 
 
 if __name__ == "__main__":

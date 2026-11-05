@@ -18,6 +18,7 @@ from modules.common.GlobalAttrs import *
 from modules.common.Utils import unzip, aee_extract, decompress_tne, get_report_history_online, get_package_white_list_online, get_monkey_blacklist_online, get_jira_project_online, post_report_history, sendMail, is_network_connected, extract_expdb, send_msg_by_feishu_robot, get_mixed_md5, walk_with_max_depth, get_str_similar, send_monkey_rlt_by_feishu_robot, get_freeze_version_from_feishu, get_top_app_list_from_feishu, get_tne_tag_info_from_feishu, random_str
 from modules.common.Version import VERSION
 from modules.dedup.aee_rule import find_first_match, is_singleton
+from modules.common.ToolCheck import REASON_MISSING, check_executables
 from modules.dedup import membership
 from modules.dedup.membership import AeeMembershipTrace
 PATTERN_MAIL = re.compile("[a-z0-9._%+-]+@[a-z0-9.-]+\\.[a-z]{2,4}")
@@ -326,8 +327,13 @@ class ScanBase(ABC):
             self._unzip = "unzip"
             TEST_LOGGER.info("Linux 系统，使用系统自带unzip")
             self._p_new_db = PathManager.tools_folder + os.sep + "expdb" + os.sep + "p-new-db"
-            if not os.path.isfile(self._p_new_db):
-                TEST_LOGGER.critical("p-new-db 文件不存在：{}".format(self._p_new_db))
+            # 自检：三个 Linux 二进制必须存在且可执行，否则不扫描（避免整份报表退化为 failed-dbg 兜底行）
+            tool_problems = check_executables([self._aee_extract, self._tne_decompress, self._p_new_db])
+            if tool_problems:
+                for tool_path, reason in tool_problems:
+                    TEST_LOGGER.critical("外部工具不可用（{}）：{}".format(
+                        "文件不存在" if reason == REASON_MISSING else "没有可执行权限，请检查文件模式应为 755", tool_path))
+                TEST_LOGGER.critical("外部工具自检失败，退出扫描，不生成报表")
                 sys.exit(EXIT_CODE_INVALID_ENV)
             TEST_LOGGER.info("p-new-db 路径：{}".format(self._p_new_db))
         else:
@@ -1749,31 +1755,25 @@ class ScanBase(ABC):
     def _is_serial_like(cls, name):
         return bool(name) and bool(cls._FAILED_DBG_SERIAL_PATTERN.match(name)) and not name.isdigit()
 
-    def _get_failed_dbg_device_root_and_id(self, dbg_file):
-        """从扫描根相对路径中证明串号目录。
+    _FAILED_DBG_EXP_DIR_NAMES = ("aee_exp", "vendor_aee_exp")
 
-        STP 布局：<scan_root>/<项目目录>/<串号>/...，取第二级；
-        旧布局：扫描根就是项目目录，<scan_root>/<串号>/...，取第一级。
-        两级都像串号或都不像时无法判断，返回 (None, None)，调用方输出 unknown_device_id。
-        不做任意位置的正则兜底，不把项目目录当作串号。
+    def _get_failed_dbg_device_root_and_id(self, dbg_file):
+        """串号取 dbg 路径中 aee_exp / vendor_aee_exp 目录的上一级目录，并做形态校验。
+
+        与扫描根布局无关（Owner 核对 78,014 行历史 MTK 数据均满足）。取不到或形态不符时
+        返回 (None, None)，调用方输出 unknown_device_id。不做任意位置的正则兜底。
         """
-        if not self._scan_root_dir:
-            return (None, None)
-        normalized_scan_root = self._scan_root_dir.replace("\\", "/").rstrip("/")
         normalized_dbg_file = dbg_file.replace("\\", "/")
-        if not normalized_scan_root or not normalized_dbg_file.startswith(normalized_scan_root + "/"):
-            return (None, None)
-        parts = [p for p in normalized_dbg_file[len(normalized_scan_root) + 1:].split("/") if p]
-        first_is_serial = len(parts) >= 2 and self._is_serial_like(parts[0])
-        second_is_serial = len(parts) >= 3 and self._is_serial_like(parts[1])
-        if second_is_serial and not first_is_serial:
-            serial_parts = parts[:2]
-        elif first_is_serial and not second_is_serial:
-            serial_parts = parts[:1]
-        else:
-            return (None, None)
-        device_root = os.path.abspath(os.path.join(self._scan_root_dir, *serial_parts))
-        return (device_root, serial_parts[-1])
+        parts = normalized_dbg_file.split("/")
+        # 取离 dbg 文件最近的 aee_exp / vendor_aee_exp（不含文件名本身）
+        for index in range(len(parts) - 2, 0, -1):
+            if parts[index] in self._FAILED_DBG_EXP_DIR_NAMES:
+                serial = parts[index - 1]
+                if not self._is_serial_like(serial):
+                    return (None, None)
+                device_root = os.path.abspath(os.path.normpath("/".join(parts[:index])) or "/")
+                return (device_root, serial)
+        return (None, None)
 
     def _get_failed_dbg_build_version_and_device_id(self, dbg_file):
         device_root, device_id = self._get_failed_dbg_device_root_and_id(dbg_file)

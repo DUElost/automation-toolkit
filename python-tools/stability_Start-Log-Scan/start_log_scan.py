@@ -404,6 +404,9 @@ if __name__ == "__main__":
     start_time = datetime.datetime.now()
     try:
         scanner.start_scan()
+    except SystemExit:
+        # 环境自检失败（EXIT_CODE_INVALID_ENV 等）必须以非 0 退出，不能被下面的兜底吞掉
+        raise
     except:
         crash_msg = traceback.format_exc()
         TEST_LOGGER.critical("解析过程发生异常崩溃：\n{}".format(crash_msg))
