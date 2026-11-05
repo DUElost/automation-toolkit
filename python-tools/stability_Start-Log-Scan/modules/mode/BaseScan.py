@@ -1742,30 +1742,52 @@ class ScanBase(ABC):
                 return True
         return False
 
+    # 串号目录名形态：6–32 位字母数字，不含 _ - .，且不是纯数字（排除时间戳目录）
+    _FAILED_DBG_SERIAL_PATTERN = re.compile(r"^[A-Za-z0-9]{6,32}$")
+
+    @classmethod
+    def _is_serial_like(cls, name):
+        return bool(name) and bool(cls._FAILED_DBG_SERIAL_PATTERN.match(name)) and not name.isdigit()
+
     def _get_failed_dbg_device_root_and_id(self, dbg_file):
+        """从扫描根相对路径中证明串号目录。
+
+        STP 布局：<scan_root>/<项目目录>/<串号>/...，取第二级；
+        旧布局：扫描根就是项目目录，<scan_root>/<串号>/...，取第一级。
+        两级都像串号或都不像时无法判断，返回 (None, None)，调用方输出 unknown_device_id。
+        不做任意位置的正则兜底，不把项目目录当作串号。
+        """
+        if not self._scan_root_dir:
+            return (None, None)
         normalized_scan_root = self._scan_root_dir.replace("\\", "/").rstrip("/")
         normalized_dbg_file = dbg_file.replace("\\", "/")
-        if normalized_scan_root and normalized_dbg_file.startswith(normalized_scan_root + "/"):
-            relative_path = normalized_dbg_file[len(normalized_scan_root) + 1:]
-            path_parts = relative_path.split("/", 1)
-            if path_parts and path_parts[0]:
-                device_id = path_parts[0]
-                return (os.path.join(self._scan_root_dir, device_id), device_id)
-        regex_rlt = re.search("/([A-Za-z0-9]{10,})/", normalized_dbg_file)
-        if regex_rlt:
-            device_id = regex_rlt.group(1)
-            return (os.path.join(self._scan_root_dir, device_id), device_id)
-        return (None, None)
+        if not normalized_scan_root or not normalized_dbg_file.startswith(normalized_scan_root + "/"):
+            return (None, None)
+        parts = [p for p in normalized_dbg_file[len(normalized_scan_root) + 1:].split("/") if p]
+        first_is_serial = len(parts) >= 2 and self._is_serial_like(parts[0])
+        second_is_serial = len(parts) >= 3 and self._is_serial_like(parts[1])
+        if second_is_serial and not first_is_serial:
+            serial_parts = parts[:2]
+        elif first_is_serial and not second_is_serial:
+            serial_parts = parts[:1]
+        else:
+            return (None, None)
+        device_root = os.path.abspath(os.path.join(self._scan_root_dir, *serial_parts))
+        return (device_root, serial_parts[-1])
 
     def _get_failed_dbg_build_version_and_device_id(self, dbg_file):
         device_root, device_id = self._get_failed_dbg_device_root_and_id(dbg_file)
+        # 已证明：以串号目录为缓存键；未证明：以 dbg 文件为键。项目目录不作缓存键。
         cache_key = device_root if device_root else dbg_file
         cache_rlt = self._failed_dbg_info_cache.get(cache_key)
         if cache_rlt:
             return cache_rlt
         build_version = self._build_version if self._build_version else "VersionNone"
-        fallback_device_id = device_id if device_id else "unknown_device_id"
-        if device_root and os.path.isdir(device_root):
+        if not device_root:
+            self._failed_dbg_info_cache[cache_key] = (build_version, "unknown_device_id")
+            return self._failed_dbg_info_cache[cache_key]
+        result_device_id = device_id
+        if os.path.isdir(device_root):
             for root, dirs, files in os.walk(device_root):
                 if "SYS_PROPERTIES" in files:
                     sys_properties_path = os.path.join(root, "SYS_PROPERTIES")
@@ -1773,12 +1795,14 @@ class ScanBase(ABC):
                         sys_properties = SysProperties(sys_properties_path)
                         if sys_properties.build_version:
                             build_version = sys_properties.build_version
-                        if sys_properties.device_id:
-                            fallback_device_id = sys_properties.device_id
+                        if sys_properties.device_id and sys_properties.device_id != device_id:
+                            TEST_LOGGER.warn("SYS_PROPERTIES 串号 {} 与路径串号 {} 不一致，DeviceId 记为 discard_device_id：{}".format(
+                                sys_properties.device_id, device_id, sys_properties_path))
+                            result_device_id = "discard_device_id"
                         break
                     except:
                         TEST_LOGGER.warn("读取 SYS_PROPERTIES 文件失败：{}\n{}".format(sys_properties_path, traceback.format_exc()))
-        self._failed_dbg_info_cache[cache_key] = (build_version, fallback_device_id)
+        self._failed_dbg_info_cache[cache_key] = (build_version, result_device_id)
         return self._failed_dbg_info_cache[cache_key]
 
     def _build_extract_failed_aee_result(self, dbg_file):

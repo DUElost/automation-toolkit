@@ -1,6 +1,6 @@
 # 日志扫描工具 (Log Scan Tool)
 
-版本：V2.1.0（反编译修复版；版本历史见 `modules/common/Version.py`）
+版本：V2.1.1（反编译修复版；版本历史见 `modules/common/Version.py`）
 
 ## 简介
 
@@ -181,6 +181,14 @@ python start_log_scan.py -match_issues req.json -o result.json
 - `python release/make_release.py --tag start-log-scan/vX.Y.Z --out <dist>` 导出到 `<dist>/X.Y.Z/` 并写 `release.json`（commit、文件 sha256）；
 - 已发布版本不可原地修改；规则语义变化必须提升 `aee_rule.RULE_VERSION`；
 - `tests/test_aee_dedup_golden.py` 保证去重输出与基线逐字节一致，改动规则时需同时更新基线并说明原因。
+
+### 解压失败 dbg 的设备号（V2.1.1 起）
+
+解压失败的 dbg 会生成兜底行，其 DeviceId 与 Detail 中的 `Device_id:` 按以下规则取值：
+
+- 只认扫描根相对路径中的串号目录。STP 布局 `<扫描根>/<项目目录>/<串号>/...` 取第二级；扫描根就是项目目录时取第一级。
+- 串号目录须匹配 `^[A-Za-z0-9]{6,32}$` 且不是纯数字。两级都像串号或都不像时，无法判断，记为 `unknown_device_id`，此时不读任何 `SYS_PROPERTIES`。
+- `SYS_PROPERTIES` 只在该串号目录内查找。其中 `ro.serialno` 与路径串号不一致时，记为 `discard_device_id`；`ro.build.display.id` 照常使用。
 
 ## 支持的异常类型
 

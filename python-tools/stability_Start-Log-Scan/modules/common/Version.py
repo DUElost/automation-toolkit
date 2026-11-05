@@ -58,5 +58,7 @@ VERSION = "V2.0.10_20261027"
 VERSION = "V2.0.11_20261028"
 # V2.1.0：成员关系 sidecar（stp.scan_membership 1.0）、-match_issues、恢复 -merge_files_list；发布日期以打 tag 时为准
 VERSION = "V2.1.0_20261104"
+# V2.1.1：failed-dbg 兜底结果的设备号只取扫描根下已证明的串号目录（STP 布局 <项目目录>/<串号>）
+VERSION = "V2.1.1_20261105"
 
 # okay decompiling extracted_pyz_modules\modules\common\Version.pyc
