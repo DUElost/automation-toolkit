@@ -126,8 +126,8 @@ python ".\init_tinno_project.py" `
 ```
 
 `MLD-NX2`、`MLD-NX3` 是 Monkey 版本前缀，标题产品名是 `P535AA`，Jira 关键字是 `PFDFAA`。
-`MLD-NX3Carrier` 单独对应 `PAANX`（`P535AA-NX3-Carrier`），标题产品名仍是 `P535AA`。
-已登记的前缀按最长匹配，`MLD-NX3` 不会覆盖 `MLD-NX3Carrier`。
+`MLD-NX3Carrier`、`MLD-NX3-Claro` 单独对应 `PAANX`（`P535AA-NX3-Carrier`），标题产品名仍是 `P535AA`。
+已登记的前缀按最长匹配，`MLD-NX3` 不会覆盖 `MLD-NX3Carrier` / `MLD-NX3-Claro`。
 未登记的版本仍按板型段（如 `LX2`、`NX2`）取前缀。
 
 工作区里会生成 `config/affect_project_mapping.json`、`config/summary_product_mapping.json`
@@ -175,6 +175,16 @@ python ".\create_tinno_jira_batch_from_excel.py" `
   --dry-run
 ```
 
+临时豁免回归 PASS 的版本前缀隔离（仍按构建日期比较；不影响 OPEN_LIKE 命中）：
+
+```powershell
+python ".\create_tinno_jira_batch_from_excel.py" `
+  --add-excel-file ".\result\JIRA_Upload_List_Tinno_xxx.xlsx" `
+  --dry-run `
+  --ignore-version-prefix-for-regression
+```
+
+
 备注说明：
 
 - `--add-comments`
@@ -183,7 +193,7 @@ python ".\create_tinno_jira_batch_from_excel.py" `
   - 新建问题单成功后，会把 Excel 中 `PS` 列追加为评论
 - labels 字段（新建问题时）
   - labels = 该行测试专项标签 + 型号标签 + 固定标签 `稳定性测试`，重复值自动去重
-  - 出现版本前缀 `MLD-NX2`、`MLD-NX3`、`MLD-NX3Carrier` 追加 `NX2`、`NX3`、`NX3Carrier`；`MLD-LX1`、`MLD-LX2`、`MLD-LX3`、`ELA-LX2`、`ELA-LX3` 追加 `LX1`、`LX2`、`LX3`。`MLD-NX3` 不会覆盖 `MLD-NX3Carrier`。标题产品名 `V552AA`、`V551A` 不加型号标签
+  - 出现版本前缀 `MLD-NX2`、`MLD-NX3`、`MLD-NX3Carrier`、`MLD-NX3-Claro` 追加 `NX2`、`NX3`、`NX3Carrier`、`NX3Claro`；`MLD-LX1`、`MLD-LX2`、`MLD-LX3`、`ELA-LX2`、`ELA-LX3` 追加 `LX1`、`LX2`、`LX3`。`MLD-NX3` 不会覆盖 `MLD-NX3Carrier` / `MLD-NX3-Claro`。标题产品名 `V552AA`、`V551A` 不加型号标签
   - 专项标签按上传模板 `Test Case` 列经 `test_case_label_mapping` 解析（如 `MTBF专项`→`MTBF`、`Monkey专项`→`MonkeyAEE`）；无 `Test Case` 列时回退取 Summary 版本号后的专项 token；仍解析不到才使用配置 `labels` 的静态值
   - 固定标签可在配置 `fixed_labels` 中调整（默认 `["稳定性测试"]`）
   - 修复历史问题：此前 labels 始终取配置 `labels` 静态值，所有单均为 `MonkeyAEE`，未跟随对应专项
@@ -246,6 +256,26 @@ python ".\retro_patch_tinno_labels.py" `
 - 已知限制：Tinno Jira 的 Closed 状态编辑屏幕不含 labels 字段，真实更新会返回 400；
   可用 `--exclude-status Closed` 跳过，或请管理员放开屏幕后重跑
 
+从评论补写 Duplicate 主单链接（孤儿重复单）
+
+resolution 已是 Duplicate/重复*，但 issuelinks / `customfield_14207` 都没有主单时，按评论里的
+**显式主单句式**自动补链，而不是把分析里随口提到的单号当主单：
+
+- 命中才自动写：`跟随主单…` / `主单是…` / `跟随 https://…/browse/KEY` / `重复问题：KEY` /
+  `同KEY`（如「同PFDFAA-1776单子」） / `同步跟踪KEY …进展`
+- 不自动写：仅「与 KEY 同类」这类普通提及（如 1779 评论里的 1780）
+
+```powershell
+# 预览（默认不写 Jira）
+python ".\retro_patch_tinno_duplicate_links.py" --filter-id 20261
+
+# 真实写入（仅显式主单句式唯一命中）
+python ".\retro_patch_tinno_duplicate_links.py" --filter-id 20261 --apply
+```
+
+- `--issue-key` 可指定单号；`--jql` 可自定义范围
+- 审计输出：`result/retro_patch_tinno_duplicate_links_audit_*.json`
+
 
 5、输出物说明
 
@@ -294,7 +324,7 @@ python ".\retro_patch_tinno_labels.py" `
 版本前缀在 `init_tinno_project.py` 写入 `affect_project_mapping.json`。
 Jira 项目本身已经隔开 535 / 552 / 551，提交、命中历史单和回归只再区分该项目里登记过的型号前缀。
 
-- `MLD-NX2`、`MLD-NX3` 同属 PFDFAA，彼此不命中、不回归；`MLD-NX3Carrier` 单独在 PAANX
+- `MLD-NX2`、`MLD-NX3` 同属 PFDFAA，彼此不命中、不回归；`MLD-NX3Carrier`、`MLD-NX3-Claro` 单独在 PAANX
 - `MLD-LX2`、`MLD-LX3` 同属 VFFCA，彼此不命中、不回归
 - `ELA-LX2`、`ELA-LX3` 同属 VFFBA，标题产品名是 `V551A`，版本串仍保留 `ELA-LX2`、`ELA-LX3`
 - 同一前缀内仍按构建日期和 V 号比较新旧

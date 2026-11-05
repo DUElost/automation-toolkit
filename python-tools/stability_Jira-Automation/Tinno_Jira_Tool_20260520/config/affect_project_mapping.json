@@ -38,5 +38,9 @@
   "MLD-NX3Carrier": {
     "jira_project": "PAANX",
     "monkey_project": "PAANX"
+  },
+  "MLD-NX3-Claro": {
+    "jira_project": "PAANX",
+    "monkey_project": "PAANX"
   }
 }

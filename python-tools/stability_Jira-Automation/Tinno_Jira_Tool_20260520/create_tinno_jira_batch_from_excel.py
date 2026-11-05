@@ -145,6 +145,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--test-mode", action="store_true", help="VCAME 测试模式：优先读取本地测试 Cookie，并可基于默认 Monkey 报告自动生成上传模板")
     parser.add_argument("--create-only", action="store_true", help="仅新建问题单并同步本地项目数据库，不做回归匹配与验证")
     parser.add_argument("--disable-regression", action="store_true", help="关闭最小回归匹配与 PASS 验证")
+    parser.add_argument(
+        "--ignore-version-prefix-for-regression",
+        dest="ignore_version_prefix_for_regression",
+        action="store_true",
+        help="临时豁免回归 PASS 的版本前缀隔离：跨前缀仍按构建日期比较；不影响 OPEN_LIKE 命中隔离",
+    )
     parser.add_argument("--jira-username", dest="jira_username", default=os.getenv("JIRA_USERNAME"), help="Jira 用户名（Cookie 失效时用于回退登录）")
     parser.add_argument("--jira-password", dest="jira_password", default=os.getenv("JIRA_PASSWORD"), help="Jira 密码（Cookie 失效时用于回退登录）")
     parser.add_argument("--jira-server", dest="jira_server", default=None, help="Jira 服务地址")
@@ -1915,13 +1921,21 @@ def process_regression_pass_candidates(
             batch_versions.append(str(current_version))
         batch_prefixes = {match_version_prefix(item, prefixes) for item in batch_versions}
         batch_prefixes.discard("")
-        if history_prefix and history_prefix not in batch_prefixes:
+        ignore_prefix = bool(getattr(args, "ignore_version_prefix_for_regression", False))
+        if history_prefix and history_prefix not in batch_prefixes and not ignore_prefix:
             logger.info(
                 "回归验证候选 %s: action=REGRESSION_PASS_SKIP reason=VERSION_PREFIX_NOT_IN_BATCH prefix=%s",
                 jira_key,
                 history_prefix,
             )
             continue
+        if history_prefix and history_prefix not in batch_prefixes and ignore_prefix:
+            logger.info(
+                "回归验证候选 %s: 豁免前缀隔离 prefix=%s batch_prefixes=%s",
+                jira_key,
+                history_prefix,
+                sorted(batch_prefixes),
+            )
         if current_version_candidates:
             matched = _match_current_version_by_board(
                 history_row.get("build_version"),
@@ -1929,7 +1943,7 @@ def process_regression_pass_candidates(
                 fallback=current_version,
                 version_prefixes=prefixes,
             )
-            if history_prefix and not matched:
+            if history_prefix and not matched and not ignore_prefix:
                 logger.info(
                     "回归验证候选 %s: action=REGRESSION_PASS_SKIP reason=VERSION_PREFIX_NOT_IN_BATCH prefix=%s",
                     jira_key,
@@ -1951,6 +1965,7 @@ def process_regression_pass_candidates(
             build_version=history_row.get("build_version"),
             project_key=project_key,
             strict_version_project_keys=strict_version_project_keys,
+            ignore_version_prefix=ignore_prefix,
         )
         reason = pass_decision.reason or "回归PASS判定"
         logger.info("回归验证候选 %s: action=%s reason=%s", jira_key, pass_decision.action, reason)

@@ -206,6 +206,22 @@ class TinnoJiraClientAdapter:
     def update_issue(self, issue_key: str, fields: Dict[str, Any]) -> Dict[str, Any]:
         return self._client.update_issue(issue_key, fields)
 
+    def get_issue_link_types(self) -> List[Dict[str, Any]]:
+        return self._client.get_issue_link_types()
+
+    def create_issue_link(
+        self,
+        *,
+        link_type_name: str,
+        inward_issue_key: str,
+        outward_issue_key: str,
+    ) -> Dict[str, Any]:
+        return self._client.create_issue_link(
+            link_type_name=link_type_name,
+            inward_issue_key=inward_issue_key,
+            outward_issue_key=outward_issue_key,
+        )
+
     def issue(self, issue_key: str) -> TinnoIssue:
         return TinnoIssue(self.get_issue(issue_key))
 
@@ -883,6 +899,7 @@ MODEL_LABELS = {
     "MLD-NX2": "NX2",
     "MLD-NX3": "NX3",
     "MLD-NX3Carrier": "NX3Carrier",
+    "MLD-NX3-Claro": "NX3Claro",
     "MLD-LX1": "LX1",
     "MLD-LX2": "LX2",
     "MLD-LX3": "LX3",

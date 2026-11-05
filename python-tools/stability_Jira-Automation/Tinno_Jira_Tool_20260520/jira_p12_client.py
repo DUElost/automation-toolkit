@@ -171,6 +171,27 @@ class JiraP12Client:
     def get_project_versions(self, project_key: str) -> List[Dict[str, Any]]:
         return self._make_request("GET", f"/rest/api/2/project/{project_key}/versions")
 
+    def get_issue_link_types(self) -> List[Dict[str, Any]]:
+        payload = self._make_request("GET", "/rest/api/2/issueLinkType")
+        if isinstance(payload, dict):
+            return list(payload.get("issueLinkTypes") or [])
+        return []
+
+    def create_issue_link(
+        self,
+        *,
+        link_type_name: str,
+        inward_issue_key: str,
+        outward_issue_key: str,
+    ) -> Dict[str, Any]:
+        """创建问题链接。Duplicate 常见语义：outward duplicates inward（outward=重复单，inward=主单）。"""
+        payload = {
+            "type": {"name": str(link_type_name or "").strip()},
+            "inwardIssue": {"key": str(inward_issue_key or "").strip()},
+            "outwardIssue": {"key": str(outward_issue_key or "").strip()},
+        }
+        return self._make_request("POST", "/rest/api/2/issueLink", json=payload)
+
     # ------------------------------------------------------------------
     def close(self) -> None:
         if self.session:

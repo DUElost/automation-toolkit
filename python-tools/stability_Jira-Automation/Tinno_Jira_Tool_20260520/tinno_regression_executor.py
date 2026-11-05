@@ -363,6 +363,7 @@ def evaluate_regression_pass(
     build_version: Any = None,
     project_key: Any = None,
     strict_version_project_keys: Any = None,
+    ignore_version_prefix: bool = False,
 ) -> RegressionPassDecision:
     current_version_text = _normalize_text(current_version)
     comparison_fix_version = _select_fix_version_for_comparison(fix_version)
@@ -416,8 +417,14 @@ def evaluate_regression_pass(
                     comment_required=False,
                     reason="FIX_VERSION_NOT_AFTER_BUILD_VERSION",
                 )
-            # current_version vs build_version (both Monkey): require matching LX board.
-            if _compare_mld_versions(current_version_text, normalized_build_version) < 0:
+            # current_version vs build_version (both Monkey): require matching LX board,
+            # unless temporarily ignoring version-prefix isolation (date-only compare).
+            compare_current_vs_build = (
+                _compare_versions_by_date
+                if ignore_version_prefix
+                else _compare_mld_versions
+            )
+            if compare_current_vs_build(current_version_text, normalized_build_version) < 0:
                 return RegressionPassDecision(
                     action="REGRESSION_PASS_SKIP",
                     record_pass=False,
