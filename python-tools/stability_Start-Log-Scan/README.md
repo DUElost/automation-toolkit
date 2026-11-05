@@ -1,6 +1,6 @@
 # 日志扫描工具 (Log Scan Tool)
 
-版本：V2.1.0（反编译修复版；版本历史见 `modules/common/Version.py`）
+版本：V2.1.1（反编译修复版；版本历史见 `modules/common/Version.py`）
 
 ## 简介
 
@@ -181,6 +181,18 @@ python start_log_scan.py -match_issues req.json -o result.json
 - `python release/make_release.py --tag start-log-scan/vX.Y.Z --out <dist>` 导出到 `<dist>/X.Y.Z/` 并写 `release.json`（commit、文件 sha256）；
 - 已发布版本不可原地修改；规则语义变化必须提升 `aee_rule.RULE_VERSION`；
 - `tests/test_aee_dedup_golden.py` 保证去重输出与基线逐字节一致，改动规则时需同时更新基线并说明原因。
+
+### 解压失败 dbg 的设备号（V2.1.1 起）
+
+解压失败的 dbg 会生成兜底行，其 DeviceId 与 Detail 中的 `Device_id:` 按以下规则取值：
+
+- 串号取 dbg 路径中 `aee_exp` 或 `vendor_aee_exp` 目录的上一级目录（取离 dbg 最近的一个），与扫描根布局无关。Owner 于 2026-11-05 核对 78,014 行历史 MTK 数据，均满足这条规则。
+- 该目录名须匹配 `^[A-Za-z0-9]{6,32}$`，且同时含字母和数字（排除时间戳目录与 `mtklog` 这类纯字母目录）。路径中没有 `aee_exp` / `vendor_aee_exp`，或上一级形态不符时，记为 `unknown_device_id`，此时不读任何 `SYS_PROPERTIES`。不再从路径任意位置用正则兜底取值。
+- `SYS_PROPERTIES` 只在该串号目录内查找。其中 `ro.serialno` 与路径串号不一致时，记为 `discard_device_id`；`ro.build.display.id` 照常使用。
+
+### 外部工具自检（V2.1.1 起）
+
+Linux 上扫描开始前只检查文件存在且可执行（不以退出码判断；`aee_extract` 退出码 255 是常态，成败以 `.DEC` 是否生成为准）：`tools/aee_extract/aee_extract`、`tools/decompress/linux/tne_decompress`、`tools/expdb/p-new-db`。任一不满足时，以非 0 退出（`EXIT_CODE_INVALID_ENV`），不生成报表，也不进入 failed-dbg 兜底。这三个文件在 git 中的模式为 `100755`；`release.json` 的 `files_mode` / `executables` 记录模式，导出时按模式设置权限。
 
 ## 支持的异常类型
 

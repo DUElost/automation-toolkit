@@ -10,7 +10,8 @@
 - tag 版本与 modules/common/Version.py 的 VERSION 一致（V2.1.0_YYYYMMDD ↔ v2.1.0）；
 - 输出目录不存在（已发布版本不可原地修改）。
 
-release.json 字段：tool、version、tag、git_commit、git_dirty、built_at、files_sha256。
+release.json 字段：tool、version、tag、git_commit、git_dirty、built_at、files_sha256、
+files_mode（git 文件模式）、executables（模式为 100755 的文件）。导出文件按 git 模式设置权限。
 运行时由 modules/dedup/membership.py 读取，写入 sidecar 的 meta.tool。
 """
 import argparse
@@ -72,9 +73,16 @@ def main():
         fail("{} 已存在；已发布版本不可原地修改".format(dest))
 
     rel_prefix = git("rev-parse", "--show-prefix")
-    listed = subprocess.check_output(["git", "-C", TOOL_DIR, "ls-files", "-z", "--full-name", "--", "."])
-    files = [f[len(rel_prefix):] for f in listed.decode("utf-8").split("\0") if f.startswith(rel_prefix)]
-    files = [f for f in files if f and not f.startswith("tests/")]
+    # ls-files -s：<mode> <blob> <stage>\t<path>；记录 git 文件模式，导出时还原可执行位
+    listed = subprocess.check_output(["git", "-C", TOOL_DIR, "ls-files", "-s", "-z", "--full-name", "--", "."])
+    file_modes = {}
+    for entry in listed.decode("utf-8").split("\0"):
+        if not entry:
+            continue
+        meta, path = entry.split("\t", 1)
+        if path.startswith(rel_prefix):
+            file_modes[path[len(rel_prefix):]] = meta.split(" ")[0]
+    files = [f for f in file_modes if f and not f.startswith("tests/")]
     final_dest = dest
     dest = final_dest + ".partial"
     if os.path.exists(dest):
@@ -87,6 +95,7 @@ def main():
         os.makedirs(os.path.dirname(target), exist_ok=True)
         with open(target, "wb") as f:
             f.write(data)
+        os.chmod(target, 0o755 if file_modes[rel] == "100755" else 0o644)
         hashes[rel] = hashlib.sha256(data).hexdigest()
 
     release = {
@@ -98,6 +107,9 @@ def main():
         "git_dirty": False,
         "built_at": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
         "files_sha256": hashes,
+        # git 文件模式（100644 / 100755），部署方据此校验可执行位
+        "files_mode": {rel: file_modes[rel] for rel in sorted(files)},
+        "executables": sorted(rel for rel in files if file_modes[rel] == "100755"),
     }
     with open(os.path.join(dest, "release.json"), "w", encoding="utf-8") as f:
         json.dump(release, f, ensure_ascii=False, indent=1, sort_keys=True)

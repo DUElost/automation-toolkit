@@ -18,6 +18,7 @@ from modules.common.GlobalAttrs import *
 from modules.common.Utils import unzip, aee_extract, decompress_tne, get_report_history_online, get_package_white_list_online, get_monkey_blacklist_online, get_jira_project_online, post_report_history, sendMail, is_network_connected, extract_expdb, send_msg_by_feishu_robot, get_mixed_md5, walk_with_max_depth, get_str_similar, send_monkey_rlt_by_feishu_robot, get_freeze_version_from_feishu, get_top_app_list_from_feishu, get_tne_tag_info_from_feishu, random_str
 from modules.common.Version import VERSION
 from modules.dedup.aee_rule import find_first_match, is_singleton
+from modules.common.ToolCheck import REASON_MISSING, check_executables
 from modules.dedup import membership
 from modules.dedup.membership import AeeMembershipTrace
 PATTERN_MAIL = re.compile("[a-z0-9._%+-]+@[a-z0-9.-]+\\.[a-z]{2,4}")
@@ -326,8 +327,13 @@ class ScanBase(ABC):
             self._unzip = "unzip"
             TEST_LOGGER.info("Linux 系统，使用系统自带unzip")
             self._p_new_db = PathManager.tools_folder + os.sep + "expdb" + os.sep + "p-new-db"
-            if not os.path.isfile(self._p_new_db):
-                TEST_LOGGER.critical("p-new-db 文件不存在：{}".format(self._p_new_db))
+            # 自检：三个 Linux 二进制必须存在且可执行，否则不扫描（避免整份报表退化为 failed-dbg 兜底行）
+            tool_problems = check_executables([self._aee_extract, self._tne_decompress, self._p_new_db])
+            if tool_problems:
+                for tool_path, reason in tool_problems:
+                    TEST_LOGGER.critical("外部工具不可用（{}）：{}".format(
+                        "文件不存在" if reason == REASON_MISSING else "没有可执行权限，请检查文件模式应为 755", tool_path))
+                TEST_LOGGER.critical("外部工具自检失败，退出扫描，不生成报表")
                 sys.exit(EXIT_CODE_INVALID_ENV)
             TEST_LOGGER.info("p-new-db 路径：{}".format(self._p_new_db))
         else:
@@ -1742,30 +1748,49 @@ class ScanBase(ABC):
                 return True
         return False
 
+    # 串号目录名形态：6–32 位字母数字，不含 _ - .，且同时含字母和数字
+    # （排除纯数字的时间戳目录，以及 mtklog、aeelog 这类纯字母目录）
+    _FAILED_DBG_SERIAL_PATTERN = re.compile(r"^[A-Za-z0-9]{6,32}$")
+
+    @classmethod
+    def _is_serial_like(cls, name):
+        if not name or not cls._FAILED_DBG_SERIAL_PATTERN.match(name):
+            return False
+        return any(c.isalpha() for c in name) and any(c.isdigit() for c in name)
+
+    _FAILED_DBG_EXP_DIR_NAMES = ("aee_exp", "vendor_aee_exp")
+
     def _get_failed_dbg_device_root_and_id(self, dbg_file):
-        normalized_scan_root = self._scan_root_dir.replace("\\", "/").rstrip("/")
+        """串号取 dbg 路径中 aee_exp / vendor_aee_exp 目录的上一级目录，并做形态校验。
+
+        与扫描根布局无关（Owner 核对 78,014 行历史 MTK 数据均满足）。取不到或形态不符时
+        返回 (None, None)，调用方输出 unknown_device_id。不做任意位置的正则兜底。
+        """
         normalized_dbg_file = dbg_file.replace("\\", "/")
-        if normalized_scan_root and normalized_dbg_file.startswith(normalized_scan_root + "/"):
-            relative_path = normalized_dbg_file[len(normalized_scan_root) + 1:]
-            path_parts = relative_path.split("/", 1)
-            if path_parts and path_parts[0]:
-                device_id = path_parts[0]
-                return (os.path.join(self._scan_root_dir, device_id), device_id)
-        regex_rlt = re.search("/([A-Za-z0-9]{10,})/", normalized_dbg_file)
-        if regex_rlt:
-            device_id = regex_rlt.group(1)
-            return (os.path.join(self._scan_root_dir, device_id), device_id)
+        parts = normalized_dbg_file.split("/")
+        # 取离 dbg 文件最近的 aee_exp / vendor_aee_exp（不含文件名本身）
+        for index in range(len(parts) - 2, 0, -1):
+            if parts[index] in self._FAILED_DBG_EXP_DIR_NAMES:
+                serial = parts[index - 1]
+                if not self._is_serial_like(serial):
+                    return (None, None)
+                device_root = os.path.abspath(os.path.normpath("/".join(parts[:index])) or "/")
+                return (device_root, serial)
         return (None, None)
 
     def _get_failed_dbg_build_version_and_device_id(self, dbg_file):
         device_root, device_id = self._get_failed_dbg_device_root_and_id(dbg_file)
+        # 已证明：以串号目录为缓存键；未证明：以 dbg 文件为键。项目目录不作缓存键。
         cache_key = device_root if device_root else dbg_file
         cache_rlt = self._failed_dbg_info_cache.get(cache_key)
         if cache_rlt:
             return cache_rlt
         build_version = self._build_version if self._build_version else "VersionNone"
-        fallback_device_id = device_id if device_id else "unknown_device_id"
-        if device_root and os.path.isdir(device_root):
+        if not device_root:
+            self._failed_dbg_info_cache[cache_key] = (build_version, "unknown_device_id")
+            return self._failed_dbg_info_cache[cache_key]
+        result_device_id = device_id
+        if os.path.isdir(device_root):
             for root, dirs, files in os.walk(device_root):
                 if "SYS_PROPERTIES" in files:
                     sys_properties_path = os.path.join(root, "SYS_PROPERTIES")
@@ -1773,12 +1798,14 @@ class ScanBase(ABC):
                         sys_properties = SysProperties(sys_properties_path)
                         if sys_properties.build_version:
                             build_version = sys_properties.build_version
-                        if sys_properties.device_id:
-                            fallback_device_id = sys_properties.device_id
+                        if sys_properties.device_id and sys_properties.device_id != device_id:
+                            TEST_LOGGER.warn("SYS_PROPERTIES 串号 {} 与路径串号 {} 不一致，DeviceId 记为 discard_device_id：{}".format(
+                                sys_properties.device_id, device_id, sys_properties_path))
+                            result_device_id = "discard_device_id"
                         break
                     except:
                         TEST_LOGGER.warn("读取 SYS_PROPERTIES 文件失败：{}\n{}".format(sys_properties_path, traceback.format_exc()))
-        self._failed_dbg_info_cache[cache_key] = (build_version, fallback_device_id)
+        self._failed_dbg_info_cache[cache_key] = (build_version, result_device_id)
         return self._failed_dbg_info_cache[cache_key]
 
     def _build_extract_failed_aee_result(self, dbg_file):
