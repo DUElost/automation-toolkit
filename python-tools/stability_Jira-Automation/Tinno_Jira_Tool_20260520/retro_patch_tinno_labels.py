@@ -29,6 +29,10 @@ retro_patch_tinno_labels.py
 
     # 完全自定义 JQL
     python "retro_patch_tinno_labels.py" --jql "project = VCAME AND reporter in (dai.lv)" ...
+
+    # 仅追加指定 label（Open + S 等级示例）
+    python "retro_patch_tinno_labels.py" --project PFDFAA --project PAANX ^
+        --status Open --bug-severity S --include-non-auto --append-label 封板必解 --dry-run
 """
 
 from __future__ import annotations
@@ -69,7 +73,13 @@ RESULT_DIR = CURRENT_DIR / "result"
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="批量给 Tinno 历史问题单补打/修正 labels")
-    parser.add_argument("--project", dest="project", default=None, help="Jira 项目 Key（默认取配置 project_key）")
+    parser.add_argument(
+        "--project",
+        dest="projects",
+        action="append",
+        default=[],
+        help="Jira 项目 Key，可重复；默认取配置 project_key",
+    )
     parser.add_argument("--jql", dest="jql", default=None, help="完整自定义 JQL，优先于 --project 等过滤条件")
     parser.add_argument(
         "--issue-key", dest="issue_keys", action="append", default=[],
@@ -82,12 +92,25 @@ def parse_args() -> argparse.Namespace:
         help='排除状态，如 --exclude-status Closed（Tinno Jira 的 Closed 编辑屏通常不含 labels），可重复传参',
     )
     parser.add_argument(
+        "--bug-severity",
+        dest="bug_severity",
+        default=None,
+        help='限定问题等级，如 S；写入 JQL cf[10120] = "S"（Tinno customfield_10120）',
+    )
+    parser.add_argument(
         "--specialty-token", dest="specialty_token", default=None,
         help="限定 Summary 含指定专项 token，如 MTBF（JQL 过滤）",
     )
     parser.add_argument(
         "--include-non-auto", action="store_true",
         help="处理非 [自动化] 标题的单（默认只处理 Summary 含 [自动化] 的单）",
+    )
+    parser.add_argument(
+        "--append-label",
+        dest="append_labels",
+        action="append",
+        default=[],
+        help="仅追加指定 label（可重复），不改专项/固定标签逻辑；已存在则跳过",
     )
     parser.add_argument(
         "--no-cleanup-legacy", action="store_true",
@@ -137,7 +160,22 @@ def build_search_jql(args: argparse.Namespace, defaults: Dict[str, Any]) -> str:
     """组装检索 JQL；复用回归导出的 JQL 构造器，保证 Summary 关键词的转义一致。"""
     if str(args.jql or "").strip():
         return str(args.jql).strip()
-    project_key = str(args.project or defaults.get("project_key", "VCAME")).strip()
+    projects = [
+        str(item or "").strip()
+        for item in (getattr(args, "projects", None) or [])
+        if str(item or "").strip()
+    ]
+    # 兼容旧属性名 project（单值）
+    legacy_project = str(getattr(args, "project", "") or "").strip()
+    if legacy_project and legacy_project not in projects:
+        projects.append(legacy_project)
+    if not projects:
+        projects = [str(defaults.get("project_key", "VCAME")).strip() or "VCAME"]
+    if len(projects) == 1:
+        project_clause = f"project = {projects[0]}"
+    else:
+        project_clause = "project in ({0})".format(", ".join(projects))
+
     extra_clauses: List[str] = []
     if str(args.reporter or "").strip():
         extra_clauses.append(f"reporter in ({str(args.reporter).strip()})")
@@ -147,7 +185,18 @@ def build_search_jql(args: argparse.Namespace, defaults: Dict[str, Any]) -> str:
         name = str(excluded or "").strip().replace('"', "")
         if name:
             extra_clauses.append(f'status != "{name}"')
-    base_jql = build_regression_base_jql(project_key, " AND ".join(extra_clauses))
+    severity = str(getattr(args, "bug_severity", None) or "").strip().replace('"', "")
+    if severity:
+        # Tinno 问题等级字段 ID：customfield_10120；JQL 名称 "Bug Severity" 在此实例不可用。
+        extra_clauses.append(f'cf[10120] = "{severity}"')
+
+    # build_regression_base_jql 只接受单项目；多项目时自行拼接同等语义子句。
+    if len(projects) == 1:
+        base_jql = build_regression_base_jql(projects[0], " AND ".join(extra_clauses))
+    else:
+        clauses = [project_clause]
+        clauses.extend(extra_clauses)
+        base_jql = " AND ".join(item for item in clauses if item)
 
     keywords: List[str] = []
     if not args.include_non_auto:
@@ -160,6 +209,49 @@ def build_search_jql(args: argparse.Namespace, defaults: Dict[str, Any]) -> str:
     for keyword in keywords:
         base_jql = build_regression_export_jql(base_jql, [keyword])
     return base_jql
+
+
+def plan_append_labels(
+    issue_key: str,
+    summary: Any,
+    current_labels: Optional[List[Any]],
+    labels_to_append: List[str],
+) -> Dict[str, Any]:
+    """仅追加指定 labels，不触碰专项/固定标签逻辑。"""
+    normalized_current = _normalize_label_list(current_labels)
+    current_set = {token.casefold() for token in normalized_current}
+    target = list(normalized_current)
+    added: List[str] = []
+    for raw in labels_to_append or []:
+        token = str(raw or "").strip()
+        if not token:
+            continue
+        if token.casefold() in current_set:
+            continue
+        target.append(token)
+        added.append(token)
+        current_set.add(token.casefold())
+    if not added:
+        return {
+            "issue_key": issue_key,
+            "summary": str(summary or ""),
+            "specialty": "",
+            "old_labels": normalized_current,
+            "new_labels": normalized_current,
+            "added": [],
+            "removed": [],
+            "action": "NO_CHANGE",
+        }
+    return {
+        "issue_key": issue_key,
+        "summary": str(summary or ""),
+        "specialty": "",
+        "old_labels": normalized_current,
+        "new_labels": target,
+        "added": added,
+        "removed": [],
+        "action": "ADD_LABELS",
+    }
 
 
 def plan_issue_labels(
@@ -353,17 +445,29 @@ def main() -> int:
             return 0
         logger.info("共读取 %d 个问题单", len(records))
 
+        append_labels = _normalize_label_list(list(getattr(args, "append_labels", None) or []))
         cleanup_legacy = not bool(args.no_cleanup_legacy)
-        plans = [
-            plan_issue_labels(
-                record["issue_key"],
-                record["summary"],
-                record["labels"],
-                defaults,
-                cleanup_legacy=cleanup_legacy,
-            )
-            for record in records
-        ]
+        if append_labels:
+            plans = [
+                plan_append_labels(
+                    record["issue_key"],
+                    record["summary"],
+                    record["labels"],
+                    append_labels,
+                )
+                for record in records
+            ]
+        else:
+            plans = [
+                plan_issue_labels(
+                    record["issue_key"],
+                    record["summary"],
+                    record["labels"],
+                    defaults,
+                    cleanup_legacy=cleanup_legacy,
+                )
+                for record in records
+            ]
         for plan in plans:
             if plan["action"] == "NO_CHANGE":
                 logger.info("%s: labels 已满足要求，跳过 %s", plan["issue_key"], plan["old_labels"])

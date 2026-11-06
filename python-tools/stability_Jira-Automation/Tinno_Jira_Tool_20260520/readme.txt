@@ -250,11 +250,26 @@ python ".\retro_patch_tinno_labels.py" `
 ```
 
 - `--issue-key VCAME-123`（可重复）只处理指定单；`--jql` 可完全自定义范围
-- `--reporter` / `--status` / `--specialty-token MTBF` 用于缩小 JQL 范围；默认只处理 Summary 含 `[自动化]` 的单，`--include-non-auto` 可放开
+- `--project` 可重复（如 `--project PFDFAA --project PAANX`）；`--reporter` / `--status` /
+  `--bug-severity S` / `--specialty-token MTBF` 用于缩小 JQL 范围
+- 默认只处理 Summary 含 `[自动化]` 的单，`--include-non-auto` 可放开
+- `--append-label 封板必解`：仅追加指定标签，不改专项/固定标签逻辑；可重复传参
 - `--no-cleanup-legacy` 改为纯追加（保留旧的 MonkeyAEE，只补专项与稳定性测试）
 - 已是目标 labels 的单自动跳过（NO_CHANGE），可重复执行；明细写 `result/retro_patch_tinno_labels_audit_*.json`
 - 已知限制：Tinno Jira 的 Closed 状态编辑屏幕不含 labels 字段，真实更新会返回 400；
   可用 `--exclude-status Closed` 跳过，或请管理员放开屏幕后重跑
+
+给 Open 状态的 S 等级单追加「封板必解」（示例，先 dry-run）：
+
+```powershell
+python ".\retro_patch_tinno_labels.py" `
+  --project PFDFAA --project PAANX `
+  --status Open `
+  --bug-severity S `
+  --include-non-auto `
+  --append-label 封板必解 `
+  --dry-run
+```
 
 从评论补写 Duplicate 主单链接（孤儿重复单）
 

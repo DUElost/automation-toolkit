@@ -12,6 +12,7 @@ from retro_patch_tinno_labels import (
     build_search_jql,
     collect_issue_records,
     execute_label_patch,
+    plan_append_labels,
     plan_issue_labels,
 )
 
@@ -122,18 +123,37 @@ class RetroPatchTinnoLabelsTest(unittest.TestCase):
 
     # ---------- build_search_jql ----------
 
+    def test_plan_append_labels_only_adds_missing(self) -> None:
+        plan = plan_append_labels(
+            "PFDFAA-1",
+            "any",
+            ["MonkeyAEE", "稳定性测试"],
+            ["封板必解", "MonkeyAEE"],
+        )
+        self.assertEqual("ADD_LABELS", plan["action"])
+        self.assertEqual(["MonkeyAEE", "稳定性测试", "封板必解"], plan["new_labels"])
+        self.assertEqual(["封板必解"], plan["added"])
+
+        no_change = plan_append_labels(
+            "PFDFAA-2",
+            "any",
+            ["封板必解", "MonkeyAEE"],
+            ["封板必解"],
+        )
+        self.assertEqual("NO_CHANGE", no_change["action"])
+
     def test_build_search_jql_defaults_to_automation_only(self) -> None:
         args = SimpleNamespace(
-            jql=None, project="VCAME", reporter=None, status=None,
-            specialty_token=None, include_non_auto=False,
+            jql=None, projects=["VCAME"], project=None, reporter=None, status=None,
+            specialty_token=None, include_non_auto=False, exclude_status=[], bug_severity=None,
         )
         jql = build_search_jql(args, self.defaults)
         self.assertEqual('project = VCAME AND (summary ~ "\\\\[自动化\\\\]")', jql)
 
     def test_build_search_jql_supports_filters_and_override(self) -> None:
         base_args = dict(
-            jql=None, project=None, reporter="dai.lv", status="Open",
-            specialty_token="MTBF", include_non_auto=True, exclude_status=[],
+            jql=None, projects=[], project=None, reporter="dai.lv", status="Open",
+            specialty_token="MTBF", include_non_auto=True, exclude_status=[], bug_severity=None,
         )
         jql = build_search_jql(SimpleNamespace(**base_args), self.defaults)
         self.assertEqual(
@@ -142,22 +162,33 @@ class RetroPatchTinnoLabelsTest(unittest.TestCase):
         )
 
         exclude_args = dict(
-            jql=None, project="VFFCA", reporter=None, status=None,
-            specialty_token=None, include_non_auto=False, exclude_status=["Closed"],
+            jql=None, projects=["VFFCA"], project=None, reporter=None, status=None,
+            specialty_token=None, include_non_auto=False, exclude_status=["Closed"], bug_severity=None,
         )
         jql = build_search_jql(SimpleNamespace(**exclude_args), self.defaults)
         self.assertIn('status != "Closed"', jql)
 
         both_args = dict(
-            jql=None, project="VFFCA", reporter=None, status=None,
-            specialty_token="MTBF", include_non_auto=False, exclude_status=[],
+            jql=None, projects=["VFFCA"], project=None, reporter=None, status=None,
+            specialty_token="MTBF", include_non_auto=False, exclude_status=[], bug_severity=None,
         )
         jql = build_search_jql(SimpleNamespace(**both_args), self.defaults)
         self.assertIn("自动化", jql)
         self.assertIn("MTBF", jql)
         self.assertEqual(2, jql.count(" AND (summary ~ "), jql)
 
-        jql = build_search_jql(SimpleNamespace(jql='project = X', project=None, reporter=None, status=None, specialty_token=None, include_non_auto=False, exclude_status=[]), self.defaults)
+        multi_args = dict(
+            jql=None, projects=["PFDFAA", "PAANX"], project=None, reporter=None,
+            status="Open", specialty_token=None, include_non_auto=True,
+            exclude_status=[], bug_severity="S",
+        )
+        jql = build_search_jql(SimpleNamespace(**multi_args), self.defaults)
+        self.assertEqual(
+            'project in (PFDFAA, PAANX) AND status = "Open" AND cf[10120] = "S"',
+            jql,
+        )
+
+        jql = build_search_jql(SimpleNamespace(jql='project = X', projects=[], project=None, reporter=None, status=None, specialty_token=None, include_non_auto=False, exclude_status=[], bug_severity=None), self.defaults)
         self.assertEqual('project = X', jql)
 
     # ---------- collect_issue_records ----------
@@ -168,7 +199,7 @@ class RetroPatchTinnoLabelsTest(unittest.TestCase):
                 "VCAME-1": {"key": "VCAME-1", "fields": {"summary": _monkey_summary(), "labels": ["MonkeyAEE"]}},
             }
         )
-        args = SimpleNamespace(issue_keys=["VCAME-1"], jql=None, project=None, reporter=None, status=None, specialty_token=None, include_non_auto=False, max_issues=500)
+        args = SimpleNamespace(issue_keys=["VCAME-1"], jql=None, projects=[], project=None, reporter=None, status=None, specialty_token=None, include_non_auto=False, max_issues=500, exclude_status=[], bug_severity=None)
         records = collect_issue_records(client, args, self.defaults)
         self.assertEqual(1, len(records))
         self.assertEqual("VCAME-1", records[0]["issue_key"])
@@ -180,7 +211,7 @@ class RetroPatchTinnoLabelsTest(unittest.TestCase):
                 SimpleNamespace(key="VCAME-2", fields=SimpleNamespace(summary=_mtbf_summary(), labels=["MonkeyAEE"])),
             ]
         )
-        args = SimpleNamespace(issue_keys=[], jql=None, project="VCAME", reporter=None, status=None, specialty_token=None, include_non_auto=False, max_issues=10)
+        args = SimpleNamespace(issue_keys=[], jql=None, projects=["VCAME"], project=None, reporter=None, status=None, specialty_token=None, include_non_auto=False, max_issues=10, exclude_status=[], bug_severity=None)
         records = collect_issue_records(client, args, self.defaults)
         self.assertEqual(1, len(records))
         self.assertTrue(client.last_jql.startswith("project = VCAME AND "))
