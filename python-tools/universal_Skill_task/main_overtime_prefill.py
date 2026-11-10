@@ -159,13 +159,16 @@ def _run_single_account(
                     page,
                     account.username,
                     allow_submit=options.allow_submit,
+                    account_id=account.account_id,
                 )
                 result.overtime_meal = meal_result
                 print(
                     f"[OK] [{account.account_id}] 加班餐 done "
                     f"processed={[p.date for p in meal_result.processed]} "
-                    f"not_monday={meal_result.skipped_not_monday} "
-                    f"no_eligible={meal_result.skipped_no_eligible}",
+                    f"outside_window={meal_result.skipped_outside_window} "
+                    f"already_done={meal_result.skipped_already_done} "
+                    f"no_eligible={meal_result.skipped_no_eligible} "
+                    f"catchup={meal_result.is_catchup}",
                     flush=True,
                 )
             else:

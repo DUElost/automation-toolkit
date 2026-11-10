@@ -204,14 +204,18 @@ def _format_overtime_meal_text(item: AccountRunResult) -> str:
         return "🍱 加班餐：\n- 无数据"
 
     lines = ["🍱 加班餐："]
-    if meal.skipped_not_monday:
-        lines.append("⏭️ 非周一，已跳过")
+    if meal.skipped_outside_window or meal.skipped_not_monday:
+        lines.append("⏭️ 非周一至周四窗口，已跳过")
+        return "\n".join(lines)
+    if meal.skipped_already_done:
+        lines.append("✅ 本周已预订，已跳过")
         return "\n".join(lines)
     if meal.skipped_no_eligible:
-        lines.append("📭 本周无符合条件的就餐日期，已跳过")
+        lines.append("📭 本周无剩余可订就餐日期，已跳过")
         return "\n".join(lines)
     if meal.processed:
-        lines.append("✅ 本轮已完成：")
+        prefix = "✅ 兜底补订完成：" if meal.is_catchup else "✅ 本轮已完成："
+        lines.append(prefix)
         for row in meal.processed:
             lines.append(f"  {_fmt_md_date(row.date)}")
     else:

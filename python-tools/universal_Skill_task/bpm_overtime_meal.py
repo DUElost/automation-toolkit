@@ -1,19 +1,23 @@
 # -*- coding: utf-8 -*-
-"""BPM 工作日加班餐申请：仅周一触发，一次可多选就餐日期。"""
+"""BPM 工作日加班餐申请：周一主跑，周二–周四未成功可补；只订 >= today。"""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import date
+from pathlib import Path
 from typing import List, Optional, Sequence
 
 from playwright.sync_api import Page
 
 from bpm_timesheet import open_portal
+from meal_state import has_meal_success, mark_meal_success
 from workday_calendar import overtime_meal_dates_for_week
 
 FLOW_ID = 1550
 FLOW_NAME = "加班餐预订流程"
+# Mon=0 .. Thu=3；周五及以后不再补订本周。
+MEAL_BOOKING_WEEKDAYS = (0, 1, 2, 3)
 
 
 class OvertimeMealError(RuntimeError):
@@ -28,16 +32,43 @@ class OvertimeMealProcessedItem:
 @dataclass
 class OvertimeMealRunResult:
     processed: List[OvertimeMealProcessedItem] = field(default_factory=list)
-    skipped_not_monday: bool = False
+    skipped_not_monday: bool = False  # legacy alias of skipped_outside_window
+    skipped_outside_window: bool = False
+    skipped_already_done: bool = False
     skipped_no_eligible: bool = False
+    is_catchup: bool = False
     step_skipped: bool = False
     error_message: Optional[str] = None
 
 
-def should_run_overtime_meal(today: Optional[date] = None) -> bool:
-    """Only Mondays trigger the overtime-meal step."""
+def is_overtime_meal_window(today: Optional[date] = None) -> bool:
+    """True on Mon–Thu (primary Monday + Tue–Thu catch-up window)."""
     day = today or date.today()
-    return day.weekday() == 0
+    return day.weekday() in MEAL_BOOKING_WEEKDAYS
+
+
+def meal_dates_to_book(today: Optional[date] = None) -> List[date]:
+    """Eligible meal dates for this week that are on or after today."""
+    day = today or date.today()
+    return [d for d in overtime_meal_dates_for_week(day) if d >= day]
+
+
+def should_run_overtime_meal(
+    today: Optional[date] = None,
+    *,
+    account_id: Optional[str] = None,
+    state_dir: Optional[Path] = None,
+) -> bool:
+    """Run when inside Mon–Thu window and this account has no week success marker.
+
+    Without account_id, only the weekday window is checked (unit-test helper).
+    """
+    day = today or date.today()
+    if not is_overtime_meal_window(day):
+        return False
+    if account_id is None:
+        return True
+    return not has_meal_success(account_id, day, state_dir=state_dir)
 
 
 def open_overtime_meal_form(page: Page) -> None:
@@ -424,32 +455,51 @@ def process_overtime_meal(
     *,
     allow_submit: bool,
     today: Optional[date] = None,
+    account_id: Optional[str] = None,
+    state_dir: Optional[Path] = None,
 ) -> OvertimeMealRunResult:
-    """Run Monday overtime-meal booking for the current week.
+    """Book overtime meals for remaining eligible dates this week.
 
-    Empty eligible-date list → skip. Without --ALLOW, fill only and stop.
+    Mon primary; Tue–Thu catch-up if no week success marker.
+    Dates strictly filtered to >= today. Without --ALLOW, fill only and stop
+    (does not write success marker).
     """
     result = OvertimeMealRunResult()
     anchor = today or date.today()
-    if not should_run_overtime_meal(anchor):
+    result.is_catchup = anchor.weekday() in (1, 2, 3)
+
+    if not is_overtime_meal_window(anchor):
         print(
-            f"[INFO] 加班餐 skip: today={anchor.isoformat()} is not Monday",
+            f"[INFO] 加班餐 skip: today={anchor.isoformat()} outside Mon–Thu window",
             flush=True,
         )
+        result.skipped_outside_window = True
         result.skipped_not_monday = True
         return result
 
-    days = overtime_meal_dates_for_week(anchor)
+    aid = (account_id or "").strip()
+    if aid and has_meal_success(aid, anchor, state_dir=state_dir):
+        print(
+            f"[INFO] 加班餐 skip: account={aid!r} already booked week of "
+            f"{anchor.isoformat()}",
+            flush=True,
+        )
+        result.skipped_already_done = True
+        return result
+
+    days = meal_dates_to_book(anchor)
     if not days:
         print(
-            f"[INFO] 加班餐 skip: no eligible meal dates in week of {anchor.isoformat()}",
+            f"[INFO] 加班餐 skip: no remaining eligible meal dates "
+            f"(>= {anchor.isoformat()}) this week",
             flush=True,
         )
         result.skipped_no_eligible = True
         return result
 
+    mode = "catchup" if result.is_catchup else "primary"
     print(
-        f"[INFO] 加班餐 eligible={ [d.isoformat() for d in days] } "
+        f"[INFO] 加班餐 mode={mode} eligible={[d.isoformat() for d in days]} "
         f"booker={booker_email!r} allow_submit={allow_submit}",
         flush=True,
     )
@@ -466,4 +516,12 @@ def process_overtime_meal(
     submit_overtime_meal(page)
     result.processed = [OvertimeMealProcessedItem(date=d) for d in selected]
     print(f"[OK] 加班餐 submitted dates={selected}", flush=True)
+    if aid:
+        marker = mark_meal_success(
+            aid,
+            anchor,
+            selected,
+            state_dir=state_dir,
+        )
+        print(f"[OK] 加班餐 week marker written {marker}", flush=True)
     return result

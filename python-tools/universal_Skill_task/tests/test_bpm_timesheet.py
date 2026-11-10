@@ -149,8 +149,28 @@ def test_overtime_meal_excludes_friday_and_holiday_monday():
     ]
 
 
-def test_should_run_overtime_meal_monday_only():
-    from bpm_overtime_meal import should_run_overtime_meal
+def test_should_run_overtime_meal_mon_thu_window():
+    from bpm_overtime_meal import (
+        is_overtime_meal_window,
+        meal_dates_to_book,
+        should_run_overtime_meal,
+    )
 
-    assert should_run_overtime_meal(date(2026, 9, 21)) is True
-    assert should_run_overtime_meal(date(2026, 9, 22)) is False
+    # Without account_id: window only (Mon–Thu).
+    assert should_run_overtime_meal(date(2026, 9, 21)) is True  # Mon
+    assert should_run_overtime_meal(date(2026, 9, 22)) is True  # Tue catch-up
+    assert should_run_overtime_meal(date(2026, 9, 25)) is False  # Fri
+    assert is_overtime_meal_window(date(2026, 9, 24)) is True  # Thu
+    assert is_overtime_meal_window(date(2026, 9, 26)) is False  # Sat
+
+    # Catch-up books only >= today within the week.
+    assert meal_dates_to_book(date(2026, 9, 21)) == [
+        date(2026, 9, 21),
+        date(2026, 9, 22),
+        date(2026, 9, 23),
+        date(2026, 9, 24),
+    ]
+    assert meal_dates_to_book(date(2026, 9, 23)) == [
+        date(2026, 9, 23),
+        date(2026, 9, 24),
+    ]
