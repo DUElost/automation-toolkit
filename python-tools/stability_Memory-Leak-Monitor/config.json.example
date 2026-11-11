@@ -1,0 +1,34 @@
+{
+    "_comment": "内存泄漏监测配置样例。复制为 config.json 后按现场填写；真实凭据只落 agent 主机，勿提交（见 mount_sonic_tinno.template.sh）",
+
+    "targets": {
+        "_note": "四路监控对象。堆占比分母：system_server 用 dalvik.vm.heapsize，其余应用用 dalvik.vm.heapgrowthlimit",
+        "system_server": { "meminfo_name": "system", "proc_name": "system_server", "prop": "dalvik.vm.heapsize" },
+        "com.android.launcher3": { "prop": "dalvik.vm.heapgrowthlimit" },
+        "com.android.systemui": { "prop": "dalvik.vm.heapgrowthlimit" },
+        "com.android.settings": { "prop": "dalvik.vm.heapgrowthlimit" }
+    },
+
+    "thresholds": {
+        "heap_levels": [[1, 0.85], [2, 0.95]],
+        "level_reset_ratio": 0.35,
+        "rss_dump_threshold_kb": 1000000,
+        "fast_poll_ratio": 0.75,
+        "app_early_signal_min_ratio": 0.60,
+        "fast_poll_interval_seconds": 30,
+        "cooldown_seconds": { "system_server": 7200, "app": 1800 }
+    },
+
+    "storage": {
+        "main_log_root_dir": "/home/android/sonic_agent/logs/ftp_log/sonic_tinno/",
+        "local_hprof_staging": "/home/android/memleak_local",
+        "mirror_min_free_gb": 20,
+        "local_min_free_gb": 10
+    },
+
+    "load": {
+        "_note": "压力由平台专项（Monkey 长跑）提供，本工具默认只观测不施压",
+        "monkey_enabled_env": "MEMLEAK_MONKEY",
+        "monkey_default_enabled": false
+    }
+}

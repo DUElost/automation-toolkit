@@ -13,6 +13,7 @@ automation-toolkit/
 │   ├── stability_Start-Log-Scan/         # 稳定性日志扫描分析
 │   ├── stability_PlayStore-Update-Extract/ # Play 商店更新提取
 │   ├── stability_FTPserver-Check/        # FTP 服务器日志检查
+│   ├── stability_Memory-Leak-Monitor/    # 内存泄漏监测（system_server/launcher3/systemui/settings）
 │   ├── stability_Reboot-Sleep-Reset/     # 重启/睡眠/重置稳定性测试
 │   ├── system_MemoryFusion/              # 内存融合工具
 │   ├── universal_Automation-Create-Task/  # ITMS 批量创建测试任务
@@ -50,6 +51,7 @@ automation-toolkit/
 | [stability_Start-Log-Scan](python-tools/stability_Start-Log-Scan/) | 稳定性日志扫描分析 |
 | [stability_PlayStore-Update-Extract](python-tools/stability_PlayStore-Update-Extract/) | Google Play 应用更新提取 |
 | [stability_FTPserver-Check](python-tools/stability_FTPserver-Check/) | FTP 日志检查 |
+| [stability_Memory-Leak-Monitor](python-tools/stability_Memory-Leak-Monitor/) | Android 主机侧内存泄漏监测：按堆占比 85%/95% 分档在崩溃前抓 hprof，四路目标，只观测不施压 |
 | [stability_Reboot-Sleep-Reset](python-tools/stability_Reboot-Sleep-Reset/) | 重启/睡眠/重置测试 |
 | [system_MemoryFusion](python-tools/system_MemoryFusion/) | 内存融合工具 |
 | [universal_Automation-Create-Task](python-tools/universal_Automation-Create-Task/) | ITMS 批量创建测试任务 |
