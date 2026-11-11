@@ -98,6 +98,7 @@ graph TD
 | [python-tools/universal_Factory-Reset](../python-tools/universal_Factory-Reset/) | Python | 通用恢复出厂设置工具 | 活跃 |
 | [python-tools/stability_Start-Log-Scan](../python-tools/stability_Start-Log-Scan/) | Python | 稳定性测试日志扫描分析工具（AEE/TNE/KE） | 活跃 |
 | [python-tools/stability_FTPserver-Check](../python-tools/stability_FTPserver-Check/) | Python | FTP 服务器日志检查与未解析 dbg 报告工具 | 活跃 |
+| [python-tools/stability_Memory-Leak-Monitor](../python-tools/stability_Memory-Leak-Monitor/) | Python | Android agent 主机侧内存泄漏监测（system_server/launcher3/systemui/settings，堆占比 85%/95% 分档、崩溃前抓 hprof） | 活跃 |
 | [python-tools/universal_Automation-Create-Task](../python-tools/universal_Automation-Create-Task/) | Python | ITMS 自动化批量创建测试任务工具 | 活跃 |
 | [python-tools/stability_Jira-Automation](../python-tools/stability_Jira-Automation/CLAUDE.md) | Python | 稳定性测试 Jira 批量提单（Transsion / Tinno / Moto 三套工具） | 活跃 |
 | [shared/python-utils](../shared/python-utils/CLAUDE.md) | Python | 共享 Python 工具库 | 初始 |
