@@ -351,6 +351,103 @@ class TinnoRegressionEntryTest(unittest.TestCase):
 
         self.assertEqual(["VCAME-101"], duplicate_keys)
 
+    def test_resolve_duplicate_follow_fix_version_skips_cross_project(self) -> None:
+        same = self.module.resolve_duplicate_follow_fix_version(
+            "PFDFAA-1773",
+            "PFDFAA-1115",
+            "P535AA_EVT_16.0_NX3_USER_261031V72",
+        )
+        cross = self.module.resolve_duplicate_follow_fix_version(
+            "PFDFAA-1773",
+            "PAANX-358",
+            "P535AA_EVT_16.0_NX3_USER_261031V72",
+        )
+        self.assertEqual("P535AA_EVT_16.0_NX3_USER_261031V72", same)
+        self.assertIsNone(cross)
+
+    def test_validate_project_matches_versions_uses_affect_project_mapping(self) -> None:
+        mapping = {
+            "MLD-NX3": {"jira_project": "PFDFAA", "monkey_project": "PFDFAA"},
+            "MLD-NX3-Claro": {"jira_project": "PAANX", "monkey_project": "PAANX"},
+        }
+        self.assertEqual(
+            [],
+            self.module.validate_project_matches_versions(
+                "PFDFAA",
+                ["MLD-NX3-16-261104V80"],
+                mapping,
+            ),
+        )
+        errors = self.module.validate_project_matches_versions(
+            "PAANX",
+            ["MLD-NX3-16-261104V80"],
+            mapping,
+        )
+        self.assertEqual(1, len(errors))
+        self.assertIn("PAANX", errors[0])
+        self.assertIn("MLD-NX3", errors[0])
+        self.assertIn("PFDFAA", errors[0])
+
+    def test_close_duplicate_issues_following_main_skips_non_allowed_reporter(self) -> None:
+        class _Name:
+            def __init__(self, name: str) -> None:
+                self.name = name
+
+        class _Fields:
+            def __init__(self, status: str, resolution: str, reporter: str) -> None:
+                self.status = _Name(status)
+                self.resolution = _Name(resolution) if resolution else None
+                self.reporter = _Name(reporter)
+
+        class _Issue:
+            def __init__(self, status: str, resolution: str, reporter: str) -> None:
+                self.fields = _Fields(status, resolution, reporter)
+
+        class _Jira:
+            def __init__(self) -> None:
+                self.comments: list[tuple[str, str]] = []
+                self.closed: list[str] = []
+
+            def issue(self, key: str) -> _Issue:
+                return _Issue("Resolved", "重复问题", "other.user")
+
+        jira = _Jira()
+        results: list[dict] = []
+        summary_rows: list[dict] = []
+
+        with mock.patch.object(
+            self.module,
+            "collect_duplicate_issue_keys",
+            return_value=["PAANX-999"],
+        ), mock.patch.object(
+            self.module,
+            "add_issue_comment",
+            side_effect=lambda *_args, **_kwargs: jira.comments.append((_args[1], _args[2])),
+        ), mock.patch.object(
+            self.module,
+            "transition_issue_to_closed",
+            side_effect=AssertionError("should not close non-allowed reporter"),
+        ):
+            self.module.close_duplicate_issues_following_main(
+                jira_client=jira,
+                store=mock.Mock(),
+                project_db=None,
+                run_id="20261112_000000",
+                main_row={
+                    "jira_key": "PFDFAA-881",
+                    "fix_version": "P535AA_EVT_16.0_NX3_USER_261028V58",
+                    "build_version": "MLD-NX3-16-261028V58",
+                },
+                closed_statuses=["Closed", "已关闭"],
+                results=results,
+                summary_rows=summary_rows,
+                allowed_reporters={"dai.lv"},
+            )
+
+        self.assertEqual([], jira.comments)
+        self.assertEqual([], results)
+        self.assertEqual([], summary_rows)
+
     def test_build_regression_row_supports_non_monkey_summary_token(self) -> None:
         row = pd.Series(
             {
@@ -492,8 +589,9 @@ class TinnoRegressionEntryTest(unittest.TestCase):
             with mock.patch.object(self.module, "RESULT_DIR", temp_path / "result"):
                 with mock.patch.object(self.module, "read_excel_smart", return_value=excel_df):
                     with mock.patch.object(self.module, "load_regression_rules", return_value=fake_rules):
-                        with mock.patch.object(self.module, "connect_to_jira", return_value=_FakeRegressionJira()):
-                            result = self.module.run_excel_mode(args)
+                        with mock.patch.object(self.module, "validate_project_matches_versions", return_value=[]):
+                            with mock.patch.object(self.module, "connect_to_jira", return_value=_FakeRegressionJira()):
+                                result = self.module.run_excel_mode(args)
 
             self.assertEqual(0, result)
 

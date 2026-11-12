@@ -1701,6 +1701,95 @@ def sync_regression_pass_to_project_history_db(
     )
 
 
+def _issue_project_key(issue_key: Any) -> str:
+    text = str(issue_key or "").strip().upper()
+    if "-" not in text:
+        return text
+    return text.split("-", 1)[0]
+
+
+def resolve_duplicate_follow_fix_version(main_key: Any, duplicate_key: Any, fix_version: Any) -> Optional[str]:
+    """跨项目跟随关单时不传主单 Fix Version，避免目标项目无该版本导致流转失败。"""
+    text = str(fix_version or "").strip()
+    if not text:
+        return None
+    if _issue_project_key(main_key) != _issue_project_key(duplicate_key):
+        return None
+    return text
+
+
+def _issue_reporter_name(issue: Any) -> str:
+    fields = getattr(issue, "fields", None)
+    reporter = getattr(fields, "reporter", None)
+    return str(getattr(reporter, "name", None) or reporter or "").strip()
+
+
+def normalize_allowed_reporters(*reporter_values: Any) -> set[str]:
+    allowed: set[str] = set()
+    for value in reporter_values:
+        text = str(value or "").strip()
+        if text:
+            allowed.add(text)
+    return allowed
+
+
+def resolve_mapped_jira_project_for_version(
+    version: str,
+    affect_project_mapping: Dict[str, Dict[str, str]] | None = None,
+) -> tuple[str, str]:
+    """按 affect_project_mapping 解析版本前缀对应的 Jira 项目。"""
+    mapping = (
+        affect_project_mapping
+        if affect_project_mapping is not None
+        else load_upload_affect_project_mapping(DEFAULT_AFFECT_PROJECT_MAPPING)
+    )
+    prefix = match_version_prefix(str(version or ""), list(mapping.keys()))
+    if not prefix:
+        return "", ""
+    item = mapping.get(prefix)
+    if not isinstance(item, dict):
+        upper = prefix.upper()
+        for key, value in mapping.items():
+            if str(key).strip().upper() == upper and isinstance(value, dict):
+                item = value
+                break
+        else:
+            item = {}
+    jira_project = str((item or {}).get("jira_project") or "").strip()
+    return prefix, jira_project
+
+
+def validate_project_matches_versions(
+    project_key: str,
+    versions: List[str],
+    affect_project_mapping: Dict[str, Dict[str, str]] | None = None,
+) -> List[str]:
+    """校验项目 Key 与版本前缀映射一致；未登记前缀不拦截。"""
+    project = str(project_key or "").strip()
+    if not project:
+        return ["项目 Key 不能为空"]
+    mapping = (
+        affect_project_mapping
+        if affect_project_mapping is not None
+        else load_upload_affect_project_mapping(DEFAULT_AFFECT_PROJECT_MAPPING)
+    )
+    errors: List[str] = []
+    seen: set[str] = set()
+    for raw_version in versions or []:
+        version = str(raw_version or "").strip()
+        if not version or version in seen:
+            continue
+        seen.add(version)
+        prefix, mapped_project = resolve_mapped_jira_project_for_version(version, mapping)
+        if not prefix or not mapped_project:
+            continue
+        if mapped_project.upper() != project.upper():
+            errors.append(
+                f"项目 {project} 与版本 {version} 的映射不一致：前缀 {prefix} → {mapped_project}"
+            )
+    return errors
+
+
 def close_duplicate_issues_following_main(
     *,
     jira_client: Any,
@@ -1711,14 +1800,22 @@ def close_duplicate_issues_following_main(
     closed_statuses: List[str],
     results: List[Dict[str, Any]],
     summary_rows: List[Dict[str, Any]],
+    allowed_reporters: set[str] | None = None,
 ) -> None:
     main_key = str(main_row.get("jira_key") or "").strip()
+    main_fix_version = str(main_row.get("fix_version") or "").strip()
     normalized_closed_statuses = {str(s).strip().lower() for s in closed_statuses if str(s).strip()}
+    allowed_reporter_set = {
+        str(item).strip() for item in (allowed_reporters or set()) if str(item).strip()
+    }
     for duplicate_key in collect_duplicate_issue_keys(main_row):
+        follow_fix_version = resolve_duplicate_follow_fix_version(
+            main_key, duplicate_key, main_fix_version
+        )
         duplicate_row = {
             "jira_key": duplicate_key,
             "summary": f"重复单跟随主单 {main_key}",
-            "fix_version": main_row.get("fix_version"),
+            "fix_version": follow_fix_version or "",
             "build_version": main_row.get("build_version"),
         }
         success = True
@@ -1729,18 +1826,41 @@ def close_duplicate_issues_following_main(
             current_status = str(getattr(getattr(fields, "status", None), "name", None) or "").strip()
             resolution_raw = getattr(fields, "resolution", None)
             current_resolution = str(getattr(resolution_raw, "name", None) or resolution_raw or "").strip()
+            duplicate_reporter = _issue_reporter_name(issue)
             if current_status.lower() in normalized_closed_statuses:
                 logger.info("重复单 %s 已是 %s 状态，无需重复关单", duplicate_key, current_status)
                 continue
             if current_resolution.lower() in {"完成", "done"}:
                 continue
+            if not allowed_reporter_set:
+                logger.warning(
+                    "重复单 %s 跟随主单 %s 跳过：未配置允许的 reporter，拒绝关单",
+                    duplicate_key,
+                    main_key,
+                )
+                continue
+            if duplicate_reporter not in allowed_reporter_set:
+                logger.info(
+                    "重复单 %s reporter=%s 不在允许列表 %s，跳过跟随关单",
+                    duplicate_key,
+                    duplicate_reporter or "(空)",
+                    sorted(allowed_reporter_set),
+                )
+                continue
+            if follow_fix_version is None and main_fix_version:
+                logger.info(
+                    "重复单 %s 与主单 %s 跨项目，跟随关单不写入主单 Fix Version=%s",
+                    duplicate_key,
+                    main_key,
+                    main_fix_version,
+                )
             add_issue_comment(jira_client, duplicate_key, DUPLICATE_FOLLOW_CLOSE_COMMENT)
             transitioned, transition_message = transition_issue_to_closed(
                 jira_client,
                 duplicate_key,
                 closed_statuses,
                 resolution_name="完成",
-                fix_version=str(main_row.get("fix_version") or "").strip() or None,
+                fix_version=follow_fix_version,
             )
             if not transitioned:
                 raise RuntimeError(transition_message)
@@ -1755,7 +1875,7 @@ def close_duplicate_issues_following_main(
                 verified_versions=[],
                 status="已关闭",
                 resolution="完成",
-                fix_version=str(main_row.get("fix_version") or ""),
+                fix_version=str(follow_fix_version or ""),
                 build_version=str(main_row.get("build_version") or ""),
             )
         except Exception as exc:
@@ -1823,6 +1943,7 @@ def process_closed_main_duplicate_followups(
     args: argparse.Namespace,
     results: List[Dict[str, Any]],
     summary_rows: List[Dict[str, Any]],
+    allowed_reporters: set[str] | None = None,
 ) -> None:
     if not is_duplicate_followups_enabled(regression_rules):
         return
@@ -1834,6 +1955,10 @@ def process_closed_main_duplicate_followups(
     normalized_closed_statuses = {str(item).strip().lower() for item in closed_statuses if str(item).strip()}
     if not normalized_closed_statuses:
         return
+    reporter_allow_list = normalize_allowed_reporters(
+        *(allowed_reporters or set()),
+        getattr(args, "history_reporter", None),
+    )
 
     # 1) Parent → Child: closed main issue (resolution≠Duplicate) → close its duplicate children
     for history_row in snapshot_rows:
@@ -1859,6 +1984,7 @@ def process_closed_main_duplicate_followups(
             closed_statuses=closed_statuses,
             results=results,
             summary_rows=summary_rows,
+            allowed_reporters=reporter_allow_list,
         )
 
 
@@ -1879,6 +2005,7 @@ def process_regression_pass_candidates(
     results: List[Dict[str, Any]],
     summary_rows: List[Dict[str, Any]],
     version_prefixes: list[str] | None = None,
+    allowed_reporters: set[str] | None = None,
 ) -> None:
     regression_config = getattr(regression_rules, "regression", None)
     status_rules = getattr(regression_rules, "status_rules", None)
@@ -1888,6 +2015,10 @@ def process_regression_pass_candidates(
     resolved_statuses = list(getattr(status_rules, "resolved_statuses", []) or [])
     resolved_fixed_resolutions = list(getattr(status_rules, "resolved_fixed_resolutions", []) or [])
     closed_statuses = list(getattr(status_rules, "closed_statuses", []) or [])
+    reporter_allow_list = normalize_allowed_reporters(
+        *(allowed_reporters or set()),
+        getattr(args, "history_reporter", None),
+    )
     pass_candidates = store.fetch_regression_pass_candidates(
         run_id,
         resolved_statuses,
@@ -2058,6 +2189,7 @@ def process_regression_pass_candidates(
                             closed_statuses=closed_statuses,
                             results=results,
                             summary_rows=summary_rows,
+                            allowed_reporters=reporter_allow_list,
                         )
                 store.record_regression_pass(
                     jira_key,
@@ -2484,6 +2616,16 @@ def run_excel_mode(args: argparse.Namespace) -> int:
             for v in regression_row.get("versions", [])
             if str(v).strip()
         ))
+        if not bool(getattr(args, "test_mode", False)):
+            mapping_errors = validate_project_matches_versions(
+                batch_project_key,
+                batch_current_version_candidates or ([batch_current_version] if batch_current_version else []),
+                load_upload_affect_project_mapping(DEFAULT_AFFECT_PROJECT_MAPPING),
+            )
+            if mapping_errors:
+                for message in mapping_errors:
+                    logger.error("%s", message)
+                return 1
         batch_specialties = collect_batch_specialties(df, defaults)
 
         run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -2773,6 +2915,11 @@ def run_excel_mode(args: argparse.Namespace) -> int:
                 args=args,
                 results=results,
                 summary_rows=summary_rows,
+                allowed_reporters=normalize_allowed_reporters(
+                    current_user,
+                    defaults.get("default_reporter"),
+                    getattr(args, "history_reporter", None),
+                ),
             )
             if is_duplicate_followups_enabled(regression_rules):
                 process_closed_main_duplicate_followups(
@@ -2786,6 +2933,11 @@ def run_excel_mode(args: argparse.Namespace) -> int:
                     args=args,
                     results=results,
                     summary_rows=summary_rows,
+                    allowed_reporters=normalize_allowed_reporters(
+                        current_user,
+                        defaults.get("default_reporter"),
+                        getattr(args, "history_reporter", None),
+                    ),
                 )
 
         return write_run_outputs(
@@ -2858,6 +3010,16 @@ def run_regression_verify_mode(args: argparse.Namespace) -> int:
         project_key = str(args.regression_project or "").strip()
         current_version = str(args.current_version or "").strip()
         history_reporter = str(args.history_reporter or "").strip()
+        if not bool(getattr(args, "test_mode", False)):
+            mapping_errors = validate_project_matches_versions(
+                project_key,
+                [current_version],
+                load_upload_affect_project_mapping(DEFAULT_AFFECT_PROJECT_MAPPING),
+            )
+            if mapping_errors:
+                for message in mapping_errors:
+                    logger.error("%s", message)
+                return 1
         project_history_sqlite_path_setting = str(
             getattr(getattr(regression_rules, "output", None), "sqlite_path", DEFAULT_PROJECT_HISTORY_SQLITE_PATH)
             or DEFAULT_PROJECT_HISTORY_SQLITE_PATH
@@ -2941,6 +3103,7 @@ def run_regression_verify_mode(args: argparse.Namespace) -> int:
             args=args,
             results=results,
             summary_rows=summary_rows,
+            allowed_reporters=normalize_allowed_reporters(history_reporter),
         )
         if is_duplicate_followups_enabled(regression_rules):
             process_closed_main_duplicate_followups(
@@ -2954,6 +3117,7 @@ def run_regression_verify_mode(args: argparse.Namespace) -> int:
                 args=args,
                 results=results,
                 summary_rows=summary_rows,
+                allowed_reporters=normalize_allowed_reporters(history_reporter),
             )
         return write_run_outputs(
             results=results,

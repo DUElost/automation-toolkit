@@ -208,6 +208,13 @@ python ".\create_tinno_jira_batch_from_excel.py" `
 - `--dry-run`
   - 只做字段组装、历史匹配、决策预演和审计输出
   - 不会真实创建 Jira，不会真实追加任何评论或备注
+- 跟随关单 reporter 限制
+  - 仅关闭 reporter 属于脚本指定范围的重复子单（Excel 模式：当前登录用户 / `default_reporter`；回归模式：`--history-reporter`）
+  - 别人的单即使被链成 Duplicate，也只跳过、不关单
+- 项目与版本映射校验
+  - 复用 `config/affect_project_mapping.json`：版本前缀对应的 `jira_project` 必须与当前项目 Key 一致
+  - 例如 `--regression-project PAANX` 配 `MLD-NX3-...`（映射到 PFDFAA）会直接报错退出
+  - 未登记前缀不拦截；`--test-mode` 跳过该校验
 
 第二阶段：指定项目做回归验证
 
@@ -330,6 +337,7 @@ python ".\retro_patch_tinno_duplicate_links.py" --filter-id 20261 --apply
   - 新建问题单后默认追加 `PS` 评论，可用 `--no-add-comments` 关闭
   - 严格版本项目按配置比较版本（见下）
   - duplicate 跟随关闭：主单关单后关闭其重复子单（resolution=Duplicate 的主单不触发）
+    - 跨项目重复子单允许跟随关单；不把主单 Fix Version 写入对方项目（避免版本不存在导致流转失败）
 - 尚待真实项目补证
   - `VFFCA` 已解决单真实回归验证
   - Tinno 各项目 fixVersions / 关单流转的项目化差异
