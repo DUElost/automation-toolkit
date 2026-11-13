@@ -71,5 +71,10 @@
   "output": {
     "sqlite_path": "result/tinno_regression_cache",
     "excel_summary_dir": "result"
+  },
+  "anr_hold": {
+    "enabled": true,
+    "min_submit_count": 6,
+    "exp_class_keywords": ["ANR"]
   }
 }

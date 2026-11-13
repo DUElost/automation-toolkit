@@ -233,11 +233,10 @@ class TinnoCreateOnlyEntryTest(unittest.TestCase):
                     with mock.patch.object(self.module, "connect_to_jira", return_value=fake_jira):
                         with mock.patch.object(self.module, "build_issue_fields", return_value={"summary": "created"}):
                             with mock.patch.object(self.module, "build_project_history_db_path", return_value=db_path):
-                                with mock.patch.object(self.module, "load_regression_rules", side_effect=AssertionError("create-only 不应加载回归规则")):
-                                    with mock.patch.object(self.module, "find_regression_match", side_effect=AssertionError("create-only 不应做历史匹配")):
-                                        with mock.patch.object(self.module, "decide_action", side_effect=AssertionError("create-only 不应走回归决策")):
-                                            with mock.patch.object(self.module, "process_regression_pass_candidates", side_effect=AssertionError("create-only 不应做回归 PASS")):
-                                                result = self.module.run_excel_mode(args)
+                                with mock.patch.object(self.module, "find_regression_match", side_effect=AssertionError("create-only 不应做历史匹配")):
+                                    with mock.patch.object(self.module, "decide_action", side_effect=AssertionError("create-only 不应走回归决策")):
+                                        with mock.patch.object(self.module, "process_regression_pass_candidates", side_effect=AssertionError("create-only 不应做回归 PASS")):
+                                            result = self.module.run_excel_mode(args)
 
             self.assertEqual(0, result)
             self.assertTrue(fake_jira.closed)

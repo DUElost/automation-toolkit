@@ -174,6 +174,21 @@ class DatabaseManager:
             execution_time_ms INTEGER,
             metadata TEXT
         );
+
+        -- ANR 本地留存：未达建单阈值的出现记录
+        CREATE TABLE IF NOT EXISTS anr_hold_records (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            affect_project TEXT,
+            environment TEXT,
+            exp_class TEXT,
+            caused_by TEXT,
+            version TEXT,
+            count INTEGER DEFAULT 1,
+            source_file TEXT,
+            row_number INTEGER,
+            occurrence_payload TEXT,
+            processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
         """
         
         try:
@@ -191,7 +206,9 @@ class DatabaseManager:
                 "CREATE INDEX IF NOT EXISTS idx_created_at ON jira_issues_main (created_at)",
                 "CREATE INDEX IF NOT EXISTS idx_pending_action ON pending_issues (action)",
                 "CREATE INDEX IF NOT EXISTS idx_pending_package ON pending_issues (package_name)",
-                "CREATE INDEX IF NOT EXISTS idx_pending_similarity ON pending_issues (similarity_score)"
+                "CREATE INDEX IF NOT EXISTS idx_pending_similarity ON pending_issues (similarity_score)",
+                "CREATE INDEX IF NOT EXISTS idx_anr_hold_exp_class ON anr_hold_records (exp_class)",
+                "CREATE INDEX IF NOT EXISTS idx_anr_hold_affect_project ON anr_hold_records (affect_project)",
             ]
             
             for sql in index_statements:
@@ -212,6 +229,23 @@ class DatabaseManager:
     
     def _ensure_columns(self):
         """确保新增列存在（向后兼容旧数据库）"""
+        self.execute(
+            """
+            CREATE TABLE IF NOT EXISTS anr_hold_records (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                affect_project TEXT,
+                environment TEXT,
+                exp_class TEXT,
+                caused_by TEXT,
+                version TEXT,
+                count INTEGER DEFAULT 1,
+                source_file TEXT,
+                row_number INTEGER,
+                occurrence_payload TEXT,
+                processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
         columns_to_ensure = [
             ("pending_issues", "module", "TEXT"),
             ("pending_issues", "affect_project", "TEXT"),
@@ -543,6 +577,62 @@ class DatabaseManager:
         
         logger.info(f"获取到 {len(issues)} 个待处理问题")
         return issues
+
+    def list_anr_hold_records(self) -> List[Dict[str, Any]]:
+        result = self.execute(
+            "SELECT * FROM anr_hold_records ORDER BY processed_at ASC, id ASC"
+        )
+        if not result:
+            return []
+        records = []
+        for row in result:
+            item = dict(row)
+            raw_payload = item.get("occurrence_payload")
+            if raw_payload:
+                try:
+                    item["occurrence_payload"] = json.loads(raw_payload)
+                except (json.JSONDecodeError, TypeError):
+                    pass
+            records.append(item)
+        return records
+
+    def insert_anr_hold_record(self, record: Dict[str, Any]) -> int:
+        payload = record.get("occurrence_payload")
+        if isinstance(payload, dict):
+            payload_text = json.dumps(payload, ensure_ascii=False)
+        else:
+            payload_text = str(payload or "")
+        lastrowid = self.execute(
+            """
+            INSERT INTO anr_hold_records (
+                affect_project, environment, exp_class, caused_by, version,
+                count, source_file, row_number, occurrence_payload, processed_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                str(record.get("affect_project") or ""),
+                str(record.get("environment") or ""),
+                str(record.get("exp_class") or ""),
+                str(record.get("caused_by") or ""),
+                str(record.get("version") or ""),
+                int(record.get("count") or 1),
+                str(record.get("source_file") or ""),
+                record.get("row_number"),
+                payload_text,
+                str(record.get("processed_at") or ""),
+            ),
+        )
+        return int(lastrowid or 0)
+
+    def delete_anr_hold_records(self, record_ids: List[int]) -> None:
+        cleaned = [int(item) for item in (record_ids or []) if item is not None]
+        if not cleaned:
+            return
+        placeholders = ", ".join("?" for _ in cleaned)
+        self.execute(
+            f"DELETE FROM anr_hold_records WHERE id IN ({placeholders})",
+            tuple(cleaned),
+        )
 
     # ------------------------------------------------------------------
     # 版本和回归操作

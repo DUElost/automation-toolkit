@@ -28,6 +28,7 @@ class TinnoToolScaffoldTest(unittest.TestCase):
             "create_tinno_jira_batch_from_excel.py",
             "generate_tinno_jira_upload_list.py",
             "init_tinno_project.py",
+            "tinno_anr_hold.py",
             "readme.txt",
             "config/tinno_jira_defaults.json",
             "config/regression_rules.json",

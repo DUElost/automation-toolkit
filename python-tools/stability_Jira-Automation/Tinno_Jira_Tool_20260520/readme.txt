@@ -215,6 +215,12 @@ python ".\create_tinno_jira_batch_from_excel.py" `
   - 复用 `config/affect_project_mapping.json`：版本前缀对应的 `jira_project` 必须与当前项目 Key 一致
   - 例如 `--regression-project PAANX` 配 `MLD-NX3-...`（映射到 PFDFAA）会直接报错退出
   - 未登记前缀不拦截；`--test-mode` 跳过该校验
+- ANR 本地留存（仅 Tinno）
+  - 配置见 `config/regression_rules.json` → `anr_hold`（默认 `min_submit_count=6`，即累计 >5 才建单）
+  - 仅拦截未命中 Jira 历史、将走 `CREATE_NEW` 的 ANR；已命中历史单仍走原决策
+  - 同类判定复用现有 `is_strong_match`；历史累计只看本地项目库 `anr_hold_records`
+  - 未达阈值：`ANR_HOLD` 写入本地留存，不建单；达阈值：用最新一次字段建单，`Total Number` 写累计次数，评论附历史出现，并清除对应留存
+  - `--dry-run` 会预演 `ANR_HOLD`/`CREATE_NEW`，但不写入/清除留存
 
 第二阶段：指定项目做回归验证
 

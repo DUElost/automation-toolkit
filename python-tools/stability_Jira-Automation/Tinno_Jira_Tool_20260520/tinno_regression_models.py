@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Union
 
 
 EXPECTED_REQUIRED_EXACT_FIELDS = ["affect_project", "environment", "exp_class"]
-TOP_LEVEL_KEYS = {"jira_export", "matching", "status_rules", "regression", "output"}
+TOP_LEVEL_KEYS = {"jira_export", "matching", "status_rules", "regression", "output", "anr_hold"}
 SECTION_KEYS = {
     "jira_export": {"enabled", "jql", "max_results", "fields"},
     "matching": {"required_exact_fields", "cause_similarity_threshold"},
@@ -26,6 +26,7 @@ SECTION_KEYS = {
         "strict_version_project_keys",
     },
     "output": {"sqlite_path", "excel_summary_dir"},
+    "anr_hold": {"enabled", "min_submit_count", "exp_class_keywords"},
 }
 
 
@@ -68,12 +69,20 @@ class OutputConfig:
 
 
 @dataclass
+class AnrHoldConfig:
+    enabled: bool = True
+    min_submit_count: int = 6
+    exp_class_keywords: List[str] = field(default_factory=lambda: ["ANR"])
+
+
+@dataclass
 class RegressionRules:
     jira_export: JiraExportRules
     matching: MatchingRules
     status_rules: StatusRules
     regression: RegressionConfig
     output: OutputConfig
+    anr_hold: AnrHoldConfig = field(default_factory=AnrHoldConfig)
 
 
 def _load_json(path: Union[str, Path]) -> Dict[str, Any]:
@@ -257,10 +266,25 @@ def load_regression_rules(path: Union[str, Path]) -> RegressionRules:
         ),
     )
 
+    anr_hold_data = _coerce_section(data, "anr_hold")
+    anr_hold = AnrHoldConfig(
+        enabled=_coerce_bool(anr_hold_data.get("enabled"), "anr_hold.enabled", True),
+        min_submit_count=_coerce_int(
+            anr_hold_data.get("min_submit_count"),
+            "anr_hold.min_submit_count",
+            6,
+        ),
+        exp_class_keywords=_coerce_str_list(
+            anr_hold_data.get("exp_class_keywords", ["ANR"]),
+            "anr_hold.exp_class_keywords",
+        ),
+    )
+
     return RegressionRules(
         jira_export=jira_export,
         matching=matching,
         status_rules=status_rules,
         regression=regression,
         output=output,
+        anr_hold=anr_hold,
     )

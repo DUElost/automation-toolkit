@@ -60,6 +60,14 @@ from tinno_upload_template_common import (
     resolve_module_assignee,
     save_upload_list as save_generated_upload_list,
 )
+from tinno_anr_hold import (
+    apply_total_number_to_summary,
+    build_anr_history_comment,
+    build_hold_record_payload,
+    evaluate_anr_hold,
+    is_anr_issue,
+    parse_occurrence_count,
+)
 from tinno_regression_executor import decide_action, evaluate_regression_pass
 from tinno_regression_matcher import is_strong_match
 from tinno_regression_models import load_regression_rules
@@ -1416,6 +1424,39 @@ def build_create_new_decision() -> Any:
     )()
 
 
+def build_anr_hold_decision() -> Any:
+    return type(
+        "DecisionAnrHold",
+        (),
+        {
+            "action": "ANR_HOLD",
+            "manual_review": False,
+            "update_jira": False,
+            "recreate_issue": False,
+            "comment_required": False,
+        },
+    )()
+
+
+def get_anr_hold_config(regression_rules: Any) -> Any:
+    config = getattr(regression_rules, "anr_hold", None) if regression_rules is not None else None
+    if config is not None:
+        return config
+    return type(
+        "AnrHoldConfigFallback",
+        (),
+        {
+            "enabled": True,
+            "min_submit_count": 6,
+            "exp_class_keywords": ["ANR"],
+        },
+    )()
+
+
+def is_anr_hold_enabled(regression_rules: Any) -> bool:
+    return bool(getattr(get_anr_hold_config(regression_rules), "enabled", True))
+
+
 def is_create_only_mode(args: argparse.Namespace) -> bool:
     return bool(getattr(args, "create_only", False) or getattr(args, "disable_regression", False))
 
@@ -2284,6 +2325,16 @@ def execute_decision(
     result_message = action
 
     try:
+        if action == "ANR_HOLD":
+            return {
+                "status": "SUCCESS",
+                "issue_key": None,
+                "result_message": str(getattr(decision, "result_message", "") or "ANR_HOLD"),
+                "reason": str(getattr(decision, "hold_reason", "") or "ANR本地留存"),
+                "comment_status": "",
+                "ps_comment_status": "",
+            }
+
         if matched_row and not getattr(decision, "recreate_issue", False):
             if action == "OPEN_LIKE_UPDATE":
                 if issue_fields and "summary" in issue_fields and matched_row:
@@ -2518,11 +2569,9 @@ def run_excel_mode(args: argparse.Namespace) -> int:
     defaults = load_defaults(args.config_file)
     apply_test_mode_defaults(args, defaults)
     create_only_mode = is_create_only_mode(args)
-    regression_rules: Any | None = None
-    regression_enabled = False
-    if not create_only_mode:
-        regression_rules = load_regression_rules(DEFAULT_REGRESSION_RULES_FILE)
-        regression_enabled = is_regression_enabled(regression_rules)
+    # ANR 留存配置与回归规则同文件；create-only 仍加载，但不做历史匹配/回归 PASS
+    regression_rules = load_regression_rules(DEFAULT_REGRESSION_RULES_FILE)
+    regression_enabled = bool(is_regression_enabled(regression_rules) and not create_only_mode)
 
     if bool(getattr(args, "test_mode", False)) and not args.excel_file:
         generated_excel = ensure_test_mode_upload_excel(args, defaults)
@@ -2685,6 +2734,7 @@ def run_excel_mode(args: argparse.Namespace) -> int:
             summary = str(regression_row.get("summary") or "")
             matched_row: Dict[str, Any] | None = None
             decision = build_create_new_decision()
+            anr_hold_result = None
             try:
                 if create_only_mode:
                     reason = "create-only 模式"
@@ -2709,9 +2759,49 @@ def run_excel_mode(args: argparse.Namespace) -> int:
                         current_version=regression_row.get("current_version", ""),
                         strict_version_project_keys=get_strict_version_project_keys(regression_rules),
                     )
+
+                anr_hold_config = get_anr_hold_config(regression_rules)
+                current_occurrence_count = parse_occurrence_count(find_first_value(row, "count", 1))
+                if (
+                    str(getattr(decision, "action", "") or "") == "CREATE_NEW"
+                    and project_db is not None
+                    and is_anr_hold_enabled(regression_rules)
+                    and is_anr_issue(
+                        exp_class=regression_row.get("exp_class"),
+                        summary=regression_row.get("summary"),
+                        keywords=getattr(anr_hold_config, "exp_class_keywords", ["ANR"]),
+                    )
+                ):
+                    hold_records = project_db.list_anr_hold_records()
+                    matching_rules = getattr(regression_rules, "matching", None)
+                    anr_hold_result = evaluate_anr_hold(
+                        current_row=regression_row,
+                        current_count=current_occurrence_count,
+                        hold_records=hold_records,
+                        min_submit_count=int(getattr(anr_hold_config, "min_submit_count", 6) or 6),
+                        cause_threshold=float(getattr(matching_rules, "cause_similarity_threshold", 0.9) or 0.9),
+                        exact_fields=list(getattr(matching_rules, "required_exact_fields", []) or []),
+                    )
+                    if anr_hold_result.hold:
+                        decision = build_anr_hold_decision()
+                        setattr(decision, "hold_reason", anr_hold_result.reason)
+                        setattr(decision, "result_message", f"ANR_HOLD: {anr_hold_result.reason}")
+                        reason = anr_hold_result.reason
+                        if not args.dry_run:
+                            project_db.insert_anr_hold_record(
+                                build_hold_record_payload(
+                                    regression_row=regression_row,
+                                    count=current_occurrence_count,
+                                    source_file=str(args.excel_file or ""),
+                                    row_number=row_number,
+                                )
+                            )
+
                 requires_issue_fields = not matched_row or bool(
                     getattr(decision, "update_jira", False) or getattr(decision, "recreate_issue", False)
                 )
+                if str(getattr(decision, "action", "") or "") == "ANR_HOLD":
+                    requires_issue_fields = False
                 issue_fields: Dict[str, Any] = {}
                 if requires_issue_fields:
                     issue_fields = build_issue_fields(
@@ -2722,6 +2812,15 @@ def run_excel_mode(args: argparse.Namespace) -> int:
                         project_cache=project_cache,
                         create_meta_cache=create_meta_cache,
                     )
+                    if (
+                        anr_hold_result is not None
+                        and not anr_hold_result.hold
+                        and issue_fields.get("summary") is not None
+                    ):
+                        issue_fields["summary"] = apply_total_number_to_summary(
+                            issue_fields.get("summary"),
+                            anr_hold_result.cumulative_count,
+                        )
 
                 matched_jira_key = str((matched_row or {}).get("jira_key") or "").strip()
                 if args.dry_run:
@@ -2785,6 +2884,22 @@ def run_excel_mode(args: argparse.Namespace) -> int:
                 result_message = str(execution_outcome.get("result_message") or getattr(decision, "action", ""))
                 success_flag = result_status != "FAILED"
                 outcome_reason = str(execution_outcome.get("reason") or reason)
+                if (
+                    success_flag
+                    and issue_key
+                    and anr_hold_result is not None
+                    and not anr_hold_result.hold
+                    and str(getattr(decision, "action", "") or "") == "CREATE_NEW"
+                ):
+                    history_comment = build_anr_history_comment(
+                        cumulative_count=anr_hold_result.cumulative_count,
+                        current_version=str(regression_row.get("current_version") or ""),
+                        current_count=current_occurrence_count,
+                        matched_records=anr_hold_result.matched_records,
+                    )
+                    add_issue_comment(jira, issue_key, history_comment)
+                    project_db.delete_anr_hold_records(anr_hold_result.matched_record_ids)
+                    result_message = f"{result_message}; anr_history_commented"
                 logger.info(
                     "%s 执行结果: matched_jira_key=%s action=%s reason=%s status=%s result=%s",
                     row_log_label,
