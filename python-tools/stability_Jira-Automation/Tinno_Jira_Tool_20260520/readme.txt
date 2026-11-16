@@ -374,3 +374,29 @@ duplicate 跟随关闭补充规则：
 3. 审计结果确认无误后，再做真实 PASS / FAIL 备注与关单验证。
 4. duplicate 跟随关闭已默认开启；若某项目 Jira 工作流不支持，可在
    `regression_rules.json` 将 `enable_duplicate_followups` 设为 `false`。
+
+
+8、B8 G8 发生归因工作区（b8-g8-attribution-v1）
+
+平台提单时会把 manifest.json 与输入 xls 放进每次 JiraRun 的隔离工作区，并以该目录为 cwd：
+
+- 第一阶段：
+  python generate_tinno_jira_upload_list.py --add-main-excel <workspace>/delivery_*.xls ...
+  清单写 <workspace>/JIRA_Upload_List_Tinno_*.xlsx，
+  归因产物写 <workspace>/attribution_input.json
+- 第二阶段：
+  python create_tinno_jira_batch_from_excel.py --add-excel-file <workspace>/JIRA_Upload_List_Tinno_*.xlsx ...
+  结果写 <workspace>/result/tinno_jira_batch_create_result_*.json，
+  归因产物写 <workspace>/attribution.json
+
+也可显式指定：
+  --output-dir <workspace> --attribution-manifest <workspace>/manifest.json
+
+规则：
+- 清单追加 Signature ID / Occurrence IDs / Occurrence Keys / Occurrence Count /
+  Attribution Status / Attribution Note / Source Excel Row
+- 同一 signature 的多个清单项合并为一行，Occurrence IDs 保留完整集合
+- 只有 manifest.attribution_candidates 内的 (signature_id, occurrence_id) 才写 Jira key 关联；
+  缺失、无效、越界、重复标识写入 attribution.json 的 gaps，重复发生不建单
+- 没有 manifest 且未传 --output-dir 时保持旧行为：result/ 输出、旧参数与 stdout 不变
+- 契约与样本：../contracts/README.md

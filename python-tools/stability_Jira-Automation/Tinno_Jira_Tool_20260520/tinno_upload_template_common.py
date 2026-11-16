@@ -36,6 +36,9 @@ EXCEL_FIELD_CANDIDATES = {
     "severity_level": ["Severity Level", "severity_level", "问题等级", "Bug Severity"],
     "affect_project": ["Affect Project", "affect_project", "机型", "项目"],
     "test_case": ["TestCase", "Test Case", "test_case", "测试项", "测试专项", "专项"],
+    "signature_id": ["Signature ID", "signature_id", "SignatureId", "Id"],
+    "occurrence_ids": ["Occurrence IDs", "occurrence_ids", "OccurrenceIds"],
+    "occurrence_keys": ["Occurrence Keys", "occurrence_keys", "OccurrenceKeys"],
 }
 
 DEFAULT_TEST_CASE_ALIAS_MAPPING = {
@@ -550,6 +553,7 @@ def build_upload_rows(
     default_test_case: Optional[str] = None,
     source_excel_path: Optional[str | Path] = None,
     skipped_rows: Optional[List[Dict[str, Any]]] = None,
+    attribution_enabled: bool = False,
 ) -> List[Dict[str, Any]]:
     rows: List[Dict[str, Any]] = []
     skipped = skipped_rows if skipped_rows is not None else []
@@ -607,27 +611,31 @@ def build_upload_rows(
             or package_info.get("assignee")
             or defaults.get("default_assignee", "")
         )
-        rows.append(
-            {
-                "Project": project_value,
-                "Issue Type": defaults.get("issue_type", "Bug"),
-                "Summary": build_summary(issue_data),
-                "Description": build_description(issue_data),
-                "Priority": priority,
-                "Bug Severity": severity_level,
-                "Test Case": resolved_test_case,
-                "key_information": issue_data["key_information"],
-                "Module": module,
-                "Components": module,
-                "Assignee": assignee,
-                "Reporter": reporter,
-                "Versions": issue_data["version"],
-                "Environment": build_environment(issue_data),
-                "PS": build_ps(issue_data, reporter=reporter),
-                "Previous Version Status": defaults.get("default_previous_version_status", "Previous version exists"),
-                "Previous Version Text": defaults.get("default_previous_version_text", "100%"),
-            }
-        )
+        prepared_row = {
+            "Project": project_value,
+            "Issue Type": defaults.get("issue_type", "Bug"),
+            "Summary": build_summary(issue_data),
+            "Description": build_description(issue_data),
+            "Priority": priority,
+            "Bug Severity": severity_level,
+            "Test Case": resolved_test_case,
+            "key_information": issue_data["key_information"],
+            "Module": module,
+            "Components": module,
+            "Assignee": assignee,
+            "Reporter": reporter,
+            "Versions": issue_data["version"],
+            "Environment": build_environment(issue_data),
+            "PS": build_ps(issue_data, reporter=reporter),
+            "Previous Version Status": defaults.get("default_previous_version_status", "Previous version exists"),
+            "Previous Version Text": defaults.get("default_previous_version_text", "100%"),
+        }
+        if attribution_enabled:
+            prepared_row["_source_row"] = row_offset + 1
+            prepared_row["_excel_row"] = row_offset + 2
+            prepared_row["_raw_signature"] = find_first_value(row, "signature_id", None)
+            prepared_row["_raw_occurrence_ids"] = find_first_value(row, "occurrence_ids", None)
+        rows.append(prepared_row)
     return rows
 
 

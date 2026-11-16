@@ -11,6 +11,7 @@
 
 | 日期 | 变更内容 |
 |------|----------|
+| 2026-11-16 | stability_Jira-Automation：Transsion/Tinno 接入 B8 G8 发生归因契约 `b8-g8-attribution-v1`（签名/发生标识贯穿清单与建单结果，支持平台隔离工作区；旧默认输出不变） |
 | 2026-11-05 | stability_Start-Log-Scan V2.1.1：解压失败 dbg 的 DeviceId 只取已证明的串号目录，不再把项目目录当作设备号 |
 | 2026-11-04 | stability_Start-Log-Scan V2.1.0：去重规则抽为 `modules/dedup/aee_rule.py`；新增成员关系 `*_members.json`（stp.scan_membership 1.0）与 `-match_issues`，供 STP 平台读取问题归并；恢复 `-merge_files_list`；发布按 tag `start-log-scan/vX.Y.Z` |
 | 2026-10-21 | 新增 windows-tools/system_mouse_without_borders：基于 PowerToys MWB，修单向剪切板、传速缓冲、文件上限 1GB |
@@ -228,7 +229,8 @@ python main.py
    - Tinno 建单 labels = 测试专项映射标签 + 固定标签「稳定性测试」（专项不可识别时回退 legacy 默认）
    - Tinno VFFCA 严格版本比较：涉及 Jira `fix_version` 时忽略 LX 板型，仅 `current_version`↔`build_version` 区分 LX2/LX3
    - Tinno 出现版本（`build_version`）一律以本地项目库为准，不从 Jira 解析；本地缺失或非法则报错退出
-   - 详见 [stability_Jira-Automation/CLAUDE.md](../python-tools/stability_Jira-Automation/CLAUDE.md)
+   - B8 G8 归因：Transsion/Tinno 共用 `b8-g8-attribution-v1`，平台 `manifest.json` 的 `signature_id` / `occurrence_id` 贯穿清单、复核和建单结果；显式 `--output-dir` 或平台工作区 cwd 下落盘，旧 `result/` 行为保留
+   - 详见 [stability_Jira-Automation/CLAUDE.md](../python-tools/stability_Jira-Automation/CLAUDE.md) 与 [contracts/README.md](../python-tools/stability_Jira-Automation/contracts/README.md) [stability_Jira-Automation/CLAUDE.md](../python-tools/stability_Jira-Automation/CLAUDE.md)
 
 ### AI 辅助开发建议
 

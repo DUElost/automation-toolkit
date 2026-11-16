@@ -1,0 +1,84 @@
+{
+  "contract": "b8-g8-attribution-v1",
+  "title": "B8 G8 厂商 Jira 工具发生归因契约",
+  "status": "active",
+  "updated": "2026-11-16",
+  "platform_manifest_schema": "stp.jira_delivery_input/v1",
+  "artifact_schema": "stp.jira_attribution/v1",
+  "applies_to": [
+    "Transsion_Jira_Tool_20260323",
+    "Tinno_Jira_Tool_20260520"
+  ],
+  "stable_identity": {
+    "signature_id": "平台交付版本登记的问题签名 ID（manifest.issues[].signature_id）",
+    "occurrence_id": "平台登记的发生 ID（manifest.attribution_candidates[].occurrence_id）",
+    "occurrence_key": "设备侧可证明的发生身份 sha256，平台生成，工具只透传",
+    "scope_rule": "一个 occurrence_id 只允许关联到本次 manifest.attribution_candidates 中同一 signature_id 的 Jira key"
+  },
+  "workbook_columns": {
+    "Signature ID": "string，平台签名 ID",
+    "Occurrence IDs": "JSON 数组字符串，清单项合并的全部 occurrence_id，升序",
+    "Occurrence Keys": "JSON 数组字符串，与 Occurrence IDs 对齐的 occurrence_key",
+    "Occurrence Count": "int，Occurrence IDs 数量",
+    "Attribution Status": "见 attribution_status",
+    "Attribution Note": "string，诊断说明",
+    "Source Excel Row": "int，生成清单时输入工作簿的物理行号（含表头，从 1 开始）"
+  },
+  "attribution_status": [
+    "OK",
+    "MERGED",
+    "MISSING_SIGNATURE_ID",
+    "INVALID_SIGNATURE_ID",
+    "UNKNOWN_SIGNATURE_ID",
+    "NO_OCCURRENCE",
+    "INVALID_OCCURRENCE_ID",
+    "OUT_OF_SCOPE_OCCURRENCE_ID",
+    "DUPLICATE_OCCURRENCE_ID",
+    "SIGNATURE_MISMATCH"
+  ],
+  "gap_kinds": [
+    "missing_signature_id",
+    "invalid_signature_id",
+    "unknown_signature_id",
+    "no_occurrence",
+    "invalid_occurrence_id",
+    "out_of_scope_occurrence_id",
+    "duplicate_occurrence_id",
+    "signature_mismatch",
+    "manifest_unreadable"
+  ],
+  "artifact": {
+    "schema": "stp.jira_attribution/v1",
+    "required": [
+      "schema",
+      "contract_version",
+      "tool",
+      "stage",
+      "run",
+      "items",
+      "links",
+      "gaps"
+    ],
+    "link_required": [
+      "issue_key",
+      "signature_id",
+      "occurrence_id"
+    ],
+    "item_required": [
+      "row",
+      "signature_id",
+      "occurrence_ids",
+      "attribution_status",
+      "status"
+    ],
+    "stage_values": [
+      "generate",
+      "create"
+    ]
+  },
+  "output_rules": {
+    "explicit_output_dir": "清单写 <output_dir>/，阶段结果写 <output_dir>/result/，归因产物写 <output_dir>/attribution.json（generate 阶段为 attribution_input.json）",
+    "platform_workspace": "未显式指定目录时，若进程 cwd 存在 manifest.json，则视 cwd 为平台隔离工作区",
+    "legacy_default": "找不到 manifest.json 且未显式指定目录时，保持旧行为：CURRENT_DIR/result/，不新增归因列与归因产物"
+  }
+}

@@ -48,6 +48,7 @@ from tinno_batch_jira_common import (
     transition_issue_to_closed,
     update_issue_fields,
 )
+import jira_attribution
 from tinno_upload_template_common import (
     build_upload_rows as build_test_upload_rows,
     load_affect_project_mapping as load_upload_affect_project_mapping,
@@ -174,6 +175,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--no-add-comments", dest="add_comments", action="store_false", help="真实建单时不追加 PS 评论")
     parser.set_defaults(add_comments=True)
     parser.add_argument("--wait-between-issues", dest="wait_between_issues", type=float, default=0.5, help="每条问题之间的等待秒数")
+    parser.add_argument("--output-dir", dest="output_dir", default=None, help="平台隔离工作区；结果与归因产物写入该目录")
+    parser.add_argument("--attribution-manifest", dest="attribution_manifest", default=None, help="平台 manifest.json；省略时在工作区/cwd 自动发现")
     return parser.parse_args()
 
 
@@ -276,9 +279,10 @@ def validate_upload_excel(df: pd.DataFrame) -> bool:
     return True
 
 
-def save_results(results: List[Dict[str, Any]]) -> Path:
-    RESULT_DIR.mkdir(parents=True, exist_ok=True)
-    target = RESULT_DIR / f"tinno_jira_batch_create_result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+def save_results(results: List[Dict[str, Any]], result_dir: Path | None = None) -> Path:
+    target_dir = Path(result_dir) if result_dir is not None else RESULT_DIR
+    target_dir.mkdir(parents=True, exist_ok=True)
+    target = target_dir / f"tinno_jira_batch_create_result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
     with target.open("w", encoding="utf-8") as fp:
         json.dump(results, fp, ensure_ascii=False, indent=2)
     return target
@@ -1012,24 +1016,26 @@ def append_result(
     matched_row: Dict[str, Any] | None,
     decision: Any,
     error: str | None,
+    attribution: Dict[str, Any] | None = None,
 ) -> None:
-    results.append(
-        {
-            "row": row_number,
-            "status": status,
-            "project": project_key,
-            "summary": summary,
-            "issue_key": issue_key,
-            "matched_jira_key": (matched_row or {}).get("jira_key"),
-            "decision": {
-                "action": getattr(decision, "action", ""),
-                "manual_review": bool(getattr(decision, "manual_review", False)),
-                "update_jira": bool(getattr(decision, "update_jira", False)),
-                "recreate_issue": bool(getattr(decision, "recreate_issue", False)),
-            },
-            "error": error,
+    entry = {
+        "row": row_number,
+        "status": status,
+        "project": project_key,
+        "summary": summary,
+        "issue_key": issue_key,
+        "matched_jira_key": (matched_row or {}).get("jira_key"),
+        "decision": {
+            "action": getattr(decision, "action", ""),
+            "manual_review": bool(getattr(decision, "manual_review", False)),
+            "update_jira": bool(getattr(decision, "update_jira", False)),
+            "recreate_issue": bool(getattr(decision, "recreate_issue", False)),
+        },
+        "error": error,
         }
-    )
+    if attribution:
+        entry.update(attribution)
+    results.append(entry)
 
 
 def build_summary_row(
@@ -2537,14 +2543,24 @@ def write_run_outputs(
     regression_rules: Any | None,
     run_id: str,
     summary_rows: List[Dict[str, Any]],
+    result_dir: Path | None = None,
+    attribution: Any | None = None,
 ) -> int:
-    output_file = save_results(results)
+    output_file = save_results(results, result_dir)
     logger.info("结果已写入: %s", output_file)
+    if attribution is not None:
+        attribution_path = attribution.write()
+        if attribution_path is not None:
+            logger.info("归因产物已写入: %s", attribution_path)
     if regression_enabled and regression_rules is not None and should_write_audit_report(regression_rules):
         audit_file = save_audit_report(results=results, summary_rows=summary_rows, run_id=run_id)
         logger.info("审计结果已写入: %s", audit_file)
     if regression_enabled and store is not None:
-        excel_summary_dir = Path(getattr(regression_rules.output, "excel_summary_dir", RESULT_DIR))
+        excel_summary_dir = (
+            Path(result_dir)
+            if result_dir is not None
+            else Path(getattr(regression_rules.output, "excel_summary_dir", RESULT_DIR))
+        )
         if not excel_summary_dir.is_absolute():
             excel_summary_dir = CURRENT_DIR / excel_summary_dir
         excel_summary_dir.mkdir(parents=True, exist_ok=True)
@@ -2592,6 +2608,24 @@ def run_excel_mode(args: argparse.Namespace) -> int:
     logger.info("已读取上传模板 %d 条，列: %s", len(df), list(df.columns))
     if not validate_upload_excel(df):
         return 1
+
+    manifest_path = jira_attribution.discover_manifest(
+        getattr(args, "attribution_manifest", None),
+        Path(args.output_dir) if getattr(args, "output_dir", None) else None,
+        Path(args.excel_file).resolve().parent,
+    )
+    index = None
+    if manifest_path is not None:
+        try:
+            index = jira_attribution.load_manifest(manifest_path)
+        except jira_attribution.AttributionError as exc:
+            logger.error("归因 manifest 不可用，停止建单: %s", exc)
+            return 1
+        logger.info("归因契约: %s", jira_attribution.CONTRACT_VERSION)
+        logger.info("归因 manifest: %s", manifest_path)
+    workspace, attribution_result_dir, attribution_mode = jira_attribution.resolve_workspace(
+        getattr(args, "output_dir", None), manifest_path, RESULT_DIR
+    )
 
     jira = connect_to_jira(
         server=jira_server,
@@ -2678,6 +2712,12 @@ def run_excel_mode(args: argparse.Namespace) -> int:
         batch_specialties = collect_batch_specialties(df, defaults)
 
         run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+        recorder = jira_attribution.AttributionRecorder(
+            index,
+            workspace=workspace if attribution_mode else None,
+            run_id=run_id,
+        )
+        attribution_rows = recorder.prepare(df) if recorder.enabled else []
         store: RegressionStore | None = None
         snapshot_rows: List[Dict[str, Any]] = []
         if regression_enabled:
@@ -2726,15 +2766,41 @@ def run_excel_mode(args: argparse.Namespace) -> int:
         summary_rows: List[Dict[str, Any]] = []
         matched_history_keys: set[str] = set()
 
-        for index, row in df.iterrows():
+        for row_position, (index, row) in enumerate(df.iterrows()):
             row_number = index + 2
             row_log_label = build_row_log_label(index)
+            resolution = attribution_rows[row_position] if recorder.enabled else None
             regression_row = regression_rows[index]
             project_key = str(resolve_project_key(jira, regression_row.get("project", ""), project_cache) or "")
             summary = str(regression_row.get("summary") or "")
             matched_row: Dict[str, Any] | None = None
             decision = build_create_new_decision()
             anr_hold_result = None
+
+            if resolution is not None and resolution.blocked:
+                logger.warning(
+                    "%s 跳过：occurrence_id 重复，%s", row_log_label, resolution.note
+                )
+                append_result(
+                    results,
+                    row_number=row_number,
+                    status="SKIPPED",
+                    project_key=project_key,
+                    summary=summary,
+                    issue_key=None,
+                    matched_row=None,
+                    decision=decision,
+                    error=resolution.note,
+                    attribution=resolution.result_fields(),
+                )
+                recorder.record(
+                    resolution,
+                    status="SKIPPED",
+                    action="DUPLICATE_OCCURRENCE_ID",
+                    error=resolution.note,
+                )
+                continue
+
             try:
                 if create_only_mode:
                     reason = "create-only 模式"
@@ -2867,6 +2933,13 @@ def run_excel_mode(args: argparse.Namespace) -> int:
                         matched_row=matched_row,
                         decision=decision,
                         error=None,
+                        attribution=resolution.result_fields() if resolution is not None else None,
+                    )
+                    recorder.record(
+                        resolution,
+                        status="DRY_RUN",
+                        matched_jira_key=matched_jira_key,
+                        action=str(getattr(decision, "action", "") or ""),
                     )
                     continue
 
@@ -2973,6 +3046,15 @@ def run_excel_mode(args: argparse.Namespace) -> int:
                     matched_row=matched_row,
                     decision=decision,
                     error=None if success_flag else result_message,
+                    attribution=resolution.result_fields() if resolution is not None else None,
+                )
+                recorder.record(
+                    resolution,
+                    status=result_status,
+                    issue_key=issue_key,
+                    matched_jira_key=matched_jira_key,
+                    action=str(getattr(decision, "action", "") or ""),
+                    error=None if success_flag else result_message,
                 )
             except Exception as exc:
                 logger.exception("%s 处理失败", row_log_label)
@@ -3010,6 +3092,14 @@ def run_excel_mode(args: argparse.Namespace) -> int:
                     issue_key=None,
                     matched_row=matched_row,
                     decision=decision,
+                    error=str(exc),
+                    attribution=resolution.result_fields() if resolution is not None else None,
+                )
+                recorder.record(
+                    resolution,
+                    status="FAILED",
+                    matched_jira_key=str((matched_row or {}).get("jira_key") or ""),
+                    action="FAILED",
                     error=str(exc),
                 )
 
@@ -3062,6 +3152,8 @@ def run_excel_mode(args: argparse.Namespace) -> int:
             regression_rules=regression_rules,
             run_id=run_id,
             summary_rows=summary_rows,
+            result_dir=attribution_result_dir if attribution_mode else None,
+            attribution=recorder,
         )
     finally:
         jira.close()

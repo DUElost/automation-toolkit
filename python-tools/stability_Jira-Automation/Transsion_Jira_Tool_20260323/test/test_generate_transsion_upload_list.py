@@ -8,6 +8,7 @@ from typing import Generator
 
 import pandas as pd
 import pytest
+from unittest import mock
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -157,3 +158,46 @@ def test_parse_args_accepts_each_assignee_mode(generate_module):
     assert auto_args.assignee_manual is False
     assert manual_args.assignee_auto is False
     assert manual_args.assignee_manual is True
+
+def test_main_writes_workspace_list_and_attribution_artifact(tmp_path: Path, generate_module):
+    module = generate_module
+    manifest = {
+        "schema": "stp.jira_delivery_input/v1",
+        "plan_run_id": 1096,
+        "platform": "mtk",
+        "delivery_version_id": 4,
+        "delivery_version_no": 2,
+        "issue_ids": [7],
+        "issues": [{"signature_id": 7, "occurrence_ids": [101, 102]}],
+        "attribution_candidates": [
+            {"signature_id": 7, "occurrence_id": 101, "occurrence_key": "k101"},
+            {"signature_id": 7, "occurrence_id": 102, "occurrence_key": "k102"},
+        ],
+    }
+    (tmp_path / "manifest.json").write_text(__import__("json").dumps(manifest), encoding="utf-8")
+    args = _make_args(assignee_auto=True, assignee_manual=False)
+    args.output_path = None
+    args.output_dir = str(tmp_path)
+    args.attribution_manifest = str(tmp_path / "manifest.json")
+    row = {
+        "Project": "X6851OS16",
+        "Issue Type": "故障",
+        "Summary": "summary",
+        "Count": 2,
+        "_raw_signature": 7,
+        "_raw_occurrence_ids": "[101,102]",
+        "_excel_row": 2,
+    }
+
+    with mock.patch.object(module, "setup_logging"):
+        with mock.patch.object(module, "parse_args", return_value=args):
+            with mock.patch.object(module, "build_upload_rows", return_value=([row], ["Monkey专项"], [])):
+                assert module.main() == 0
+
+    workbooks = list(tmp_path.glob("JIRA_Upload_List_Transsion_*.xlsx"))
+    assert len(workbooks) == 1
+    payload = pd.read_excel(workbooks[0])
+    assert list(payload["Occurrence IDs"]) == ["[101, 102]"]
+    artifact = tmp_path / "attribution_input.json"
+    assert artifact.is_file()
+    assert '"stage": "generate"' in artifact.read_text(encoding="utf-8")

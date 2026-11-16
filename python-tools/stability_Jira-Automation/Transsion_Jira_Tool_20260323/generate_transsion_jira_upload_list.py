@@ -23,6 +23,7 @@ CURRENT_DIR = Path(__file__).resolve().parent
 if str(CURRENT_DIR) not in sys.path:
     sys.path.insert(0, str(CURRENT_DIR))
 
+import jira_attribution
 from transsion_upload_template_common import (
     clean_cell_value,
     load_component_regex_mapping,
@@ -105,13 +106,15 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     parser.add_argument("--probability-rules-file", dest="probability_rules_file", default=str(DEFAULT_PROBABILITY_RULES), help="问题出现概率评级表路径")
     parser.add_argument("--test-summary-file", dest="test_summary_file", default=str(DEFAULT_TEST_CASE_SUMMARY), help="稳定性专项汇总表路径")
     parser.add_argument("--component-regex-file", dest="component_regex_file", default=str(DEFAULT_COMPONENT_REGEX), help="正则模块映射文件路径")
+    parser.add_argument("--output-dir", dest="output_dir", default=None, help="平台隔离工作区；清单、归因产物写入该目录")
+    parser.add_argument("--attribution-manifest", dest="attribution_manifest", default=None, help="平台 manifest.json；省略时在工作区/cwd 自动发现")
     args = parser.parse_args(argv)
     if not args.assignee_auto and not args.assignee_manual:
         parser.error("必须且只能提供一个经办人方案参数: --assignee-auto 或 --assignee-manual")
     return args
 
 
-def build_upload_rows(args: argparse.Namespace) -> tuple[List[dict], List[str], List[Dict[str, str]]]:
+def build_upload_rows(args: argparse.Namespace, attribution_enabled: bool = False) -> tuple[List[dict], List[str], List[Dict[str, str]]]:
     defaults = load_defaults(args.config_file)
     if args.project_key:
         defaults["project_key"] = args.project_key
@@ -181,6 +184,11 @@ def build_upload_rows(args: argparse.Namespace) -> tuple[List[dict], List[str], 
                 )
                 logger.warning("第 %d 行经办人为空，已跳过：Package=%s", index + 1, issue_row.get("Package"))
                 continue
+            if attribution_enabled:
+                issue_row["_source_row"] = index + 1
+                issue_row["_excel_row"] = index + 2
+                issue_row["_raw_signature"] = row.get("Id") if row.get("Id") is not None else row.get("Signature ID")
+                issue_row["_raw_occurrence_ids"] = row.get("Occurrence IDs")
             rows.append(issue_row)
             resolved_test_cases.append(resolved_test_case)
         except Exception:
@@ -236,11 +244,12 @@ def save_upload_list(rows: List[dict], output_path: str) -> None:
         "Count",
         "Device Count",
     ]
+    extra_columns = [column for column in pd.DataFrame(rows).columns if column not in columns_order]
     df = pd.DataFrame(rows)
     for column in columns_order:
         if column not in df.columns:
             df[column] = ""
-    df = df[columns_order]
+    df = df[columns_order + extra_columns]
     df.to_excel(output_path, index=False, engine="openpyxl")
 
 
@@ -257,24 +266,91 @@ def main() -> int:
     logger.info("稳定性专项汇总表: %s", os.path.abspath(args.test_summary_file))
     logger.info("经办人方案: %s", "auto（Assignee 固定为“自动”）" if args.assignee_auto else "manual（按包名与模块&经办人对应表匹配）")
 
-    rows, resolved_test_cases, skipped_issues = build_upload_rows(args)
+    search_dirs = []
+    if args.main_excel_path:
+        search_dirs.append(Path(args.main_excel_path).resolve().parent)
+    if args.output_path:
+        search_dirs.append(Path(args.output_path).resolve().parent)
+    if getattr(args, "output_dir", None):
+        search_dirs.append(Path(args.output_dir))
+    manifest_path = jira_attribution.discover_manifest(
+        getattr(args, "attribution_manifest", None), *search_dirs
+    )
+    index = None
+    if manifest_path is not None:
+        try:
+            index = jira_attribution.load_manifest(manifest_path)
+        except jira_attribution.AttributionError as exc:
+            logger.error("归因 manifest 不可用，停止生成: %s", exc)
+            return 1
+        logger.info("归因契约: %s", jira_attribution.CONTRACT_VERSION)
+        logger.info("归因 manifest: %s", manifest_path)
+        logger.info("本次登记范围: plan_run_id=%s delivery_version_no=%s issue_ids=%s",
+                    index.run_meta().get("plan_run_id"),
+                    index.run_meta().get("delivery_version_no"),
+                    index.run_meta().get("issue_ids"))
+
+    rows, resolved_test_cases, skipped_issues = build_upload_rows(
+        args, attribution_enabled=index is not None
+    )
+    items: List[dict] = []
+    gaps: List[dict] = []
+    if index is not None:
+        rows, items, gaps = jira_attribution.annotate_rows(rows, index)
+        for item in items:
+            logger.info(
+                "归因: Excel 行 %s signature_id=%s occurrence_ids=%s status=%s",
+                item.get("workbook_row"),
+                item.get("signature_id"),
+                item.get("occurrence_ids"),
+                item.get("attribution_status"),
+            )
+        for gap in gaps:
+            logger.warning(
+                "归因缺口: kind=%s Excel 行 %s signature_id=%s reason=%s",
+                gap.get("kind"),
+                gap.get("workbook_row"),
+                gap.get("signature_id"),
+                gap.get("reason"),
+            )
     if not rows:
         log_skipped_issues(skipped_issues)
         logger.error("没有生成任何上传记录")
         return 1
 
+    workspace = None
+    if getattr(args, "output_dir", None):
+        workspace = Path(args.output_dir)
+    elif manifest_path is not None:
+        workspace = manifest_path.parent
+    result_dir = workspace if workspace is not None else RESULT_DIR
+
     output_path = args.output_path
     if not output_path:
-        RESULT_DIR.mkdir(parents=True, exist_ok=True)
+        result_dir.mkdir(parents=True, exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         unique_test_cases = sorted({test_case for test_case in resolved_test_cases if test_case})
         output_case_name = unique_test_cases[0] if len(unique_test_cases) == 1 else "多专项"
-        output_path = str(RESULT_DIR / f"{DEFAULT_OUTPUT_PREFIX}_{output_case_name}_{timestamp}.xlsx")
+        output_path = str(result_dir / f"{DEFAULT_OUTPUT_PREFIX}_{output_case_name}_{timestamp}.xlsx")
 
     save_upload_list(rows, output_path)
     logger.info("上传模板已生成: %s", os.path.abspath(output_path))
     logger.info("成功处理 %d 条记录", len(rows))
     log_skipped_issues(skipped_issues)
+    if index is not None and workspace is not None:
+        payload = jira_attribution.build_payload(
+            stage="generate",
+            index=index,
+            items=items,
+            links=[],
+            gaps=gaps,
+            run_id=datetime.now().strftime("%Y%m%d_%H%M%S"),
+            workspace=workspace,
+        )
+        artifact_path = jira_attribution.write_payload(
+            workspace / "attribution_input.json", payload
+        )
+        logger.info("归因产物已写入: %s", artifact_path)
     return 0
 
 

@@ -1,0 +1,83 @@
+{
+  "schema": "stp.jira_attribution/v1",
+  "contract_version": "b8-g8-attribution-v1",
+  "tool": "transsion",
+  "stage": "generate",
+  "run": {
+    "run_id": "20261116_120000",
+    "workspace": "/workspace/jira_workspaces/console-42",
+    "generated_at": "2026-11-16T12:00:00",
+    "manifest": "/workspace/jira_workspaces/console-42/manifest.json",
+    "manifest_schema": "stp.jira_delivery_input/v1",
+    "plan_run_id": 1096,
+    "root_plan_run_id": 1085,
+    "platform": "mtk",
+    "delivery_version_id": 4,
+    "delivery_version_no": 2,
+    "compat_rerun_id": null,
+    "issue_ids": [
+      7,
+      8
+    ],
+    "event_ids": [
+      "dle-1",
+      "dle-2"
+    ]
+  },
+  "items": [
+    {
+      "row": 1,
+      "workbook_row": 2,
+      "signature_id": 7,
+      "occurrence_ids": [
+        101,
+        102,
+        103
+      ],
+      "occurrence_keys": [
+        "k101",
+        "k102",
+        "k103"
+      ],
+      "occurrence_count": 3,
+      "attribution_status": "MERGED",
+      "attribution_note": "合并清单项 Excel 行: 2, 3"
+    },
+    {
+      "row": 4,
+      "workbook_row": 5,
+      "signature_id": 8,
+      "occurrence_ids": [
+        201
+      ],
+      "occurrence_keys": [
+        "k201"
+      ],
+      "occurrence_count": 1,
+      "attribution_status": "OK",
+      "attribution_note": "按 manifest 补全发生集合"
+    },
+    {
+      "row": 5,
+      "workbook_row": 6,
+      "signature_id": null,
+      "occurrence_ids": [],
+      "occurrence_keys": [],
+      "occurrence_count": 0,
+      "attribution_status": "MISSING_SIGNATURE_ID",
+      "attribution_note": "清单行缺少平台 Signature ID"
+    }
+  ],
+  "links": [],
+  "gaps": [
+    {
+      "kind": "missing_signature_id",
+      "stage": "generate",
+      "row": 5,
+      "workbook_row": 6,
+      "signature_id": null,
+      "occurrence_ids": [],
+      "reason": "清单行缺少平台 Signature ID"
+    }
+  ]
+}

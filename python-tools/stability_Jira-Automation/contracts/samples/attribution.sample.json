@@ -1,0 +1,132 @@
+{
+  "schema": "stp.jira_attribution/v1",
+  "contract_version": "b8-g8-attribution-v1",
+  "tool": "tinno",
+  "stage": "create",
+  "run": {
+    "run_id": "20261116_120500",
+    "workspace": "/workspace/jira_workspaces/console-42",
+    "generated_at": "2026-11-16T12:05:00",
+    "manifest": "/workspace/jira_workspaces/console-42/manifest.json",
+    "manifest_schema": "stp.jira_delivery_input/v1",
+    "plan_run_id": 1096,
+    "root_plan_run_id": 1085,
+    "platform": "mtk",
+    "delivery_version_id": 4,
+    "delivery_version_no": 2,
+    "compat_rerun_id": null,
+    "issue_ids": [
+      7,
+      8
+    ],
+    "event_ids": [
+      "dle-1",
+      "dle-2"
+    ]
+  },
+  "items": [
+    {
+      "row": 1,
+      "workbook_row": 2,
+      "signature_id": 7,
+      "occurrence_ids": [
+        101,
+        102,
+        103
+      ],
+      "occurrence_keys": [
+        "k101",
+        "k102",
+        "k103"
+      ],
+      "attribution_status": "OK",
+      "attribution_note": "",
+      "status": "SUCCESS",
+      "action": "CREATE_NEW",
+      "issue_key": "VFFCA-1234",
+      "matched_jira_key": null,
+      "error": null
+    },
+    {
+      "row": 2,
+      "workbook_row": 3,
+      "signature_id": 8,
+      "occurrence_ids": [
+        201
+      ],
+      "occurrence_keys": [
+        "k201"
+      ],
+      "attribution_status": "OK",
+      "attribution_note": "",
+      "status": "SUCCESS",
+      "action": "OPEN_LIKE_UPDATE",
+      "issue_key": "VFFCA-900",
+      "matched_jira_key": "VFFCA-900",
+      "error": null
+    },
+    {
+      "row": 3,
+      "workbook_row": 4,
+      "signature_id": 999,
+      "occurrence_ids": [],
+      "occurrence_keys": [],
+      "attribution_status": "UNKNOWN_SIGNATURE_ID",
+      "attribution_note": "Signature ID 999 不在本次 manifest 登记范围",
+      "status": "SUCCESS",
+      "action": "CREATE_NEW",
+      "issue_key": "VFFCA-1235",
+      "matched_jira_key": null,
+      "error": null
+    }
+  ],
+  "links": [
+    {
+      "issue_key": "VFFCA-1234",
+      "signature_id": 7,
+      "occurrence_id": 101,
+      "occurrence_key": "k101",
+      "evidence_source": "vendor_attribution_json",
+      "row": 1,
+      "workbook_row": 2
+    },
+    {
+      "issue_key": "VFFCA-1234",
+      "signature_id": 7,
+      "occurrence_id": 102,
+      "occurrence_key": "k102",
+      "evidence_source": "vendor_attribution_json",
+      "row": 1,
+      "workbook_row": 2
+    },
+    {
+      "issue_key": "VFFCA-1234",
+      "signature_id": 7,
+      "occurrence_id": 103,
+      "occurrence_key": "k103",
+      "evidence_source": "vendor_attribution_json",
+      "row": 1,
+      "workbook_row": 2
+    },
+    {
+      "issue_key": "VFFCA-900",
+      "signature_id": 8,
+      "occurrence_id": 201,
+      "occurrence_key": "k201",
+      "evidence_source": "vendor_attribution_json",
+      "row": 2,
+      "workbook_row": 3
+    }
+  ],
+  "gaps": [
+    {
+      "kind": "unknown_signature_id",
+      "stage": "create",
+      "row": 3,
+      "workbook_row": 4,
+      "signature_id": 999,
+      "occurrence_ids": [],
+      "reason": "Signature ID 999 不在本次 manifest 登记范围"
+    }
+  ]
+}

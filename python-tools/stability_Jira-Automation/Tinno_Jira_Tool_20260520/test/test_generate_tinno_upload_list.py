@@ -1,3 +1,4 @@
+import json
 import os
 import sys
 import tempfile
@@ -264,6 +265,72 @@ class GenerateTinnoUploadListTest(unittest.TestCase):
 
         self.assertEqual(1, result)
         read_excel.assert_not_called()
+
+
+    def test_main_writes_workspace_list_and_attribution_artifact(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            manifest = {
+                "schema": "stp.jira_delivery_input/v1",
+                "plan_run_id": 1096,
+                "platform": "mtk",
+                "delivery_version_id": 4,
+                "delivery_version_no": 2,
+                "issue_ids": [7],
+                "issues": [{"signature_id": 7, "occurrence_ids": [101, 102]}],
+                "attribution_candidates": [
+                    {"signature_id": 7, "occurrence_id": 101, "occurrence_key": "k101"},
+                    {"signature_id": 7, "occurrence_id": 102, "occurrence_key": "k102"},
+                ],
+            }
+            (workspace / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+            args = Namespace(
+                main_excel_path="input.xlsx",
+                output_path=None,
+                output_dir=str(workspace),
+                attribution_manifest=str(workspace / "manifest.json"),
+                config_file="config.json",
+                package_mapping_file="mapping.xlsx",
+                severity_rules_file="severity.xlsx",
+                affect_project_mapping_file="affect.json",
+                test_summary_file="test-summary.xlsx",
+                summary_product_mapping_file=None,
+                module_assignee_mapping_file=None,
+                project_key="VFFCA",
+                test_case="Monkey专项",
+                reporter=None,
+                assignee=None,
+                test_mode=False,
+            )
+            row = {
+                "Summary": "summary",
+                "Test Case": "Monkey专项",
+                "Count": 2,
+                "_raw_signature": 7,
+                "_raw_occurrence_ids": "[101,102]",
+                "_excel_row": 2,
+            }
+            with mock.patch.object(generate_module, "setup_logging"):
+                with mock.patch.object(generate_module, "load_local_env"):
+                    with mock.patch.object(generate_module, "parse_args", return_value=args):
+                        with mock.patch.object(generate_module, "load_defaults", return_value={"project_key": "VCAME", "issue_type": "Bug"}):
+                            with mock.patch.object(generate_module, "read_excel_smart", return_value=pd.DataFrame([{"Package": "pkg"}])):
+                                with mock.patch.object(generate_module, "load_package_owner_mapping", return_value={}):
+                                    with mock.patch.object(generate_module, "load_severity_rules", return_value=[]):
+                                        with mock.patch.object(generate_module, "load_affect_project_mapping", return_value={}):
+                                            with mock.patch.object(generate_module, "load_module_assignee_mapping", return_value={}):
+                                                with mock.patch.object(generate_module, "load_test_case_summary", return_value={"Monkey专项": {"index": "0"}}):
+                                                    with mock.patch.object(generate_module, "build_upload_rows", return_value=[row]):
+                                                        result = generate_module.main()
+
+            self.assertEqual(0, result)
+            workbooks = list(workspace.glob("JIRA_Upload_List_Tinno_*.xlsx"))
+            self.assertEqual(1, len(workbooks))
+            payload = pd.read_excel(workbooks[0])
+            self.assertEqual(["[101, 102]"], list(payload["Occurrence IDs"]))
+            artifact = workspace / "attribution_input.json"
+            self.assertTrue(artifact.is_file())
+            self.assertIn('"stage": "generate"', artifact.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

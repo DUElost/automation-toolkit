@@ -140,6 +140,28 @@ graph TD
 
 ---
 
+## B8 G8 发生归因（Transsion / Tinno）
+
+两套工具共用同一份可版本化契约 `b8-g8-attribution-v1`：
+
+- 契约与样本：[`contracts/README.md`](./contracts/README.md)、[`contracts/attribution-contract-v1.json`](./contracts/attribution-contract-v1.json)
+- 实现：各工具目录内 `jira_attribution.py`（内容一致，仅 `TOOL_NAME` 不同；测试校验同步）
+- 平台 manifest：`stp.jira_delivery_input/v1`；工具产物：`stp.jira_attribution/v1`
+
+运行规则：
+
+- 平台把 `manifest.json` 与输入 xls 放入隔离工作区并以该目录为 cwd；工具自动识别。
+- 也可显式传 `--output-dir <workspace> --attribution-manifest <manifest.json>`。
+- 工作区模式：清单写 `<workspace>/`，阶段结果写 `<workspace>/result/`，
+  归因产物写 `<workspace>/attribution_input.json`（第一）与 `<workspace>/attribution.json`（第二）。
+- 没有 manifest 且未指定目录时保持旧行为：写脚本目录 `result/`，不新增归因列/产物。
+- 只有 `manifest.attribution_candidates` 内的 `(signature_id, occurrence_id)` 才会生成 Jira key 关联；
+  缺失/无效/越界/重复标识写入 gaps，重复发生不建单。
+
+测试：两套 `test/test_jira_attribution.py` 覆盖契约同步、合并、重排/筛选、反例与关联范围。
+
+---
+
 ## AI 辅助开发指引
 
 1. 先确认目标 Jira 环境，进入对应子目录

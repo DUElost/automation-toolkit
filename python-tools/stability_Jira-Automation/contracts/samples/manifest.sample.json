@@ -1,0 +1,97 @@
+{
+  "schema": "stp.jira_delivery_input/v1",
+  "plan_run_id": 1096,
+  "root_plan_run_id": 1085,
+  "platform": "mtk",
+  "delivery_version_id": 4,
+  "delivery_version_no": 2,
+  "compat_rerun_id": null,
+  "issue_ids": [
+    7,
+    8
+  ],
+  "event_ids": [
+    "dle-1",
+    "dle-2"
+  ],
+  "issues": [
+    {
+      "signature_id": 7,
+      "signature_raw": "com.android.phone ANR",
+      "normalized_key": "system_app_anr",
+      "event_type": "ANR",
+      "occurrences_count": 3,
+      "machines_count": 2,
+      "serials": [
+        "S1",
+        "S2"
+      ],
+      "build_versions": [
+        "X6851-16.3.0.021"
+      ],
+      "representative_dle_id": "dle-1",
+      "representative_verified_path": "evidence/1085/mtk/S1/event",
+      "occurrence_ids": [
+        101,
+        102,
+        103
+      ],
+      "dle_ids": [
+        "dle-1",
+        "dle-2"
+      ]
+    },
+    {
+      "signature_id": 8,
+      "signature_raw": "com.android.settings crash",
+      "normalized_key": "system_app_crash",
+      "event_type": "Java (JE)",
+      "occurrences_count": 1,
+      "machines_count": 1,
+      "serials": [
+        "S1"
+      ],
+      "build_versions": [
+        "X6851-16.3.0.021"
+      ],
+      "representative_dle_id": "dle-2",
+      "representative_verified_path": "evidence/1085/mtk/S1/event",
+      "occurrence_ids": [
+        201
+      ],
+      "dle_ids": [
+        "dle-2"
+      ]
+    }
+  ],
+  "attribution_candidates": [
+    {
+      "signature_id": 7,
+      "occurrence_id": 101,
+      "occurrence_key": "k101",
+      "dle_id": "dle-1",
+      "serial": "S1"
+    },
+    {
+      "signature_id": 7,
+      "occurrence_id": 102,
+      "occurrence_key": "k102",
+      "dle_id": "dle-1",
+      "serial": "S1"
+    },
+    {
+      "signature_id": 7,
+      "occurrence_id": 103,
+      "occurrence_key": "k103",
+      "dle_id": "dle-2",
+      "serial": "S2"
+    },
+    {
+      "signature_id": 8,
+      "occurrence_id": 201,
+      "occurrence_key": "k201",
+      "dle_id": "dle-2",
+      "serial": "S1"
+    }
+  ]
+}

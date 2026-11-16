@@ -22,6 +22,7 @@ CURRENT_DIR = Path(__file__).resolve().parent
 if str(CURRENT_DIR) not in sys.path:
     sys.path.insert(0, str(CURRENT_DIR))
 
+import jira_attribution
 from tinno_upload_template_common import (
     build_upload_rows,
     load_affect_project_mapping,
@@ -103,6 +104,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--set-reporter", dest="reporter", default=None, help="覆盖 Reporter")
     parser.add_argument("--set-assignee", dest="assignee", default=None, help="覆盖 Assignee")
     parser.add_argument("--test-mode", action="store_true", help="VCAME 测试模式：默认使用测试原始 Excel、AUTOTEST 与当前用户")
+    parser.add_argument("--output-dir", dest="output_dir", default=None, help="平台隔离工作区；清单、归因产物写入该目录")
+    parser.add_argument("--attribution-manifest", dest="attribution_manifest", default=None, help="平台 manifest.json；省略时在工作区/cwd 自动发现")
     return parser.parse_args()
 
 
@@ -163,6 +166,29 @@ def main() -> int:
         getattr(args, "module_assignee_mapping_file", None) or DEFAULT_MODULE_ASSIGNEE_MAPPING
     )
     test_case_summary_mapping = load_test_case_summary(args.test_summary_file)
+    search_dirs = []
+    if getattr(args, "main_excel_path", None):
+        search_dirs.append(Path(args.main_excel_path).resolve().parent)
+    if getattr(args, "output_path", None):
+        search_dirs.append(Path(args.output_path).resolve().parent)
+    if getattr(args, "output_dir", None):
+        search_dirs.append(Path(args.output_dir))
+    manifest_path = jira_attribution.discover_manifest(
+        getattr(args, "attribution_manifest", None), *search_dirs
+    )
+    index = None
+    if manifest_path is not None:
+        try:
+            index = jira_attribution.load_manifest(manifest_path)
+        except jira_attribution.AttributionError as exc:
+            logger.error("归因 manifest 不可用，停止生成: %s", exc)
+            return 1
+        logger.info("归因契约: %s", jira_attribution.CONTRACT_VERSION)
+        logger.info("归因 manifest: %s", manifest_path)
+        logger.info("本次登记范围: plan_run_id=%s delivery_version_no=%s issue_ids=%s",
+                    index.run_meta().get("plan_run_id"),
+                    index.run_meta().get("delivery_version_no"),
+                    index.run_meta().get("issue_ids"))
     skipped_rows: list = []
     rows = build_upload_rows(
         main_df=main_df,
@@ -179,15 +205,43 @@ def main() -> int:
         default_test_case=args.test_case,
         source_excel_path=args.main_excel_path,
         skipped_rows=skipped_rows,
+        attribution_enabled=index is not None,
     )
     if not rows and not skipped_rows:
         logger.error("没有生成任何上传记录")
         return 1
+    items: list = []
+    gaps: list = []
+    if index is not None:
+        rows, items, gaps = jira_attribution.annotate_rows(rows, index)
+        for item in items:
+            logger.info(
+                "归因: Excel 行 %s signature_id=%s occurrence_ids=%s status=%s",
+                item.get("workbook_row"),
+                item.get("signature_id"),
+                item.get("occurrence_ids"),
+                item.get("attribution_status"),
+            )
+        for gap in gaps:
+            logger.warning(
+                "归因缺口: kind=%s Excel 行 %s signature_id=%s reason=%s",
+                gap.get("kind"),
+                gap.get("workbook_row"),
+                gap.get("signature_id"),
+                gap.get("reason"),
+            )
     if not rows:
         logger.info("没有可写入上传模板的记录")
         for line in format_skipped_severity_rows(skipped_rows):
             logger.info("%s", line)
         return 0
+
+    workspace = None
+    if getattr(args, "output_dir", None):
+        workspace = Path(args.output_dir)
+    elif manifest_path is not None:
+        workspace = manifest_path.parent
+    result_dir = workspace if workspace is not None else RESULT_DIR
 
     output_path = args.output_path
     resolved_test_cases = sorted(
@@ -198,10 +252,10 @@ def main() -> int:
         }
     )
     if not output_path:
-        RESULT_DIR.mkdir(parents=True, exist_ok=True)
+        result_dir.mkdir(parents=True, exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         output_case_name = resolved_test_cases[0] if len(resolved_test_cases) == 1 else "多专项"
-        output_path = str(RESULT_DIR / f"{DEFAULT_OUTPUT_PREFIX}_{output_case_name}_{timestamp}.xlsx")
+        output_path = str(result_dir / f"{DEFAULT_OUTPUT_PREFIX}_{output_case_name}_{timestamp}.xlsx")
 
     saved = save_upload_list(rows, output_path)
     logger.info("原始结果: %s", os.path.abspath(args.main_excel_path))
@@ -211,6 +265,20 @@ def main() -> int:
     logger.info("成功处理 %d 条记录", len(rows))
     for line in format_skipped_severity_rows(skipped_rows):
         logger.info("%s", line)
+    if index is not None and workspace is not None:
+        payload = jira_attribution.build_payload(
+            stage="generate",
+            index=index,
+            items=items,
+            links=[],
+            gaps=gaps,
+            run_id=datetime.now().strftime("%Y%m%d_%H%M%S"),
+            workspace=workspace,
+        )
+        artifact_path = jira_attribution.write_payload(
+            workspace / "attribution_input.json", payload
+        )
+        logger.info("归因产物已写入: %s", artifact_path)
     return 0
 
 

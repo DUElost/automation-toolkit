@@ -441,7 +441,33 @@ python create_transsion_jira_batch_from_excel.py --add-excel-file JIRA_Upload_Li
 - 当前尚未执行真实建单
 
 
-8、后续扩展建议
+
+8、B8 G8 发生归因工作区（b8-g8-attribution-v1）
+
+平台提单时会把 manifest.json 与输入 xls 放进每次 JiraRun 的隔离工作区，并以该目录为 cwd：
+
+- 第一阶段：
+  python generate_transsion_jira_upload_list.py --add-main-excel <workspace>/delivery_*.xls ...
+  清单写 <workspace>/JIRA_Upload_List_*.xlsx，归因产物写 <workspace>/attribution_input.json
+- 第二阶段：
+  python create_transsion_jira_batch_from_excel.py --add-excel-file <workspace>/JIRA_Upload_List_*.xlsx ...
+  结果写 <workspace>/result/transsion_jira_batch_create_result_*.json，
+  归因产物写 <workspace>/attribution.json
+
+也可显式指定：
+  --output-dir <workspace> --attribution-manifest <workspace>/manifest.json
+
+规则：
+- 清单追加 Signature ID / Occurrence IDs / Occurrence Keys / Occurrence Count /
+  Attribution Status / Attribution Note / Source Excel Row；人工重排、筛选后按标识仍可定位发生
+- 同一 signature 的多个清单项合并为一行，Occurrence IDs 保留完整集合
+- 只有 manifest.attribution_candidates 内的 (signature_id, occurrence_id) 才写 Jira key 关联；
+  缺失、无效、越界、重复标识写入 attribution.json 的 gaps，重复发生不建单
+- 没有 manifest 且未传 --output-dir 时保持旧行为：默认输入、result/ 输出与 stdout 不变
+- 契约与样本：../contracts/README.md
+
+
+9、后续扩展建议
 
 新增项目时，优先维护以下文件：
 - config/affect_project_mapping.json

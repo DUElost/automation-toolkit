@@ -1,0 +1,56 @@
+[
+  {
+    "row": 1,
+    "status": "SUCCESS",
+    "project": "VFFCA",
+    "summary": "【Monkey专项】...",
+    "issue_key": "VFFCA-1234",
+    "matched_jira_key": null,
+    "decision": {
+      "action": "CREATE_NEW",
+      "manual_review": false,
+      "update_jira": false,
+      "recreate_issue": true
+    },
+    "error": null,
+    "signature_id": 7,
+    "occurrence_id": null,
+    "occurrence_ids": [
+      101,
+      102,
+      103
+    ],
+    "occurrence_keys": [
+      "k101",
+      "k102",
+      "k103"
+    ],
+    "attribution_status": "OK",
+    "attribution_note": ""
+  },
+  {
+    "row": 2,
+    "status": "SUCCESS",
+    "project": "VFFCA",
+    "summary": "【Monkey专项】...",
+    "issue_key": "VFFCA-900",
+    "matched_jira_key": "VFFCA-900",
+    "decision": {
+      "action": "OPEN_LIKE_UPDATE",
+      "manual_review": false,
+      "update_jira": true,
+      "recreate_issue": false
+    },
+    "error": null,
+    "signature_id": 8,
+    "occurrence_id": 201,
+    "occurrence_ids": [
+      201
+    ],
+    "occurrence_keys": [
+      "k201"
+    ],
+    "attribution_status": "OK",
+    "attribution_note": ""
+  }
+]
