@@ -333,8 +333,11 @@ def get_connected_devices():
                 device_id = line.split()[0]
                 if not device_id.upper().startswith(prefixes):
                     # v11(N6): 本函数每轮都重跑，逐轮逐台打 INFO 会淹没日志
-                    #（现场 .58：118 分钟 132 条跳过 INFO / 16 台唯一设备，外推日增≈1600 条/host）。
-                    # 每台设备首次出现记 INFO，之后降级 DEBUG——跳过这件事仍然留痕。
+                    #（现场 .58：截至 20:52，当日 2098 行日志里 214 行是这条跳过 INFO（10.2%）、
+                    #  16 台唯一设备，外推日增≈1600 行/host）。
+                    # 每台设备只记首轮 1 条 INFO，之后转 DEBUG。注意 TEST_LOGGER 常驻 INFO 级别
+                    # （Logger.setDebugMode 全文无调用点，实测当日日志 DEBUG 行数=0），
+                    # 因此默认级别下这些行不会落盘——要逐轮留痕，先给 logger 接一个 debug 开关。
                     key = device_id.upper()
                     if key in non_535_skip_notified:
                         TEST_LOGGER.debug(f"跳过非 535 族设备 {device_id}（不在监测机型白名单，已记过一次）")
