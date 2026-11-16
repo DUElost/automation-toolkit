@@ -22,7 +22,7 @@ import importlib
 import json
 import os
 import sys
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Dict, Iterable, List, Optional, Tuple
@@ -748,9 +748,21 @@ def _prepare_generator_fixtures(tool: str, workspace: Path) -> Dict[str, Path]:
     return fixtures
 
 
-def _scenario_generator_workspace(tool: str, repo_root: Path, root: Path) -> Dict[str, Any]:
+def _scenario_generator(tool: str, repo_root: Path, root: Path, mode: str) -> Dict[str, Any]:
     module, tool_dir = _load_module(repo_root, tool, "generate")
-    workspace = root / "generator-workspace"
+    if mode == "relative":
+        parent = root / "generator-relative-parent"
+        workspace = parent / "rel_ws"
+        output_dir: Optional[str] = "rel_ws"
+        cwd: Optional[Path] = parent
+    elif mode == "auto":
+        workspace = root / "generator-auto"
+        output_dir = None
+        cwd = workspace
+    else:
+        workspace = root / "generator-absolute"
+        output_dir = str(workspace)
+        cwd = None
     workspace.mkdir(parents=True, exist_ok=True)
     (workspace / "manifest.json").write_text(json.dumps(_manifest(), ensure_ascii=False), encoding="utf-8")
     raw_workbook = workspace / "raw.xlsx"
@@ -777,8 +789,8 @@ def _scenario_generator_workspace(tool: str, repo_root: Path, root: Path) -> Dic
             probability_rules_file=str(fixtures["probability"]),
             test_summary_file=str(fixtures["summary"]),
             component_regex_file=str(fixtures["regex"]),
-            output_dir=str(workspace),
-            attribution_manifest=str(workspace / "manifest.json"),
+            output_dir=output_dir,
+            attribution_manifest=None if mode == "auto" else str(workspace / "manifest.json"),
         )
     else:
         args = SimpleNamespace(
@@ -796,20 +808,22 @@ def _scenario_generator_workspace(tool: str, repo_root: Path, root: Path) -> Dic
             reporter="probe-user",
             assignee="probe-user",
             test_mode=False,
-            output_dir=str(workspace),
-            attribution_manifest=str(workspace / "manifest.json"),
+            output_dir=output_dir,
+            attribution_manifest=None if mode == "auto" else str(workspace / "manifest.json"),
         )
     failures: List[str] = []
     with mock.patch.object(module, "setup_logging"):
         with mock.patch.object(module, "parse_args", return_value=args):
-            if tool == "tinno":
-                with mock.patch.object(module, "load_local_env"):
+            with chdir(cwd) if cwd is not None else nullcontext():
+                if tool == "tinno":
+                    with mock.patch.object(module, "load_local_env"):
+                        rc = int(module.main())
+                else:
                     rc = int(module.main())
-            else:
-                rc = int(module.main())
-    workbooks = list(workspace.glob("JIRA_Upload_List_*.xlsx"))
+    expected_workspace = parent / "rel_ws" if mode == "relative" else workspace
+    workbooks = list(expected_workspace.glob("JIRA_Upload_List_*.xlsx"))
     _check(len(workbooks) == 1, f"generator workbook count={len(workbooks)}", failures)
-    _check((workspace / "attribution_input.json").is_file(), "attribution_input.json missing", failures)
+    _check((expected_workspace / "attribution_input.json").is_file(), "attribution_input.json missing", failures)
     if workbooks:
         payload = pd.read_excel(workbooks[0])
         _check("Occurrence IDs" in payload.columns, "generator workbook lacks Occurrence IDs", failures)
@@ -819,7 +833,7 @@ def _scenario_generator_workspace(tool: str, repo_root: Path, root: Path) -> Dic
             failures,
         )
     return {
-        "scenario": "generator_workspace",
+        "scenario": f"generator_{mode}",
         "passed": not failures,
         "failures": failures,
         "workbook": str(workbooks[0]) if workbooks else "",
@@ -841,7 +855,9 @@ SCENARIOS = [
     ("output_auto", _scenario_output_auto, "batch"),
     ("two_workspaces", _scenario_two_workspaces, "batch"),
     ("legacy_default", _scenario_legacy_default, "batch"),
-    ("generator_workspace", _scenario_generator_workspace, "generate"),
+    ("generator_relative", lambda tool, repo, root: _scenario_generator(tool, repo, root, "relative"), "generate"),
+    ("generator_absolute", lambda tool, repo, root: _scenario_generator(tool, repo, root, "absolute"), "generate"),
+    ("generator_auto", lambda tool, repo, root: _scenario_generator(tool, repo, root, "auto"), "generate"),
 ]
 
 
@@ -893,4 +909,3 @@ def main(argv: Optional[List[str]] = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
