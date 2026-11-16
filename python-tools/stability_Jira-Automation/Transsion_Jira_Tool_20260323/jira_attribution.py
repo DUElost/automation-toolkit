@@ -230,6 +230,11 @@ class ManifestIndex:
         self.candidates: Dict[Tuple[int, int], Occurrence] = {}
         self.by_signature: Dict[int, List[Occurrence]] = {}
         self.issue_by_signature: Dict[int, Dict[str, Any]] = {}
+        self.registered_signatures: set[int] = set()
+        for item in manifest.get("issue_ids") or []:
+            signature_id = _parse_int(item)
+            if signature_id is not None:
+                self.registered_signatures.add(signature_id)
         for item in manifest.get("issues") or []:
             if not isinstance(item, Mapping):
                 continue
@@ -237,12 +242,16 @@ class ManifestIndex:
             if signature_id is None:
                 continue
             self.issue_by_signature[signature_id] = dict(item)
+            self.registered_signatures.add(signature_id)
+        scoped_signatures = set(self.registered_signatures)
         for item in manifest.get("attribution_candidates") or []:
             if not isinstance(item, Mapping):
                 continue
             signature_id = _parse_int(item.get("signature_id"))
             occurrence_id = _parse_int(item.get("occurrence_id"))
             if signature_id is None or occurrence_id is None:
+                continue
+            if scoped_signatures and signature_id not in scoped_signatures:
                 continue
             occurrence = Occurrence(
                 signature_id=signature_id,
@@ -294,12 +303,12 @@ class ManifestIndex:
             resolution.note = f"Signature ID 不是整数: {resolution.raw_signature!r}"
             return resolution
         resolution.signature_id = signature_id
-        if signature_id not in self.by_signature:
+        if signature_id not in self.registered_signatures:
             resolution.status = STATUS_UNKNOWN_SIGNATURE_ID
             resolution.note = f"Signature ID {signature_id} 不在本次 manifest 登记范围"
             return resolution
 
-        allowed = self.by_signature[signature_id]
+        allowed = self.by_signature.get(signature_id, [])
         if not allowed:
             resolution.status = STATUS_NO_OCCURRENCE
             resolution.note = f"Signature ID {signature_id} 在 manifest 中没有发生"
