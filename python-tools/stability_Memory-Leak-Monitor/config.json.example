@@ -9,6 +9,14 @@
         "com.android.settings": { "prop": "dalvik.vm.heapgrowthlimit" }
     },
 
+    "serial_whitelist": {
+        "_note": "v10：机型白名单（序列号前缀）。非白名单设备只记 INFO 并跳过，不进入任何采集/判据",
+        "prefixes": ["AHFFNX", "ATHTNX", "ASEBNX", "AZ6QNX", "AT7QNX", "AW8QNX"],
+        "family": "MLD-NX2(AHFFNX,ATHTNX) / MLD-NX3-Claro(ASEBNX,AZ6QNX) / MLD-NX3(AT7QNX,AW8QNX)",
+        "excluded_observed": ["A2WENX", "AVCGNX", "AS4XNX"],
+        "override_env": "MEMLEAK_SERIAL_PREFIXES"
+    },
+
     "thresholds": {
         "heap_levels": [[1, 0.85], [2, 0.95]],
         "level_reset_ratio": 0.35,
