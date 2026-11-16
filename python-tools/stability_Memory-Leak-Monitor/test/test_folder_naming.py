@@ -51,12 +51,54 @@ def test_trigger_thresholds_match_documented_criteria():
     assert mon.HPROF_DUMP_COOLDOWN_SECONDS == 1800
 
 
-def test_v8_targets_registered():
-    """v8 的四路监控对象（systemui/settings 复用 launcher 档判据）。"""
+def test_targets_registered():
+    """四路监控对象（systemui/settings 复用 launcher 档判据）。"""
     assert mon.LAUNCHER_PKG == "com.android.launcher3"
     assert set(mon.APP_EXTRA_PKGS) == {"com.android.systemui", "com.android.settings"}
     assert mon.HEAP_SERIES_LAUNCHER_FILENAME == "meminfo_heap_launcher.txt"
     assert mon.APP_HEAP_SERIES_MULTI_FILENAME == "meminfo_heap_apps.txt"
+
+
+def _pct_of(line):
+    m = re.search(r"pct=([\d.]+)%", line)
+    return float(m.group(1)) if m else None
+
+
+def test_apps_series_is_per_process_throttled():
+    """v9 修复：systemui 与 settings 合写一份文件时，不得互相吃掉对方的行。"""
+    import tempfile
+    from pathlib import Path
+
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        target = "meminfo_heap_apps.txt"
+        mon.heap_series_last_write.clear()
+        mon._append_heap_series("DEV", tmp_path, 30 * 1024, 256 * 1024, 0, None, target, proc="com.android.systemui")
+        gc_hint = "Waiting for a blocking GC"
+        mon._append_heap_series("DEV", tmp_path, 228 * 1024, 256 * 1024, 1, gc_hint, target,
+                                proc="com.android.settings")
+        # 同进程 30 秒内重复调用必须仍被节流
+        mon._append_heap_series("DEV", tmp_path, 230 * 1024, 256 * 1024, 1, None, target, proc="com.android.settings")
+        lines = (tmp_path / target).read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 2, lines
+    procs = {l.split("proc=")[1].split()[0]: _pct_of(l) for l in lines}
+    assert procs["com.android.systemui"] == 11.7, procs
+    # settings 的 89.1% 高水位必须留存——修复前它会被 systemui 的行挤掉
+    assert procs["com.android.settings"] == 89.1, procs
+
+
+def test_system_server_series_format_unchanged():
+    """system_server 通道不带 proc= 字段，保证历史曲线可续读、解析口径不变。"""
+    import tempfile
+    from pathlib import Path
+
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        mon.heap_series_last_write.clear()
+        mon._append_heap_series("DEV", tmp_path, 62 * 1024, 512 * 1024, 0, None, "meminfo_heap.txt")
+        row = (tmp_path / "meminfo_heap.txt").read_text(encoding="utf-8").splitlines()[-1]
+    assert "| proc=" not in row
+    assert "target=512MB" in row
 
 
 def test_monkey_off_by_default():

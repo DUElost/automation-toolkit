@@ -90,6 +90,19 @@ MIRROR_MIN_FREE_GB = 20          # 15.4 剩余低于此值时不再拷共享盘�
 LOCAL_MIN_FREE_GB = 10           # 本地剩余低于此值才真正跳过 dump
 # A) 重点盯防名单：命中者无条件进入 30 秒加密轮询（不必等 L1）
 # 运行时可在主机维护 /home/android/memleak/hot_devices.txt（每行一个序列号，# 注释），下一轮即生效
+# —— v10(2026-11-16 用户要求)：监测限定 535 族机型。前缀取自 fleet 全部 20 台 host 的实测序列号枚举。
+#   535 族：AHFFNX/ATHTNX(NX2) ASEBNX/AZ6QNX(NX3-Claro) AT7QNX/AW8QNX(NX3)
+#   非 535 族（现场实测，不纳入）：A2WENX/AVCGNX(MLY-LX2/LX3) AS4XNX(MOD-LX3)
+SERIAL_PREFIX_DEFAULT = ("AHFFNX", "ATHTNX", "ASEBNX", "AZ6QNX", "AT7QNX", "AW8QNX")
+
+
+def get_serial_prefixes():
+    """可用 MEMLEAK_SERIAL_PREFIXES="A,B,…" 覆盖，便于其它机型临时复用。"""
+    raw = os.environ.get("MEMLEAK_SERIAL_PREFIXES", "")
+    items = tuple(x.strip().upper() for x in raw.split(",") if x.strip())
+    return items or SERIAL_PREFIX_DEFAULT
+
+
 HOT_DEVICES_FILE = os.environ.get("MEMLEAK_HOT_FILE", "/home/android/memleak/hot_devices.txt")
 HOT_DEVICE_SERIALS_DEFAULT = {
     "AHFFNX6930000217", "AHFFNX6930000188", "AHFFNX6930000167",
@@ -311,9 +324,13 @@ def get_connected_devices():
     try:
         result = subprocess.run(["adb", "devices"], capture_output=True, text=True, check=True)
         devices = []
+        prefixes = get_serial_prefixes()
         for line in result.stdout.strip().split('\n')[1:]:
             if line.strip() and "device" in line:
                 device_id = line.split()[0]
+                if not device_id.upper().startswith(prefixes):
+                    TEST_LOGGER.info(f"跳过非 535 族设备 {device_id}（不在监测机型白名单）")
+                    continue
                 devices.append(device_id)
         return devices
     except Exception as e:
@@ -827,17 +844,24 @@ def _scan_logcat_early_signal(device_id):
 
 
 def _append_heap_series(device_id, log_path, heap_kb, target_kb, level, early,
-                        filename=HEAP_SERIES_FILENAME):
-    """B) 落一行堆时序：时间 | heap | 占比 | 上限 | 档位 | 是否盯防 | 早期信号。"""
+                        filename=HEAP_SERIES_FILENAME, proc=""):
+    """B) 落一行堆时序：时间 | 进程 | heap | 占比 | 上限 | 档位 | 是否盯防 | 早期信号。
+
+    v9：节流键按 (设备, 文件, 进程) 分列。此前 systemui/settings 合写
+    meminfo_heap_apps.txt 且只按 (设备, 文件) 节流，先执行的 systemui 会把
+    settings 的高水位行整条吃掉（11-12 现场：settings 实测 89%，文件里峰值只有 15%）。
+    """
     now = time.time()
-    ck=(device_id,filename)
+    ck=(device_id,filename,proc)
     if now - heap_series_last_write.get(ck, 0) < HEAP_SERIES_MIN_INTERVAL:
         return
     heap_series_last_write[ck] = now
     try:
         os.makedirs(log_path, exist_ok=True)
-        line = "%s | heap=%dMB | pct=%.1f%% | target=%dMB | level=L%d | hot=%d%s" % (
-            datetime.now().strftime("%Y-%m-%d %H:%M:%S"), heap_kb // 1024, 100.0 * heap_kb / target_kb,
+        line = "%s |%s heap=%dMB | pct=%.1f%% | target=%dMB | level=L%d | hot=%d%s" % (
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            (" proc=%s" % proc) if proc else "",
+            heap_kb // 1024, 100.0 * heap_kb / target_kb,
             target_kb // 1024, level, 1 if device_id in HOT_DEVICE_SERIALS else 0,
             (" | early=%s" % early) if early else "")
         with open(os.path.join(log_path, filename), "a", encoding="utf-8") as fh:
@@ -868,7 +892,7 @@ def check_launcher_heap(device_id, log_path, pkg=LAUNCHER_PKG):
         else:
             app_heap_level[(device_id, pkg)] = 0
         _append_heap_series(device_id, log_path, heap_kb, target_kb, 0, None,
-                            series_file)
+                            series_file, proc=label)
         return
     level = 0
     for lv, th in SS_HEAP_LEVELS:
@@ -877,7 +901,7 @@ def check_launcher_heap(device_id, log_path, pkg=LAUNCHER_PKG):
     headroom_mb = (target_kb - heap_kb) / 1024.0
     early = _scan_logcat_early_signal(device_id)
     _append_heap_series(device_id, log_path, heap_kb, target_kb, level, early,
-                        series_file)
+                        series_file, proc=label)
     if ratio >= 0.75:
         ss_hot_devices.add(device_id)
     if level > prev:
