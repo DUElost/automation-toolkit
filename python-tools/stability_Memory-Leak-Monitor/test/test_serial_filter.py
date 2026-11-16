@@ -83,3 +83,37 @@ def test_config_example_agrees_with_source_constant():
     )
     assert tuple(cfg["serial_whitelist"]["prefixes"]) == mon.SERIAL_PREFIX_DEFAULT
     assert cfg["serial_whitelist"]["override_env"] == "MEMLEAK_SERIAL_PREFIXES"
+
+
+@patch("subprocess.run", return_value=_Result(_fake_adb_output(SERIALS_535 + SERIALS_NON_535)))
+def test_non_535_skip_is_logged_once_per_serial(_r):
+    """v11(N6)：跳过非 535 设备这件事，每台只在首轮记 INFO，之后降为 DEBUG。
+
+    反证：v10 每轮逐台重复打 INFO，`.58` 实测 118 分钟 132 条跳过 INFO、16 台唯一设备
+    （外推日增≈1600 条/host），把与泄漏无关的行刷成主体日志。
+    """
+    mon.non_535_skip_notified.clear()
+    with patch.object(mon.TEST_LOGGER, "info") as info, \
+            patch.object(mon.TEST_LOGGER, "debug") as dbg:
+        for _ in range(3):                       # 模拟 3 个轮次
+            mon.get_connected_devices()
+    first_round = [c.args[0] for c in info.call_args_list if "跳过非 535" in c.args[0]]
+    later = [c.args[0] for c in dbg.call_args_list if "跳过非 535" in c.args[0]]
+    assert len(first_round) == len(SERIALS_NON_535), first_round      # 每台设备只记 1 条
+    # 消息里序列号紧跟全角括号，不能用空白切词取
+    noticed = {m.split("族设备 ")[1].split("（")[0] for m in first_round}
+    assert noticed == set(SERIALS_NON_535), first_round
+    assert len(later) == 2 * len(SERIALS_NON_535), later              # 后两轮降级但仍留痕
+    mon.non_535_skip_notified.clear()
+
+
+@patch("subprocess.run", return_value=_Result(_fake_adb_output([s.lower() for s in SERIALS_NON_535])))
+def test_skip_notice_dedup_is_case_insensitive(_r):
+    """大小写不同的同一序列号不得再刷一条 INFO（判定按大写，去重键也必须按大写）。"""
+    mon.non_535_skip_notified.clear()
+    with patch("subprocess.run", return_value=_Result(_fake_adb_output(SERIALS_NON_535))):
+        mon.get_connected_devices()              # 先按大写记满
+    with patch.object(mon.TEST_LOGGER, "info") as info:
+        mon.get_connected_devices()              # 再来一份小写的同一批设备
+    assert not [c for c in info.call_args_list if "跳过非 535" in c.args[0]]
+    mon.non_535_skip_notified.clear()
