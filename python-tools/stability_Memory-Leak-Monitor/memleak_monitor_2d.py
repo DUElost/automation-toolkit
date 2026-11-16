@@ -89,7 +89,9 @@ LOCAL_HPROF_STAGING_ROOT = os.environ.get("MEMLEAK_STAGING", "/home/android/meml
 MIRROR_MIN_FREE_GB = 20          # 15.4 剩余低于此值时不再拷共享盘，只保留本地镜像
 LOCAL_MIN_FREE_GB = 10           # 本地剩余低于此值才真正跳过 dump
 # A) 重点盯防名单：命中者无条件进入 30 秒加密轮询（不必等 L1）
-# 运行时可在主机维护 /home/android/memleak/hot_devices.txt（每行一个序列号，# 注释），下一轮即生效
+# 运行时可在主机维护 /home/android/memleak/hot_devices.txt（每行一个序列号，# 注释）。
+# v11 更正：名单只在进程启动时读一次（见 HOT_DEVICE_SERIALS 赋值），改文件必须重启监测才生效，
+#           轮询里不会重读——在此之前改完文件就以为生效，会白等一场（N3）。
 # —— v10(2026-11-16 用户要求)：监测限定 535 族机型。前缀取自 fleet 全部 20 台 host 的实测序列号枚举。
 #   535 族：AHFFNX/ATHTNX(NX2) ASEBNX/AZ6QNX(NX3-Claro) AT7QNX/AW8QNX(NX3)
 #   非 535 族（现场实测，不纳入）：A2WENX/AVCGNX(MLY-LX2/LX3) AS4XNX(MOD-LX3)
@@ -113,7 +115,7 @@ HOT_DEVICE_SERIALS_DEFAULT = {
 
 
 def get_hot_device_set():
-    """默认名单 + 外部文件，名单可运行时增删。"""
+    """默认名单 + 外部文件。只在进程启动时被调用一次，增删成员必须重启监测才生效。"""
     result = set(HOT_DEVICE_SERIALS_DEFAULT)
     try:
         with open(HOT_DEVICES_FILE, encoding="utf-8") as fh:
@@ -317,6 +319,7 @@ INITIAL_SETUP_COMMAND_ACTIONS = [
 last_execution_times = {}
 last_device_check_time = 0 
 active_devices = set()
+non_535_skip_notified = set()     # v11(N6): 已就「非 535 跳过」记过 INFO 的序列号（大写）
 
 
 def get_connected_devices():
@@ -329,7 +332,15 @@ def get_connected_devices():
             if line.strip() and "device" in line:
                 device_id = line.split()[0]
                 if not device_id.upper().startswith(prefixes):
-                    TEST_LOGGER.info(f"跳过非 535 族设备 {device_id}（不在监测机型白名单）")
+                    # v11(N6): 本函数每轮都重跑，逐轮逐台打 INFO 会淹没日志
+                    #（现场 .58：118 分钟 132 条跳过 INFO / 16 台唯一设备，外推日增≈1600 条/host）。
+                    # 每台设备首次出现记 INFO，之后降级 DEBUG——跳过这件事仍然留痕。
+                    key = device_id.upper()
+                    if key in non_535_skip_notified:
+                        TEST_LOGGER.debug(f"跳过非 535 族设备 {device_id}（不在监测机型白名单，已记过一次）")
+                    else:
+                        non_535_skip_notified.add(key)
+                        TEST_LOGGER.info(f"跳过非 535 族设备 {device_id}（不在监测机型白名单）")
                     continue
                 devices.append(device_id)
         return devices

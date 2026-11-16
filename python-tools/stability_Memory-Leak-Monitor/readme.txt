@@ -3,7 +3,7 @@
 
 版本锚点
 --------
-主脚本 memleak_monitor_2d.py：sha256 前缀 c70ccc22，1502 行，为 v11。
+主脚本 memleak_monitor_2d.py：sha256 前缀 9fdab83d，1513 行，为 v11。
 前一版 v10（307f43b6，1495 行）已移入 archive/memleak_monitor_2d_261116_v10.py。
 再前一版 v8（4bf9136e，1471 行）在 archive/memleak_monitor_2d_261102_v8.py。
 在跑版本不等于本文件：2026-11-16 逐台 sha 实测 fleet 20 台仍跑 v10（307f43b6，
@@ -68,7 +68,9 @@ run_2d.sh                      启动器：nohup + timeout 到点自停 + 拉起
 stop_2d.sh                     唯一允许的手动提前停止方式（精确 PID + cmdline 白名单，不用 pkill -f）
 watchdog.sh                    只管 15.4 挂载存活与容量水位；不重启监控进程（避免批次计时清零造成全量重拉）
 mount_sonic_tinno.template.sh  CIFS 挂载模板【无凭据】，复制为 mount_sonic_tinno.sh 后现场填写
-hot_devices.txt                常驻 30 秒加密盯防名单（每行一个序列号，# 注释，下一轮生效）
+hot_devices.txt                常驻 30 秒加密盯防名单（每行一个序列号，# 注释）。
+                               改文件后必须重启监测进程才生效——名单只在启动时读一次
+                               （HOT_DEVICE_SERIALS 在 import 时求值，轮询里不重读）。
 config.json.example            判据/路径的只读参考样例——注意：主脚本不读此文件，改判据必须改源码常量
 archive/                       历史版本（_<YYMMDD>_<ver>.py 命名，沿用仓库既有惯例）
 MonkeyTest.sh                  设备侧压测启动器；本工具默认不调用它（见下）
@@ -101,16 +103,30 @@ MEMLEAK_MONKEY 默认为 0：本工具只观测，Monkey 压力由测试平台�
    非 535 族自 v10 起会被过滤跳过；但同一主机上其它 535 项目的设备仍会一并纳入观测，
    这是有意取舍（宁可多看，不可漏看）。
 6. 重启监测会清零档位状态与批次计时，泄漏观测须重新计数；非必要不得在窗口中途重启。
+7. 盯防名单与「不得中途重启」（见 6）互相牵制：改 hot_devices.txt 必须重启才生效，
+   而重启又清零档位。要加名单就随下一次计划内的重启一起做，别为它单独重启。
 
 变更记录
 --------
-v11 2026-11-16  `proc=` 字段收回多进程文件。v10 把日志文案用的 label 同时当作 proc= 入参，
-                launcher 曲线被写成「… | proc=launcher3 heap=…」，既与上面「行格式约束」的
-                文档口径不符，也让同一文件里出现两种行格式（11-02 起的 v8/v9 曲线无该字段）；
-                apps 侧的短名/全名并存（launcher3 vs com.android.systemui）随之消失。
-                判据、触发逻辑、节流键 (设备, 文件, 进程) 与产物路径均未变。
-                动因：PR #28 独立复核 P2-1/N4。新增 test_proc_field_is_limited_to_multi_process_file
-                ——该例在 v10 字节上必失败（实测 1 failed, 9 passed），在 v11 上通过。
+v11 2026-11-16  三条 PR #28 复核整改。判据、触发逻辑、产物路径、节流窗口均未动：
+                · P2-1/N4  `proc=` 字段收回多进程文件。v10 把日志文案用的 label 同时当作 proc= 入参，
+                  launcher 曲线被写成「… | proc=launcher3 heap=…」，既与「行格式约束」的口径不符，
+                  也让同一文件里并存两种行格式（11-02 起的 v8/v9 曲线无该字段）；apps 侧短名/全名
+                  并存（launcher3 vs com.android.systemui）随之消失。launcher 的节流键退回
+                  (设备, 文件, "")，与 v9 行为一致。新增调用方视角的
+                  test_proc_field_is_limited_to_multi_process_file（两路各写一行 + 共用行格式正则）。
+                · N6  非 535 跳过日志按序列号去重：每台首轮记 1 条 INFO，之后降级 DEBUG（仍留痕）。
+                  v10 每轮逐台重复打印——`.58` 实测 118 分钟 132 条跳过 INFO、16 台唯一设备
+                  （外推日增≈1600 条/host），与泄漏无关的行刷成日志主体。去重键取大写序列号，
+                  大小写异常不重复计。新增 test_non_535_skip_is_logged_once_per_serial、
+                  test_skip_notice_dedup_is_case_insensitive。
+                · N3  文档纠错（无代码行为变更）：本节与源码注释原写「hot 名单下一轮生效」，实际
+                  get_hot_device_set() 只在 import 时被调用一次（全文仅 2 处：定义 + 赋值），轮询里
+                  零调用，改文件必须重启进程才生效。本轮生产新增的 9 台 hot 之所以生效，纯属 v10
+                  部署恰好重启了进程，不是「下一轮」的功劳。已知限制补第 7 条说明它与「不得中途重启」
+                  的牵制。
+                回归：新例在 v10 字节上 3 failed / 16 passed，在 v8 字节上 9 failed / 10 passed；
+                本版本 19 passed。
 v10 2026-11-16  监测限定 535 族：get_connected_devices 按序列号前缀白名单过滤，
                 非 535 设备只记一条 INFO 并跳过；新增 MEMLEAK_SERIAL_PREFIXES 覆盖口子。
                 线上动因：4 台主机单日累计 ERROR 1493/1135/536/453 条，全部来自非 535
