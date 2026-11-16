@@ -101,6 +101,50 @@ def test_system_server_series_format_unchanged():
     assert "target=512MB" in row
 
 
+HEAP_ROW_SHAPE = re.compile(
+    r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} \| (?:proc=\S+ )?heap=\d+MB \| "
+    r"pct=[\d.]+% \| target=\d+MB \| level=L\d \| hot=\d$"
+)
+
+
+def test_proc_field_is_limited_to_multi_process_file():
+    """v11（复核 P2-1/N4）：`proc=` 只能出现在多进程合写的 apps 曲线上。
+
+    反证：v10 把日志文案用的 label 同时当作 proc= 入参，launcher 曲线被写成
+    「… | proc=launcher3 heap=…」——readme 只声明 apps 文件带 proc=，且 11-02 起的
+    launcher 历史曲线会在同一文件里出现两种行格式。
+    本例走调用方（check_launcher_heap）而非直接调 _append_heap_series，
+    这样两路 `proc=` 的取值也必须由调用方决定，短名/全名并存（N4）一并锁住。
+    """
+    import tempfile
+    from pathlib import Path
+
+    rows = {}
+    for pkg, filename in (
+        (mon.LAUNCHER_PKG, mon.HEAP_SERIES_LAUNCHER_FILENAME),
+        ("com.android.systemui", mon.APP_HEAP_SERIES_MULTI_FILENAME),
+    ):
+        mon.heap_series_last_write.clear()
+        mon.la_heap_level.clear()
+        mon.app_heap_level.clear()
+        mon.ss_hot_devices.clear()
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            # 30MB/256MB = 11.7%，低于 35% 复位线：只写一行时序，不触发 dump 与 logcat 扫描
+            with patch.object(mon, "_read_dalvik_heap_kb", return_value=30 * 1024), \
+                    patch.object(mon, "_read_target_heap_kb", return_value=256 * 1024):
+                mon.check_launcher_heap("DEV", tmp_path, pkg)
+            rows[filename] = (tmp_path / filename).read_text(encoding="utf-8").splitlines()[-1]
+
+    launcher_row = rows[mon.HEAP_SERIES_LAUNCHER_FILENAME]
+    apps_row = rows[mon.APP_HEAP_SERIES_MULTI_FILENAME]
+    assert "proc=" not in launcher_row, launcher_row
+    assert "| proc=com.android.systemui " in apps_row, apps_row
+    # 两路共用同一字段序列，唯一差别就是 apps 多一个 proc= 前缀
+    assert HEAP_ROW_SHAPE.match(launcher_row), launcher_row
+    assert HEAP_ROW_SHAPE.match(apps_row), apps_row
+
+
 def test_monkey_off_by_default():
     """压力归平台专项：默认不得由本工具拉起 monkey。"""
     assert mon.MONKEY_ENABLED is False

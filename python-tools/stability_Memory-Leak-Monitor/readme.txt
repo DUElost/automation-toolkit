@@ -3,9 +3,12 @@
 
 版本锚点
 --------
-主脚本 memleak_monitor_2d.py：sha256 前缀 307f43b6，1495 行，为 v10。
-前一版 v8（4bf9136e，1471 行）已移入 archive/memleak_monitor_2d_261102_v8.py。
-顶层脚本与生产 fleet 全部 agent 主机在跑的副本逐字节一致（20 台已逐台 sha 核对）。
+主脚本 memleak_monitor_2d.py：sha256 前缀 c70ccc22，1502 行，为 v11。
+前一版 v10（307f43b6，1495 行）已移入 archive/memleak_monitor_2d_261116_v10.py。
+再前一版 v8（4bf9136e，1471 行）在 archive/memleak_monitor_2d_261102_v8.py。
+在跑版本不等于本文件：2026-11-16 逐台 sha 实测 fleet 20 台仍跑 v10（307f43b6，
+窗口至 2026-11-18 18:00）。v11 只入库未下发；下发要按「使用」节重启监测，而重启会
+清零档位与批次计时（见已知限制 6），必须等窗口收口或另行决策后再做。
 改脚本必须同步改本节版本号；行为变更必须新增版本并把上一版移入 archive/，不得原地替换不留档。
 
 它解决什么问题
@@ -48,6 +51,9 @@ Monkey 长跑专项中，system_server 的堆会缓慢爬坡直到打满（实�
     meminfo_heap_launcher.txt   launcher3 独立序列
     meminfo_heap_apps.txt       systemui/settings 合用一份，v9 起每行带 proc=<pkg>、
                                 节流按 (设备, 文件, 进程) 分列，两进程各自成行
+    行格式约束（v11 明确并加测试锁定）：proc= 只出现在多进程合写的 apps 文件里，
+    且取值为全限定包名；单进程文件（meminfo_heap.txt / meminfo_heap_launcher.txt）
+    行内不带 proc=，与 v9 起的历史曲线保持同一解析口径。
     meminfo_rss_top.txt         "system=…; launcher=…; settings=…; systemui=…" 四目标 RSS
 触发样本：
     leak_<pkg>_<时间戳>.hprof  → 先 pull 到主机本地暂存，再镜像中心共享盘，两边做字节校验
@@ -98,6 +104,13 @@ MEMLEAK_MONKEY 默认为 0：本工具只观测，Monkey 压力由测试平台�
 
 变更记录
 --------
+v11 2026-11-16  `proc=` 字段收回多进程文件。v10 把日志文案用的 label 同时当作 proc= 入参，
+                launcher 曲线被写成「… | proc=launcher3 heap=…」，既与上面「行格式约束」的
+                文档口径不符，也让同一文件里出现两种行格式（11-02 起的 v8/v9 曲线无该字段）；
+                apps 侧的短名/全名并存（launcher3 vs com.android.systemui）随之消失。
+                判据、触发逻辑、节流键 (设备, 文件, 进程) 与产物路径均未变。
+                动因：PR #28 独立复核 P2-1/N4。新增 test_proc_field_is_limited_to_multi_process_file
+                ——该例在 v10 字节上必失败（实测 1 failed, 9 passed），在 v11 上通过。
 v10 2026-11-16  监测限定 535 族：get_connected_devices 按序列号前缀白名单过滤，
                 非 535 设备只记一条 INFO 并跳过；新增 MEMLEAK_SERIAL_PREFIXES 覆盖口子。
                 线上动因：4 台主机单日累计 ERROR 1493/1135/536/453 条，全部来自非 535

@@ -850,6 +850,10 @@ def _append_heap_series(device_id, log_path, heap_kb, target_kb, level, early,
     v9：节流键按 (设备, 文件, 进程) 分列。此前 systemui/settings 合写
     meminfo_heap_apps.txt 且只按 (设备, 文件) 节流，先执行的 systemui 会把
     settings 的高水位行整条吃掉（11-12 现场：settings 实测 89%，文件里峰值只有 15%）。
+
+    v11：`proc=` 字段只属于多进程合写的 meminfo_heap_apps.txt。单进程文件
+    （meminfo_heap.txt / meminfo_heap_launcher.txt）不写该字段，保持 v9 行格式，
+    历史曲线可续读；调用方由 proc_tag 表达该约束（见 check_launcher_heap）。
     """
     now = time.time()
     ck=(device_id,filename,proc)
@@ -880,6 +884,8 @@ def check_launcher_heap(device_id, log_path, pkg=LAUNCHER_PKG):
     ratio = heap_kb / float(target_kb)
     series_file = HEAP_SERIES_LAUNCHER_FILENAME if pkg == LAUNCHER_PKG else APP_HEAP_SERIES_MULTI_FILENAME
     label = "launcher3" if pkg == LAUNCHER_PKG else pkg
+    # v11: label 只用于日志文案；写盘字段只对多进程文件加 proc=，launcher 曲线格式与 v9 一致。
+    proc_tag = "" if pkg == LAUNCHER_PKG else pkg
     if pkg == LAUNCHER_PKG:
         prev = la_heap_level.get(device_id, 0)
     else:
@@ -892,7 +898,7 @@ def check_launcher_heap(device_id, log_path, pkg=LAUNCHER_PKG):
         else:
             app_heap_level[(device_id, pkg)] = 0
         _append_heap_series(device_id, log_path, heap_kb, target_kb, 0, None,
-                            series_file, proc=label)
+                            series_file, proc=proc_tag)
         return
     level = 0
     for lv, th in SS_HEAP_LEVELS:
@@ -901,7 +907,7 @@ def check_launcher_heap(device_id, log_path, pkg=LAUNCHER_PKG):
     headroom_mb = (target_kb - heap_kb) / 1024.0
     early = _scan_logcat_early_signal(device_id)
     _append_heap_series(device_id, log_path, heap_kb, target_kb, level, early,
-                        series_file, proc=label)
+                        series_file, proc=proc_tag)
     if ratio >= 0.75:
         ss_hot_devices.add(device_id)
     if level > prev:
