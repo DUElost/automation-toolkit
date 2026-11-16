@@ -3,7 +3,7 @@
 
 版本锚点
 --------
-主脚本 memleak_monitor_2d.py：sha256 前缀 9fdab83d，1513 行，为 v11。
+主脚本 memleak_monitor_2d.py：sha256 前缀 8a6c1541，1516 行，为 v11。
 前一版 v10（307f43b6，1495 行）已移入 archive/memleak_monitor_2d_261116_v10.py。
 再前一版 v8（4bf9136e，1471 行）在 archive/memleak_monitor_2d_261102_v8.py。
 在跑版本不等于本文件：2026-11-16 逐台 sha 实测 fleet 20 台仍跑 v10（307f43b6，
@@ -115,11 +115,15 @@ v11 2026-11-16  三条 PR #28 复核整改。判据、触发逻辑、产物路�
                   并存（launcher3 vs com.android.systemui）随之消失。launcher 的节流键退回
                   (设备, 文件, "")，与 v9 行为一致。新增调用方视角的
                   test_proc_field_is_limited_to_multi_process_file（两路各写一行 + 共用行格式正则）。
-                · N6  非 535 跳过日志按序列号去重：每台首轮记 1 条 INFO，之后降级 DEBUG（仍留痕）。
-                  v10 每轮逐台重复打印——`.58` 实测 118 分钟 132 条跳过 INFO、16 台唯一设备
-                  （外推日增≈1600 条/host），与泄漏无关的行刷成日志主体。去重键取大写序列号，
-                  大小写异常不重复计。新增 test_non_535_skip_is_logged_once_per_serial、
-                  test_skip_notice_dedup_is_case_insensitive。
+                · N6  非 535 跳过日志按序列号去重：每台只在首轮记 1 条 INFO，之后转 DEBUG。
+                  v10 每轮逐台重复打印——`.58` 当日 2098 行日志里 214 行是这条跳过 INFO（10.2%）、
+                  16 台唯一设备（外推日增≈1600 行/host），与泄漏无关的行刷成日志主体。
+                  去重键取大写序列号，大小写异常不重复计。
+                  口径注意：TEST_LOGGER 常驻 INFO 级别（Logger.setDebugMode 全文无调用点，
+                  实测当日日志 DEBUG 行数 0），所以生产上每台就是「只留首轮 1 行」，不是每行都
+                  可查；要逐轮留痕必须给 logger 接 debug 开关（本次未做，属日志级别策略另案）。
+                  新增 test_non_535_skip_is_logged_once_per_serial、
+                  test_skip_notice_dedup_is_case_insensitive（断言调用层级，不宣称落盘）。
                 · N3  文档纠错（无代码行为变更）：本节与源码注释原写「hot 名单下一轮生效」，实际
                   get_hot_device_set() 只在 import 时被调用一次（全文仅 2 处：定义 + 赋值），轮询里
                   零调用，改文件必须重启进程才生效。本轮生产新增的 9 台 hot 之所以生效，纯属 v10

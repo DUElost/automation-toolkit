@@ -89,8 +89,11 @@ def test_config_example_agrees_with_source_constant():
 def test_non_535_skip_is_logged_once_per_serial(_r):
     """v11(N6)：跳过非 535 设备这件事，每台只在首轮记 INFO，之后降为 DEBUG。
 
-    反证：v10 每轮逐台重复打 INFO，`.58` 实测 118 分钟 132 条跳过 INFO、16 台唯一设备
-    （外推日增≈1600 条/host），把与泄漏无关的行刷成主体日志。
+    反证：v10 每轮逐台重复打 INFO，`.58` 当日 2098 行日志里 214 行是这条跳过 INFO
+    （10.2%）、16 台唯一设备，外推日增≈1600 行/host，把与泄漏无关的行刷成主体日志。
+
+    本例断言的是**调用层级**（info 一次、后续走 debug）；TEST_LOGGER 默认 INFO 级别，
+    `setDebugMode` 全文无调用点，所以 debug 行在生产日志里不落盘——每台实际只留首轮 1 行。
     """
     mon.non_535_skip_notified.clear()
     with patch.object(mon.TEST_LOGGER, "info") as info, \
