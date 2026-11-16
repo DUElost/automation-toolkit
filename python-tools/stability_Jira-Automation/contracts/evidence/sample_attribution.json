@@ -1,0 +1,119 @@
+{
+  "schema": "stp.jira_attribution/v1",
+  "contract_version": "b8-g8-attribution-v1",
+  "tool": "transsion",
+  "stage": "create",
+  "run": {
+    "run_id": "20261116_170145",
+    "workspace": "<workspace>",
+    "generated_at": "2026-11-16T17:01:45",
+    "manifest": "<workspace>/manifest.json",
+    "manifest_schema": "stp.jira_delivery_input/v1",
+    "plan_run_id": 1096,
+    "root_plan_run_id": 1085,
+    "platform": "mtk",
+    "delivery_version_id": 4,
+    "delivery_version_no": 2,
+    "compat_rerun_id": null,
+    "issue_ids": [
+      7,
+      8,
+      9
+    ],
+    "event_ids": [
+      "dle-1",
+      "dle-2"
+    ]
+  },
+  "items": [
+    {
+      "row": 1,
+      "workbook_row": 2,
+      "signature_id": 7,
+      "occurrence_ids": [
+        101,
+        102
+      ],
+      "occurrence_keys": [
+        "k101",
+        "k102"
+      ],
+      "attribution_status": "OK",
+      "attribution_note": "",
+      "status": "SUCCESS",
+      "action": "CREATE_NEW",
+      "issue_key": "SIM-1",
+      "matched_jira_key": null,
+      "error": null,
+      "filtered": false
+    },
+    {
+      "row": 2,
+      "workbook_row": 3,
+      "signature_id": 8,
+      "occurrence_ids": [
+        201
+      ],
+      "occurrence_keys": [
+        "k201"
+      ],
+      "attribution_status": "OK",
+      "attribution_note": "",
+      "status": "SUCCESS",
+      "action": "OPEN_LIKE_UPDATE",
+      "issue_key": "SIM-MATCHED-900",
+      "matched_jira_key": "SIM-MATCHED-900",
+      "error": null,
+      "filtered": false
+    },
+    {
+      "row": 3,
+      "workbook_row": 4,
+      "signature_id": 9,
+      "occurrence_ids": [
+        301
+      ],
+      "occurrence_keys": [
+        "k301"
+      ],
+      "attribution_status": "OK",
+      "attribution_note": "",
+      "status": "FAILED",
+      "action": "CREATE_NEW",
+      "issue_key": null,
+      "matched_jira_key": null,
+      "error": "simulated create failure",
+      "filtered": false
+    }
+  ],
+  "links": [
+    {
+      "issue_key": "SIM-1",
+      "signature_id": 7,
+      "occurrence_id": 101,
+      "occurrence_key": "k101",
+      "evidence_source": "vendor_attribution_json",
+      "row": 1,
+      "workbook_row": 2
+    },
+    {
+      "issue_key": "SIM-1",
+      "signature_id": 7,
+      "occurrence_id": 102,
+      "occurrence_key": "k102",
+      "evidence_source": "vendor_attribution_json",
+      "row": 1,
+      "workbook_row": 2
+    },
+    {
+      "issue_key": "SIM-MATCHED-900",
+      "signature_id": 8,
+      "occurrence_id": 201,
+      "occurrence_key": "k201",
+      "evidence_source": "vendor_attribution_json",
+      "row": 2,
+      "workbook_row": 3
+    }
+  ],
+  "gaps": []
+}

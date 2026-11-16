@@ -398,5 +398,8 @@ duplicate 跟随关闭补充规则：
 - 同一 signature 的多个清单项合并为一行，Occurrence IDs 保留完整集合
 - 只有 manifest.attribution_candidates 内的 (signature_id, occurrence_id) 才写 Jira key 关联；
   缺失、无效、越界、重复标识写入 attribution.json 的 gaps，重复发生不建单
+- Occurrence IDs 列清空时记 EMPTY_OCCURRENCE_IDS 缺口，不再从 manifest 补入；小数标识判非法
+- AutoFilter 隐藏行不建单、不写关联
+- 相对 --output-dir 按当前工作目录解析；摘要 XLSX、审计 JSON 与批量结果落工作区 result/
 - 没有 manifest 且未传 --output-dir 时保持旧行为：result/ 输出、旧参数与 stdout 不变
 - 契约与样本：../contracts/README.md

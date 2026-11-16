@@ -1,0 +1,79 @@
+[
+  {
+    "row": 1,
+    "status": "SUCCESS",
+    "project": "X6851OS16",
+    "summary": "CREATE-multi",
+    "issue_key": "SIM-1",
+    "matched_jira_key": null,
+    "decision": {
+      "action": "CREATE_NEW",
+      "manual_review": false,
+      "update_jira": false,
+      "recreate_issue": true
+    },
+    "error": null,
+    "signature_id": 7,
+    "occurrence_id": null,
+    "occurrence_ids": [
+      101,
+      102
+    ],
+    "occurrence_keys": [
+      "k101",
+      "k102"
+    ],
+    "attribution_status": "OK",
+    "attribution_note": ""
+  },
+  {
+    "row": 2,
+    "status": "SUCCESS",
+    "project": "X6851OS16",
+    "summary": "MATCH-open",
+    "issue_key": "SIM-MATCHED-900",
+    "matched_jira_key": "SIM-MATCHED-900",
+    "decision": {
+      "action": "OPEN_LIKE_UPDATE",
+      "manual_review": false,
+      "update_jira": true,
+      "recreate_issue": false
+    },
+    "error": null,
+    "signature_id": 8,
+    "occurrence_id": 201,
+    "occurrence_ids": [
+      201
+    ],
+    "occurrence_keys": [
+      "k201"
+    ],
+    "attribution_status": "OK",
+    "attribution_note": ""
+  },
+  {
+    "row": 3,
+    "status": "FAILED",
+    "project": "X6851OS16",
+    "summary": "FAIL-create",
+    "issue_key": null,
+    "matched_jira_key": null,
+    "decision": {
+      "action": "CREATE_NEW",
+      "manual_review": false,
+      "update_jira": false,
+      "recreate_issue": true
+    },
+    "error": "simulated create failure",
+    "signature_id": 9,
+    "occurrence_id": 301,
+    "occurrence_ids": [
+      301
+    ],
+    "occurrence_keys": [
+      "k301"
+    ],
+    "attribution_status": "OK",
+    "attribution_note": ""
+  }
+]

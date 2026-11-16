@@ -2498,9 +2498,11 @@ def save_audit_report(
     results: List[Dict[str, Any]],
     summary_rows: List[Dict[str, Any]],
     run_id: str,
+    result_dir: Path | None = None,
 ) -> Path:
-    RESULT_DIR.mkdir(parents=True, exist_ok=True)
-    target = RESULT_DIR / f"tinno_jira_batch_create_audit_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+    target_dir = Path(result_dir) if result_dir is not None else RESULT_DIR
+    target_dir.mkdir(parents=True, exist_ok=True)
+    target = target_dir / f"tinno_jira_batch_create_audit_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
     stats = build_run_decision_stats(results, summary_rows)
 
     payload = {
@@ -2553,16 +2555,17 @@ def write_run_outputs(
         if attribution_path is not None:
             logger.info("归因产物已写入: %s", attribution_path)
     if regression_enabled and regression_rules is not None and should_write_audit_report(regression_rules):
-        audit_file = save_audit_report(results=results, summary_rows=summary_rows, run_id=run_id)
+        audit_file = save_audit_report(
+            results=results, summary_rows=summary_rows, run_id=run_id, result_dir=result_dir
+        )
         logger.info("审计结果已写入: %s", audit_file)
     if regression_enabled and store is not None:
-        excel_summary_dir = (
-            Path(result_dir)
-            if result_dir is not None
-            else Path(getattr(regression_rules.output, "excel_summary_dir", RESULT_DIR))
-        )
-        if not excel_summary_dir.is_absolute():
-            excel_summary_dir = CURRENT_DIR / excel_summary_dir
+        if result_dir is not None:
+            excel_summary_dir = Path(result_dir)
+        else:
+            excel_summary_dir = Path(getattr(regression_rules.output, "excel_summary_dir", RESULT_DIR))
+            if not excel_summary_dir.is_absolute():
+                excel_summary_dir = CURRENT_DIR / excel_summary_dir
         excel_summary_dir.mkdir(parents=True, exist_ok=True)
         summary_path = excel_summary_dir / f"tinno_jira_batch_create_summary_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
         write_excel_summary(summary_path, summary_rows)
@@ -2626,6 +2629,13 @@ def run_excel_mode(args: argparse.Namespace) -> int:
     workspace, attribution_result_dir, attribution_mode = jira_attribution.resolve_workspace(
         getattr(args, "output_dir", None), manifest_path, RESULT_DIR
     )
+    try:
+        hidden_positions = jira_attribution.hidden_row_positions(args.excel_file)
+    except Exception as exc:
+        logger.warning("无法读取 AutoFilter 隐藏行，按全部行处理: %s", exc)
+        hidden_positions = set()
+    if hidden_positions:
+        logger.info("检测到 AutoFilter 隐藏数据行 %d 条", len(hidden_positions))
 
     jira = connect_to_jira(
         server=jira_server,
@@ -2666,6 +2676,10 @@ def run_excel_mode(args: argparse.Namespace) -> int:
         create_meta_cache: Dict[Tuple[str, str], Dict[str, Any]] = {}
         batch_project_key = collect_batch_project_key(jira, df, project_cache, defaults)
         project_history_sqlite_path_setting = DEFAULT_PROJECT_HISTORY_SQLITE_PATH
+        if attribution_mode:
+            project_history_sqlite_path_setting = str(
+                (workspace / "result" / "tinno_regression_cache").resolve()
+            )
         if regression_enabled and regression_rules is not None:
             project_history_sqlite_path_setting = str(
                 getattr(getattr(regression_rules, "output", None), "sqlite_path", DEFAULT_PROJECT_HISTORY_SQLITE_PATH)
@@ -2717,7 +2731,9 @@ def run_excel_mode(args: argparse.Namespace) -> int:
             workspace=workspace if attribution_mode else None,
             run_id=run_id,
         )
-        attribution_rows = recorder.prepare(df) if recorder.enabled else []
+        attribution_rows = (
+            recorder.prepare(df, filtered_positions=hidden_positions) if recorder.enabled else []
+        )
         store: RegressionStore | None = None
         snapshot_rows: List[Dict[str, Any]] = []
         if regression_enabled:
@@ -2729,10 +2745,15 @@ def run_excel_mode(args: argparse.Namespace) -> int:
                 ),
             )
             summary_keywords = collect_regression_summary_keywords(df, defaults)
+            store_sqlite_setting = getattr(
+                regression_rules.output, "sqlite_path", "result/tinno_regression_cache"
+            )
+            if attribution_mode:
+                store_sqlite_setting = str((workspace / "result" / "tinno_regression_cache").resolve())
             store = RegressionStore(
                 build_project_scoped_sqlite_path(
                     batch_project_key,
-                    getattr(regression_rules.output, "sqlite_path", "result/tinno_regression_cache"),
+                    store_sqlite_setting,
                 )
             )
             snapshot_rows = export_jira_snapshot(
@@ -2776,6 +2797,29 @@ def run_excel_mode(args: argparse.Namespace) -> int:
             matched_row: Dict[str, Any] | None = None
             decision = build_create_new_decision()
             anr_hold_result = None
+
+            if row_position in hidden_positions:
+                logger.info("%s 跳过：AutoFilter 隐藏行", row_log_label)
+                append_result(
+                    results,
+                    row_number=row_number,
+                    status="SKIPPED",
+                    project_key=project_key,
+                    summary=summary,
+                    issue_key=None,
+                    matched_row=None,
+                    decision=decision,
+                    error="autofilter_hidden",
+                    attribution=resolution.result_fields() if resolution is not None else None,
+                )
+                recorder.record(
+                    resolution,
+                    status="SKIPPED",
+                    action="FILTERED",
+                    error="autofilter_hidden",
+                    extra={"filter_reason": "autofilter_hidden"},
+                )
+                continue
 
             if resolution is not None and resolution.blocked:
                 logger.warning(

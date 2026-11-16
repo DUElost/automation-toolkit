@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 import os
+from decimal import Decimal, InvalidOperation
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -48,6 +49,7 @@ STATUS_INVALID_OCCURRENCE_ID = "INVALID_OCCURRENCE_ID"
 STATUS_OUT_OF_SCOPE_OCCURRENCE_ID = "OUT_OF_SCOPE_OCCURRENCE_ID"
 STATUS_DUPLICATE_OCCURRENCE_ID = "DUPLICATE_OCCURRENCE_ID"
 STATUS_SIGNATURE_MISMATCH = "SIGNATURE_MISMATCH"
+STATUS_EMPTY_OCCURRENCE_IDS = "EMPTY_OCCURRENCE_IDS"
 
 LINKABLE_STATUSES = frozenset({STATUS_OK, STATUS_MERGED})
 RESULT_STATUSES_WITH_KEY = frozenset({"SUCCESS", "FAILED"})
@@ -144,13 +146,22 @@ def _cell_text(value: Any) -> str:
 
 
 def _parse_int(value: Any) -> Optional[int]:
+    """严格解析整数标识；小数（如 7.5）视为非法，绝不截断。"""
+
     text = _cell_text(value)
     if not text:
         return None
     try:
-        return int(float(text))
-    except (TypeError, ValueError):
+        return int(text, 10)
+    except ValueError:
+        pass
+    try:
+        number = Decimal(text)
+    except InvalidOperation:
         return None
+    if not number.is_finite() or number != number.to_integral_value():
+        return None
+    return int(number)
 
 
 def _parse_id_list(value: Any) -> Tuple[List[int], List[str]]:
@@ -207,13 +218,74 @@ def _row_value(row: Any, *names: str) -> Any:
     return None
 
 
-def read_attribution_inputs(row: Any) -> Tuple[Any, Any, Any]:
-    """从清单行读取平台标识；兼容平台列名与手工复核后的列名。"""
+def _row_has(row: Any, *names: str) -> bool:
+    """判断工作簿是否真的带有该列（区别于单元格为空）。"""
+
+    if isinstance(row, Mapping):
+        return any(name in row for name in names)
+    index = getattr(row, "index", None)
+    if index is None:
+        return False
+    for name in names:
+        if name in index:
+            return True
+    lookup = {str(column).strip().lower() for column in index}
+    return any(name.strip().lower() in lookup for name in names)
+
+
+def read_attribution_inputs(row: Any) -> Tuple[Any, Any, Any, bool]:
+    """从清单行读取平台标识；兼容平台列名与手工复核后的列名。
+
+    第 4 个返回值表示 Occurrence IDs 列是否存在：列存在但单元格为空，
+    表示人工复核明确清空了选中发生，不得再从 manifest 补入。
+    """
 
     signature = _row_value(row, SIGNATURE_COLUMN, "signature_id", "SignatureId", "Id")
     occurrence_ids = _row_value(row, OCCURRENCE_IDS_COLUMN, "occurrence_ids", "OccurrenceIds")
     occurrence_keys = _row_value(row, OCCURRENCE_KEYS_COLUMN, "occurrence_keys", "OccurrenceKeys")
-    return signature, occurrence_ids, occurrence_keys
+    occurrence_ids_provided = _row_has(row, OCCURRENCE_IDS_COLUMN, "occurrence_ids", "OccurrenceIds")
+    return signature, occurrence_ids, occurrence_keys, occurrence_ids_provided
+
+
+def read_hidden_excel_rows(path: str | Path) -> set[int]:
+    """返回 Excel 中带隐藏标记的物理行号（1 基，AutoFilter 或手动隐藏）。"""
+
+    source = Path(path)
+    suffix = source.suffix.lower()
+    if suffix in {".xlsx", ".xlsm"}:
+        try:
+            from openpyxl import load_workbook
+        except ImportError as exc:  # pragma: no cover - 依赖缺失时明确失败
+            raise AttributionError("读取 AutoFilter 隐藏行需要 openpyxl") from exc
+        workbook = load_workbook(source, read_only=False, data_only=True)
+        try:
+            sheet = workbook.active
+            return {
+                int(row_index)
+                for row_index, dimension in (sheet.row_dimensions or {}).items()
+                if bool(getattr(dimension, "hidden", False))
+            }
+        finally:
+            workbook.close()
+    if suffix == ".xls":
+        try:
+            import xlrd
+        except ImportError as exc:  # pragma: no cover
+            raise AttributionError("读取 .xls 隐藏行需要 xlrd") from exc
+        book = xlrd.open_workbook(str(source), formatting_info=True)
+        sheet = book.sheet_by_index(0)
+        return {
+            row_index + 1
+            for row_index in range(sheet.nrows)
+            if getattr(sheet.rowinfo_map.get(row_index), "hidden", 0)
+        }
+    return set()
+
+
+def hidden_row_positions(path: str | Path) -> set[int]:
+    """把隐藏 Excel 行号换算为 DataFrame 的 0 基数据行位置。"""
+
+    return {row - 2 for row in read_hidden_excel_rows(path) if row >= 2}
 
 
 class ManifestIndex:
@@ -284,6 +356,7 @@ class ManifestIndex:
         signature_raw: Any,
         occurrence_ids_raw: Any = None,
         *,
+        occurrence_ids_provided: bool = False,
         source_row: Optional[int] = None,
         workbook_row: Optional[int] = None,
     ) -> Resolution:
@@ -318,6 +391,10 @@ class ManifestIndex:
         if invalid_tokens:
             resolution.status = STATUS_INVALID_OCCURRENCE_ID
             resolution.note = "Occurrence IDs 含非整数: " + ", ".join(sorted(set(invalid_tokens)))
+            return resolution
+        if occurrence_ids_provided and not explicit_ids:
+            resolution.status = STATUS_EMPTY_OCCURRENCE_IDS
+            resolution.note = "Occurrence IDs 已清空；不从 manifest 补入未选中的发生"
             return resolution
         if not explicit_ids:
             resolution.occurrences = list(allowed)
@@ -450,9 +527,13 @@ def annotate_rows(
 
     resolved: List[Tuple[Dict[str, Any], Resolution]] = []
     for row in rows:
+        occurrence_ids_provided = _row_has(
+            row, OCCURRENCE_IDS_COLUMN, "occurrence_ids", "OccurrenceIds"
+        )
         resolution = index.resolve(
             row.pop("_raw_signature", None),
             row.pop("_raw_occurrence_ids", None),
+            occurrence_ids_provided=occurrence_ids_provided,
             source_row=row.pop("_source_row", None),
             workbook_row=row.pop("_excel_row", None),
         )
@@ -608,22 +689,29 @@ class AttributionRecorder:
         self.links: List[Dict[str, Any]] = []
         self.gaps: List[Dict[str, Any]] = []
         self._link_keys: set[Tuple[int, str]] = set()
+        self._filtered_rows: set[int] = set()
 
     @property
     def enabled(self) -> bool:
         return self.index is not None
 
-    def prepare(self, rows: Iterable[Any]) -> List[Resolution]:
+    def prepare(
+        self,
+        rows: Iterable[Any],
+        filtered_positions: Optional[Iterable[int]] = None,
+    ) -> List[Resolution]:
         if self.index is None:
             return []
+        self._filtered_rows = {int(position) + 1 for position in (filtered_positions or [])}
         resolutions: List[Resolution] = []
         row_iter = (item for _, item in rows.iterrows()) if hasattr(rows, "iterrows") else iter(rows)
         for position, row in enumerate(row_iter):
-            signature, occurrence_ids, _ = read_attribution_inputs(row)
+            signature, occurrence_ids, _, occurrence_ids_provided = read_attribution_inputs(row)
             resolutions.append(
                 self.index.resolve(
                     signature,
                     occurrence_ids,
+                    occurrence_ids_provided=occurrence_ids_provided,
                     source_row=position + 1,
                     workbook_row=position + 2,
                 )
@@ -643,6 +731,8 @@ class AttributionRecorder:
                 resolution.note = f"occurrence_id {occurrence_id} 同时出现在多个清单项"
                 resolution.occurrences = []
         for resolution in resolutions:
+            if resolution.source_row in self._filtered_rows:
+                continue
             gap = _gap(resolution, stage=self.stage)
             if gap is not None:
                 self.gaps.append(gap)
@@ -675,6 +765,7 @@ class AttributionRecorder:
             "issue_key": key or None,
             "matched_jira_key": str(matched_jira_key or "").strip() or None,
             "error": error or None,
+            "filtered": resolution.source_row in self._filtered_rows,
         }
         if extra:
             item.update(dict(extra))

@@ -157,6 +157,11 @@ graph TD
 - 没有 manifest 且未指定目录时保持旧行为：写脚本目录 `result/`，不新增归因列/产物。
 - 只有 `manifest.attribution_candidates` 内的 `(signature_id, occurrence_id)` 才会生成 Jira key 关联；
   缺失/无效/越界/重复标识写入 gaps，重复发生不建单。
+- Occurrence IDs 列存在但被清空时记 `EMPTY_OCCURRENCE_IDS` gap，禁止从 manifest 补入；
+  小数标识（7.5 / 101.5）判为非法，不截断。
+- 第二阶段识别 AutoFilter/隐藏行：不建单、不写 link，结果记 `SKIPPED` + `autofilter_hidden`。
+- 相对 `--output-dir` 按进程 cwd 解析；摘要 XLSX、Tinno 审计 JSON、批量结果与
+  `attribution.json` 均落工作区；工作区模式 SQLite 缓存也隔离到工作区。
 
 测试：两套 `test/test_jira_attribution.py` 覆盖契约同步、合并、重排/筛选、反例与关联范围。
 

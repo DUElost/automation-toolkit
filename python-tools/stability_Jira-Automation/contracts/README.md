@@ -42,6 +42,8 @@ Signature ID | Occurrence IDs          | Occurrence Keys              | Occurren
 | `Source Excel Row` | 生成清单时输入工作簿的物理行号（含表头，从 1 开始） |
 
 人工复核可重排、筛选、删除行；标识随行移动，平台只按标识回写，不依赖行号。
+AutoFilter 隐藏行在第二阶段不建单、不写关联，结果记 `SKIPPED` +
+`autofilter_hidden`；显式删行则直接不在工作簿中。
 
 ### Attribution Status
 
@@ -53,7 +55,8 @@ Signature ID | Occurrence IDs          | Occurrence Keys              | Occurren
 | `INVALID_SIGNATURE_ID` | 标识不是整数 | 否 |
 | `UNKNOWN_SIGNATURE_ID` | 标识不在本次 manifest 登记范围 | 否 |
 | `NO_OCCURRENCE` | manifest 中该 signature 没有发生 | 否 |
-| `INVALID_OCCURRENCE_ID` | Occurrence IDs 含非整数 | 否 |
+| `INVALID_OCCURRENCE_ID` | Occurrence IDs 含非整数（含 7.5 等小数） | 否 |
+| `EMPTY_OCCURRENCE_IDS` | Occurrence IDs 列存在但被清空，不从 manifest 补入 | 否 |
 | `OUT_OF_SCOPE_OCCURRENCE_ID` | 发生不属于该 signature 的登记集合 | 否 |
 | `DUPLICATE_OCCURRENCE_ID` | 同一发生出现在多个清单项 | 否（该行不建单） |
 
@@ -86,10 +89,11 @@ python create_tinno_jira_batch_from_excel.py \
   --jira-p12-path <p12> --jira-p12-password <password>
 ```
 
-平台也可显式指定目录：
+平台也可显式指定目录；相对路径按进程 cwd 解析：
 
 ```bash
 --output-dir /path/to/workspace --attribution-manifest /path/to/workspace/manifest.json
+--output-dir ./rel_ws
 ```
 
 ### 3.2 独立运行（旧行为）
@@ -112,7 +116,8 @@ python create_tinno_jira_batch_from_excel.py \
 ├── attribution.json                  # 第二阶段归因产物（stage=create，平台读取）
 └── result/
     ├── {vendor}_jira_batch_create_result_*.json
-    └── {vendor}_jira_batch_create_summary_*.xlsx
+    ├── {vendor}_jira_batch_create_summary_*.xlsx
+    └── {vendor}_jira_batch_create_audit_*.json   # Tinno 回归开启时
 ```
 
 `attribution.json` 结构：
@@ -136,6 +141,7 @@ python create_tinno_jira_batch_from_excel.py \
 
 平台侧 `record_jira_run_completion` 读取 `links`，并用 `manifest.attribution_candidates`
 复核每个 `(signature_id, occurrence_id)`；越界或缺失写入 `JiraRun.attribution_gaps`。
+工作区模式下 SQLite 回归缓存也落在 `<workspace>/result/`，双工作区互不串写。
 结果 JSON 亦带 `signature_id` / `occurrence_id` / `occurrence_ids`，供只读消费。
 
 ## 5. 样本

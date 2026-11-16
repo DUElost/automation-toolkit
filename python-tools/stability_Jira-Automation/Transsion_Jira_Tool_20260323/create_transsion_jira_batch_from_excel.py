@@ -1365,13 +1365,12 @@ def write_run_outputs(
         if attribution_path is not None:
             logger.info("归因产物已写入: %s", attribution_path)
     if regression_enabled and store is not None:
-        excel_summary_dir = (
-            target_result_dir
-            if result_dir is not None
-            else Path(getattr(regression_rules.output, "excel_summary_dir", RESULT_DIR))
-        )
-        if not excel_summary_dir.is_absolute():
-            excel_summary_dir = CURRENT_DIR / excel_summary_dir
+        if result_dir is not None:
+            excel_summary_dir = Path(result_dir)
+        else:
+            excel_summary_dir = Path(getattr(regression_rules.output, "excel_summary_dir", RESULT_DIR))
+            if not excel_summary_dir.is_absolute():
+                excel_summary_dir = CURRENT_DIR / excel_summary_dir
         excel_summary_dir.mkdir(parents=True, exist_ok=True)
         summary_path = excel_summary_dir / f"transsion_jira_batch_create_summary_{timestamp}.xlsx"
         write_excel_summary(summary_path, summary_rows)
@@ -1426,6 +1425,13 @@ def run_excel_mode(args: argparse.Namespace) -> int:
     workspace, attribution_result_dir, attribution_mode = jira_attribution.resolve_workspace(
         getattr(args, "output_dir", None), manifest_path, RESULT_DIR
     )
+    try:
+        hidden_positions = jira_attribution.hidden_row_positions(args.excel_file)
+    except Exception as exc:
+        logger.warning("无法读取 AutoFilter 隐藏行，按全部行处理: %s", exc)
+        hidden_positions = set()
+    if hidden_positions:
+        logger.info("检测到 AutoFilter 隐藏数据行 %d 条", len(hidden_positions))
     summary_keywords = collect_regression_summary_keywords(df)
     batch_specialties = collect_batch_specialties(df)
     for _sp in batch_specialties:
@@ -1453,14 +1459,19 @@ def run_excel_mode(args: argparse.Namespace) -> int:
         workspace=workspace if attribution_mode else None,
         run_id=run_id,
     )
-    attribution_rows = recorder.prepare(df) if recorder.enabled else []
+    attribution_rows = (
+        recorder.prepare(df, filtered_positions=hidden_positions) if recorder.enabled else []
+    )
     store = None
     snapshot_rows: List[Dict[str, Any]] = []
     if regression_enabled:
+        store_sqlite_setting = getattr(regression_rules.output, "sqlite_path", "result/regression_cache")
+        if attribution_mode:
+            store_sqlite_setting = str((workspace / "result" / "regression_cache").resolve())
         store = RegressionStore(
             build_project_scoped_sqlite_path(
                 batch_project_key,
-                getattr(regression_rules.output, "sqlite_path", "result/regression_cache"),
+                store_sqlite_setting,
             )
         )
         snapshot_field_mapping = build_snapshot_field_mapping(defaults)
@@ -1513,6 +1524,29 @@ def run_excel_mode(args: argparse.Namespace) -> int:
             "update_jira": False,
             "recreate_issue": False,
         })()
+
+        if row_position in hidden_positions:
+            logger.info("第 %d 行跳过：AutoFilter 隐藏行", row_number)
+            append_result(
+                results,
+                row_number=row_number,
+                status="SKIPPED",
+                project_key=project_key,
+                summary=summary,
+                issue_key=None,
+                matched_row=None,
+                decision=decision,
+                error="autofilter_hidden",
+                attribution=resolution.result_fields() if resolution is not None else None,
+            )
+            recorder.record(
+                resolution,
+                status="SKIPPED",
+                action="FILTERED",
+                error="autofilter_hidden",
+                extra={"filter_reason": "autofilter_hidden"},
+            )
+            continue
 
         if resolution is not None and resolution.blocked:
             logger.warning(

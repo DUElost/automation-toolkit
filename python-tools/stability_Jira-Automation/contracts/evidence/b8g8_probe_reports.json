@@ -1,0 +1,526 @@
+{
+  "probe": "b8g8_review_probe/v1",
+  "baseline": "24f86c895740ebf735533b1914047118fd6544de",
+  "reports": {
+    "transsion_new": {
+      "tool": "transsion",
+      "variant": "new",
+      "passed": true,
+      "scenarios": [
+        {
+          "scenario": "create_match_failure",
+          "passed": true,
+          "failures": []
+        },
+        {
+          "scenario": "empty_occurrence_ids",
+          "passed": true,
+          "failures": []
+        },
+        {
+          "scenario": "fractional_ids",
+          "passed": true,
+          "failures": []
+        },
+        {
+          "scenario": "autofilter_hidden",
+          "passed": true,
+          "failures": []
+        },
+        {
+          "scenario": "explicit_delete",
+          "passed": true,
+          "failures": []
+        },
+        {
+          "scenario": "reorder",
+          "passed": true,
+          "failures": []
+        },
+        {
+          "scenario": "duplicate_occurrence",
+          "passed": true,
+          "failures": []
+        },
+        {
+          "scenario": "output_relative",
+          "passed": true,
+          "failures": []
+        },
+        {
+          "scenario": "output_absolute",
+          "passed": true,
+          "failures": []
+        },
+        {
+          "scenario": "output_auto",
+          "passed": true,
+          "failures": []
+        },
+        {
+          "scenario": "two_workspaces",
+          "passed": true,
+          "failures": []
+        },
+        {
+          "scenario": "legacy_default",
+          "passed": true,
+          "failures": []
+        },
+        {
+          "scenario": "generator_workspace",
+          "passed": true,
+          "failures": []
+        }
+      ]
+    },
+    "transsion_base": {
+      "tool": "transsion",
+      "variant": "baseline",
+      "passed": false,
+      "scenarios": [
+        {
+          "scenario": "create_match_failure",
+          "passed": true,
+          "failures": []
+        },
+        {
+          "scenario": "empty_occurrence_ids",
+          "passed": false,
+          "failures": [
+            "empty occurrence produced links: [{'issue_key': 'SIM-1', 'signature_id': 7, 'occurrence_id': 101, 'occurrence_key': 'k101', 'evidence_source': 'vendor_attribution_json', 'row': 1, 'workbook_row': 2}, {'issue_key': 'SIM-1', 'signature_id': 7, 'occurrence_id': 102, 'occurrence_key': 'k102', 'evidence_source': 'vendor_attribution_json', 'row': 1, 'workbook_row': 2}, {'issue_key': 'SIM-1', 'signature_id': 7, 'occurrence_id': 103, 'occurrence_key': 'k103', 'evidence_source': 'vendor_attribution_json', 'row': 1, 'workbook_row': 2}]",
+            "empty occurrence gap missing: []",
+            "empty occurrence status missing"
+          ]
+        },
+        {
+          "scenario": "fractional_ids",
+          "passed": false,
+          "failures": [
+            "invalid signature gap missing: ['duplicate_occurrence_id', 'duplicate_occurrence_id']",
+            "invalid occurrence gap missing: ['duplicate_occurrence_id', 'duplicate_occurrence_id']"
+          ]
+        },
+        {
+          "scenario": "autofilter_hidden",
+          "passed": false,
+          "failures": [
+            "hidden row created: ['VISIBLE-row', 'HIDDEN-row']",
+            "hidden row links leaked: [{'issue_key': 'SIM-1', 'signature_id': 7, 'occurrence_id': 101, 'occurrence_key': 'k101', 'evidence_source': 'vendor_attribution_json', 'row': 1, 'workbook_row': 2}, {'issue_key': 'SIM-1', 'signature_id': 7, 'occurrence_id': 102, 'occurrence_key': 'k102', 'evidence_source': 'vendor_attribution_json', 'row': 1, 'workbook_row': 2}, {'issue_key': 'SIM-2', 'signature_id': 8, 'occurrence_id': 201, 'occurrence_key': 'k201', 'evidence_source': 'vendor_attribution_json', 'row': 2, 'workbook_row': 3}]",
+            "hidden row not marked filtered/skipped in attribution",
+            "hidden row not recorded as autofilter_hidden in result"
+          ]
+        },
+        {
+          "scenario": "explicit_delete",
+          "passed": true,
+          "failures": []
+        },
+        {
+          "scenario": "reorder",
+          "passed": true,
+          "failures": []
+        },
+        {
+          "scenario": "duplicate_occurrence",
+          "passed": true,
+          "failures": []
+        },
+        {
+          "scenario": "output_relative",
+          "passed": false,
+          "failures": [
+            "summary xlsx missing under <workspace>/output-relative-parent/rel_ws/result"
+          ]
+        },
+        {
+          "scenario": "output_absolute",
+          "passed": true,
+          "failures": []
+        },
+        {
+          "scenario": "output_auto",
+          "passed": true,
+          "failures": []
+        },
+        {
+          "scenario": "two_workspaces",
+          "passed": false,
+          "failures": [
+            "workspace A regression db missing",
+            "workspace B regression db missing"
+          ]
+        },
+        {
+          "scenario": "legacy_default",
+          "passed": true,
+          "failures": []
+        },
+        {
+          "scenario": "generator_workspace",
+          "passed": true,
+          "failures": []
+        }
+      ]
+    },
+    "tinno_new": {
+      "tool": "tinno",
+      "variant": "new",
+      "passed": true,
+      "scenarios": [
+        {
+          "scenario": "create_match_failure",
+          "passed": true,
+          "failures": []
+        },
+        {
+          "scenario": "empty_occurrence_ids",
+          "passed": true,
+          "failures": []
+        },
+        {
+          "scenario": "fractional_ids",
+          "passed": true,
+          "failures": []
+        },
+        {
+          "scenario": "autofilter_hidden",
+          "passed": true,
+          "failures": []
+        },
+        {
+          "scenario": "explicit_delete",
+          "passed": true,
+          "failures": []
+        },
+        {
+          "scenario": "reorder",
+          "passed": true,
+          "failures": []
+        },
+        {
+          "scenario": "duplicate_occurrence",
+          "passed": true,
+          "failures": []
+        },
+        {
+          "scenario": "output_relative",
+          "passed": true,
+          "failures": []
+        },
+        {
+          "scenario": "output_absolute",
+          "passed": true,
+          "failures": []
+        },
+        {
+          "scenario": "output_auto",
+          "passed": true,
+          "failures": []
+        },
+        {
+          "scenario": "two_workspaces",
+          "passed": true,
+          "failures": []
+        },
+        {
+          "scenario": "legacy_default",
+          "passed": true,
+          "failures": []
+        },
+        {
+          "scenario": "generator_workspace",
+          "passed": true,
+          "failures": []
+        }
+      ]
+    },
+    "tinno_base": {
+      "tool": "tinno",
+      "variant": "baseline",
+      "passed": false,
+      "scenarios": [
+        {
+          "scenario": "create_match_failure",
+          "passed": false,
+          "failures": [
+            "audit json missing"
+          ]
+        },
+        {
+          "scenario": "empty_occurrence_ids",
+          "passed": false,
+          "failures": [
+            "empty occurrence produced links: [{'issue_key': 'SIM-1', 'signature_id': 7, 'occurrence_id': 101, 'occurrence_key': 'k101', 'evidence_source': 'vendor_attribution_json', 'row': 1, 'workbook_row': 2}, {'issue_key': 'SIM-1', 'signature_id': 7, 'occurrence_id': 102, 'occurrence_key': 'k102', 'evidence_source': 'vendor_attribution_json', 'row': 1, 'workbook_row': 2}, {'issue_key': 'SIM-1', 'signature_id': 7, 'occurrence_id': 103, 'occurrence_key': 'k103', 'evidence_source': 'vendor_attribution_json', 'row': 1, 'workbook_row': 2}]",
+            "empty occurrence gap missing: []",
+            "empty occurrence status missing"
+          ]
+        },
+        {
+          "scenario": "fractional_ids",
+          "passed": false,
+          "failures": [
+            "invalid signature gap missing: ['duplicate_occurrence_id', 'duplicate_occurrence_id']",
+            "invalid occurrence gap missing: ['duplicate_occurrence_id', 'duplicate_occurrence_id']"
+          ]
+        },
+        {
+          "scenario": "autofilter_hidden",
+          "passed": false,
+          "failures": [
+            "hidden row created: ['VISIBLE-row', 'HIDDEN-row']",
+            "hidden row links leaked: [{'issue_key': 'SIM-1', 'signature_id': 7, 'occurrence_id': 101, 'occurrence_key': 'k101', 'evidence_source': 'vendor_attribution_json', 'row': 1, 'workbook_row': 2}, {'issue_key': 'SIM-1', 'signature_id': 7, 'occurrence_id': 102, 'occurrence_key': 'k102', 'evidence_source': 'vendor_attribution_json', 'row': 1, 'workbook_row': 2}, {'issue_key': 'SIM-2', 'signature_id': 8, 'occurrence_id': 201, 'occurrence_key': 'k201', 'evidence_source': 'vendor_attribution_json', 'row': 2, 'workbook_row': 3}]",
+            "hidden row not marked filtered/skipped in attribution",
+            "hidden row not recorded as autofilter_hidden in result"
+          ]
+        },
+        {
+          "scenario": "explicit_delete",
+          "passed": true,
+          "failures": []
+        },
+        {
+          "scenario": "reorder",
+          "passed": true,
+          "failures": []
+        },
+        {
+          "scenario": "duplicate_occurrence",
+          "passed": true,
+          "failures": []
+        },
+        {
+          "scenario": "output_relative",
+          "passed": false,
+          "failures": [
+            "summary xlsx missing under <workspace>/output-relative-parent/rel_ws/result",
+            "audit json missing under <workspace>/output-relative-parent/rel_ws/result"
+          ]
+        },
+        {
+          "scenario": "output_absolute",
+          "passed": false,
+          "failures": [
+            "audit json missing under <workspace>/output-absolute/result"
+          ]
+        },
+        {
+          "scenario": "output_auto",
+          "passed": false,
+          "failures": [
+            "audit json missing under <workspace>/output-auto/result"
+          ]
+        },
+        {
+          "scenario": "two_workspaces",
+          "passed": false,
+          "failures": [
+            "audit json missing under <workspace>/two-workspaces-a/result",
+            "audit json missing under <workspace>/two-workspaces-b/result",
+            "workspace A regression db missing",
+            "workspace B regression db missing"
+          ]
+        },
+        {
+          "scenario": "legacy_default",
+          "passed": true,
+          "failures": []
+        },
+        {
+          "scenario": "generator_workspace",
+          "passed": true,
+          "failures": []
+        }
+      ]
+    }
+  },
+  "workspace_layouts": {
+    "transsion": {
+      "new_workspace": [
+        "autofilter-hidden/attribution.json",
+        "autofilter-hidden/input.xlsx",
+        "autofilter-hidden/manifest.json",
+        "autofilter-hidden/result/regression_cache/X6851OS16.db",
+        "autofilter-hidden/result/transsion_jira_batch_create_result_20261116_170145.json",
+        "autofilter-hidden/result/transsion_jira_batch_create_summary_20261116_170145.xlsx",
+        "create-match-failure/attribution.json",
+        "create-match-failure/input.xlsx",
+        "create-match-failure/manifest.json",
+        "create-match-failure/result/regression_cache/X6851OS16.db",
+        "create-match-failure/result/transsion_jira_batch_create_result_20261116_170145.json",
+        "create-match-failure/result/transsion_jira_batch_create_summary_20261116_170145.xlsx",
+        "duplicate-occurrence/attribution.json",
+        "duplicate-occurrence/input.xlsx",
+        "duplicate-occurrence/manifest.json",
+        "duplicate-occurrence/result/regression_cache/X6851OS16.db",
+        "duplicate-occurrence/result/transsion_jira_batch_create_result_20261116_170145.json",
+        "duplicate-occurrence/result/transsion_jira_batch_create_summary_20261116_170145.xlsx",
+        "empty-occurrence/attribution.json",
+        "empty-occurrence/input.xlsx",
+        "empty-occurrence/manifest.json",
+        "empty-occurrence/result/regression_cache/X6851OS16.db",
+        "empty-occurrence/result/transsion_jira_batch_create_result_20261116_170145.json",
+        "empty-occurrence/result/transsion_jira_batch_create_summary_20261116_170145.xlsx",
+        "explicit-delete/attribution.json",
+        "explicit-delete/input.xlsx",
+        "explicit-delete/manifest.json",
+        "explicit-delete/result/regression_cache/X6851OS16.db",
+        "explicit-delete/result/transsion_jira_batch_create_result_20261116_170145.json",
+        "explicit-delete/result/transsion_jira_batch_create_summary_20261116_170145.xlsx",
+        "fractional-ids/attribution.json",
+        "fractional-ids/input.xlsx",
+        "fractional-ids/manifest.json",
+        "fractional-ids/result/regression_cache/X6851OS16.db",
+        "fractional-ids/result/transsion_jira_batch_create_result_20261116_170145.json",
+        "fractional-ids/result/transsion_jira_batch_create_summary_20261116_170145.xlsx",
+        "generator-workspace/JIRA_Upload_List_Transsion_Monkey专项_20261116_170145.xlsx",
+        "generator-workspace/attribution_input.json",
+        "generator-workspace/manifest.json",
+        "generator-workspace/pkg_map.xlsx",
+        "generator-workspace/probability.xlsx",
+        "generator-workspace/raw.xlsx",
+        "generator-workspace/regex.txt",
+        "generator-workspace/summary.xlsx",
+        "legacy-default/input.xlsx",
+        "legacy-result/reg.db",
+        "legacy-result/transsion_jira_batch_create_result_20261116_170145.json",
+        "output-absolute/attribution.json",
+        "output-absolute/input.xlsx",
+        "output-absolute/manifest.json",
+        "output-absolute/result/regression_cache/X6851OS16.db",
+        "output-absolute/result/transsion_jira_batch_create_result_20261116_170145.json",
+        "output-absolute/result/transsion_jira_batch_create_summary_20261116_170145.xlsx",
+        "output-auto/attribution.json",
+        "output-auto/input.xlsx",
+        "output-auto/manifest.json",
+        "output-auto/result/regression_cache/X6851OS16.db",
+        "output-auto/result/transsion_jira_batch_create_result_20261116_170145.json",
+        "output-auto/result/transsion_jira_batch_create_summary_20261116_170145.xlsx",
+        "output-relative-parent/rel_ws/attribution.json",
+        "output-relative-parent/rel_ws/input.xlsx",
+        "output-relative-parent/rel_ws/manifest.json",
+        "output-relative-parent/rel_ws/result/regression_cache/X6851OS16.db",
+        "output-relative-parent/rel_ws/result/transsion_jira_batch_create_result_20261116_170145.json",
+        "output-relative-parent/rel_ws/result/transsion_jira_batch_create_summary_20261116_170145.xlsx",
+        "reorder/attribution.json",
+        "reorder/input.xlsx",
+        "reorder/manifest.json",
+        "reorder/result/regression_cache/X6851OS16.db",
+        "reorder/result/transsion_jira_batch_create_result_20261116_170145.json",
+        "reorder/result/transsion_jira_batch_create_summary_20261116_170145.xlsx",
+        "two-workspaces-a/attribution.json",
+        "two-workspaces-a/input.xlsx",
+        "two-workspaces-a/manifest.json",
+        "two-workspaces-a/result/regression_cache/X6851OS16.db",
+        "two-workspaces-a/result/transsion_jira_batch_create_result_20261116_170145.json",
+        "two-workspaces-a/result/transsion_jira_batch_create_summary_20261116_170145.xlsx",
+        "two-workspaces-b/attribution.json",
+        "two-workspaces-b/input.xlsx",
+        "two-workspaces-b/manifest.json",
+        "two-workspaces-b/result/regression_cache/X6851OS16.db",
+        "two-workspaces-b/result/transsion_jira_batch_create_result_20261116_170145.json",
+        "two-workspaces-b/result/transsion_jira_batch_create_summary_20261116_170145.xlsx"
+      ]
+    },
+    "tinno": {
+      "new_workspace": [
+        "autofilter-hidden/attribution.json",
+        "autofilter-hidden/input.xlsx",
+        "autofilter-hidden/manifest.json",
+        "autofilter-hidden/result/tinno_jira_batch_create_audit_20261116_170146.json",
+        "autofilter-hidden/result/tinno_jira_batch_create_result_20261116_170146.json",
+        "autofilter-hidden/result/tinno_jira_batch_create_summary_20261116_170146.xlsx",
+        "autofilter-hidden/result/tinno_regression_cache/VFFCA.db",
+        "create-match-failure/attribution.json",
+        "create-match-failure/input.xlsx",
+        "create-match-failure/manifest.json",
+        "create-match-failure/result/tinno_jira_batch_create_audit_20261116_170146.json",
+        "create-match-failure/result/tinno_jira_batch_create_result_20261116_170146.json",
+        "create-match-failure/result/tinno_jira_batch_create_summary_20261116_170146.xlsx",
+        "create-match-failure/result/tinno_regression_cache/VFFCA.db",
+        "duplicate-occurrence/attribution.json",
+        "duplicate-occurrence/input.xlsx",
+        "duplicate-occurrence/manifest.json",
+        "duplicate-occurrence/result/tinno_jira_batch_create_audit_20261116_170146.json",
+        "duplicate-occurrence/result/tinno_jira_batch_create_result_20261116_170146.json",
+        "duplicate-occurrence/result/tinno_jira_batch_create_summary_20261116_170146.xlsx",
+        "duplicate-occurrence/result/tinno_regression_cache/VFFCA.db",
+        "empty-occurrence/attribution.json",
+        "empty-occurrence/input.xlsx",
+        "empty-occurrence/manifest.json",
+        "empty-occurrence/result/tinno_jira_batch_create_audit_20261116_170146.json",
+        "empty-occurrence/result/tinno_jira_batch_create_result_20261116_170146.json",
+        "empty-occurrence/result/tinno_jira_batch_create_summary_20261116_170146.xlsx",
+        "empty-occurrence/result/tinno_regression_cache/VFFCA.db",
+        "explicit-delete/attribution.json",
+        "explicit-delete/input.xlsx",
+        "explicit-delete/manifest.json",
+        "explicit-delete/result/tinno_jira_batch_create_audit_20261116_170146.json",
+        "explicit-delete/result/tinno_jira_batch_create_result_20261116_170146.json",
+        "explicit-delete/result/tinno_jira_batch_create_summary_20261116_170146.xlsx",
+        "explicit-delete/result/tinno_regression_cache/VFFCA.db",
+        "fractional-ids/attribution.json",
+        "fractional-ids/input.xlsx",
+        "fractional-ids/manifest.json",
+        "fractional-ids/result/tinno_jira_batch_create_audit_20261116_170146.json",
+        "fractional-ids/result/tinno_jira_batch_create_result_20261116_170146.json",
+        "fractional-ids/result/tinno_jira_batch_create_summary_20261116_170146.xlsx",
+        "fractional-ids/result/tinno_regression_cache/VFFCA.db",
+        "generator-workspace/JIRA_Upload_List_Tinno_Monkey专项_20261116_170146.xlsx",
+        "generator-workspace/attribution_input.json",
+        "generator-workspace/manifest.json",
+        "generator-workspace/pkg_map.xlsx",
+        "generator-workspace/probability.xlsx",
+        "generator-workspace/raw.xlsx",
+        "generator-workspace/regex.txt",
+        "generator-workspace/summary.xlsx",
+        "legacy-default/input.xlsx",
+        "legacy-result/history.db",
+        "legacy-result/tinno_jira_batch_create_audit_20261116_170146.json",
+        "legacy-result/tinno_jira_batch_create_result_20261116_170146.json",
+        "output-absolute/attribution.json",
+        "output-absolute/input.xlsx",
+        "output-absolute/manifest.json",
+        "output-absolute/result/tinno_jira_batch_create_audit_20261116_170146.json",
+        "output-absolute/result/tinno_jira_batch_create_result_20261116_170146.json",
+        "output-absolute/result/tinno_jira_batch_create_summary_20261116_170146.xlsx",
+        "output-absolute/result/tinno_regression_cache/VFFCA.db",
+        "output-auto/attribution.json",
+        "output-auto/input.xlsx",
+        "output-auto/manifest.json",
+        "output-auto/result/tinno_jira_batch_create_audit_20261116_170146.json",
+        "output-auto/result/tinno_jira_batch_create_result_20261116_170146.json",
+        "output-auto/result/tinno_jira_batch_create_summary_20261116_170146.xlsx",
+        "output-auto/result/tinno_regression_cache/VFFCA.db",
+        "output-relative-parent/rel_ws/attribution.json",
+        "output-relative-parent/rel_ws/input.xlsx",
+        "output-relative-parent/rel_ws/manifest.json",
+        "output-relative-parent/rel_ws/result/tinno_jira_batch_create_audit_20261116_170146.json",
+        "output-relative-parent/rel_ws/result/tinno_jira_batch_create_result_20261116_170146.json",
+        "output-relative-parent/rel_ws/result/tinno_jira_batch_create_summary_20261116_170146.xlsx",
+        "output-relative-parent/rel_ws/result/tinno_regression_cache/VFFCA.db",
+        "reorder/attribution.json",
+        "reorder/input.xlsx",
+        "reorder/manifest.json",
+        "reorder/result/tinno_jira_batch_create_audit_20261116_170146.json",
+        "reorder/result/tinno_jira_batch_create_result_20261116_170146.json",
+        "reorder/result/tinno_jira_batch_create_summary_20261116_170146.xlsx",
+        "reorder/result/tinno_regression_cache/VFFCA.db",
+        "two-workspaces-a/attribution.json",
+        "two-workspaces-a/input.xlsx",
+        "two-workspaces-a/manifest.json",
+        "two-workspaces-a/result/tinno_jira_batch_create_audit_20261116_170146.json",
+        "two-workspaces-a/result/tinno_jira_batch_create_result_20261116_170146.json",
+        "two-workspaces-a/result/tinno_jira_batch_create_summary_20261116_170146.xlsx",
+        "two-workspaces-a/result/tinno_regression_cache/VFFCA.db",
+        "two-workspaces-b/attribution.json",
+        "two-workspaces-b/input.xlsx",
+        "two-workspaces-b/manifest.json",
+        "two-workspaces-b/result/tinno_jira_batch_create_audit_20261116_170146.json",
+        "two-workspaces-b/result/tinno_jira_batch_create_result_20261116_170146.json",
+        "two-workspaces-b/result/tinno_jira_batch_create_summary_20261116_170146.xlsx",
+        "two-workspaces-b/result/tinno_regression_cache/VFFCA.db"
+      ]
+    }
+  }
+}

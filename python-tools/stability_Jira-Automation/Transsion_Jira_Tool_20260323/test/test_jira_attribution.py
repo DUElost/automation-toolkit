@@ -215,6 +215,70 @@ class AttributionContractTest(unittest.TestCase):
         )
         self.assertEqual("SUCCESS", payload["items"][0]["status"])
 
+    def test_cleared_occurrence_ids_gap_without_manifest_backfill(self) -> None:
+        recorder = attr.AttributionRecorder(self.index, workspace=self.workspace, run_id="run-empty")
+        rows = pd.DataFrame([{"Signature ID": "7", "Occurrence IDs": ""}])
+        resolution = recorder.prepare(rows)[0]
+        self.assertEqual(attr.STATUS_EMPTY_OCCURRENCE_IDS, resolution.status)
+        self.assertEqual([], resolution.occurrence_ids)
+        recorder.record(resolution, status="SUCCESS", issue_key="MTK-EMPTY")
+        payload = recorder.payload()
+        self.assertEqual([], payload["links"])
+        self.assertEqual("empty_occurrence_ids", payload["gaps"][0]["kind"])
+
+    def test_fractional_ids_are_invalid_not_truncated(self) -> None:
+        signature = self.index.resolve("7.5", "[101]", occurrence_ids_provided=True, workbook_row=2)
+        self.assertEqual(attr.STATUS_INVALID_SIGNATURE_ID, signature.status)
+        occurrence = self.index.resolve(7, "[101.5]", occurrence_ids_provided=True, workbook_row=2)
+        self.assertEqual(attr.STATUS_INVALID_OCCURRENCE_ID, occurrence.status)
+        recorder = attr.AttributionRecorder(self.index, workspace=self.workspace, run_id="run-frac")
+        resolutions = recorder.prepare(
+            pd.DataFrame(
+                [
+                    {"Signature ID": "7.5", "Occurrence IDs": "[101]"},
+                    {"Signature ID": "7", "Occurrence IDs": "[101.5]"},
+                ]
+            )
+        )
+        for resolution in resolutions:
+            recorder.record(resolution, status="SUCCESS", issue_key="MTK-FRAC")
+        payload = recorder.payload()
+        self.assertEqual([], payload["links"])
+        self.assertEqual(
+            ["invalid_signature_id", "invalid_occurrence_id"],
+            [gap["kind"] for gap in payload["gaps"]],
+        )
+
+    def test_hidden_row_positions_reads_autofilter(self) -> None:
+        from openpyxl import load_workbook
+
+        workbook_path = self.workspace / "hidden.xlsx"
+        pd.DataFrame([{"Signature ID": index, "Occurrence IDs": "[]"} for index in range(4)]).to_excel(
+            workbook_path, index=False
+        )
+        workbook = load_workbook(workbook_path)
+        sheet = workbook.active
+        sheet.auto_filter.ref = sheet.dimensions
+        sheet.row_dimensions[3].hidden = True
+        workbook.save(workbook_path)
+        self.assertEqual({1}, attr.hidden_row_positions(workbook_path))
+
+    def test_filtered_row_has_no_gap_and_no_link(self) -> None:
+        recorder = attr.AttributionRecorder(self.index, workspace=self.workspace, run_id="run-filter")
+        rows = pd.DataFrame(
+            [
+                {"Signature ID": "7", "Occurrence IDs": "[101]"},
+                {"Signature ID": "7", "Occurrence IDs": ""},
+            ]
+        )
+        resolutions = recorder.prepare(rows, filtered_positions={1})
+        recorder.record(resolutions[0], status="SUCCESS", issue_key="MTK-KEEP")
+        recorder.record(resolutions[1], status="SKIPPED", error="autofilter_hidden")
+        payload = recorder.payload()
+        self.assertEqual([101], [link["occurrence_id"] for link in payload["links"]])
+        self.assertEqual([], payload["gaps"])
+        self.assertTrue(payload["items"][1]["filtered"])
+
     def test_legacy_workspace_keeps_result_dir(self) -> None:
         default_result = Path("/tmp/tool/result")
         workspace, result_dir, mode = attr.resolve_workspace(None, None, default_result)
