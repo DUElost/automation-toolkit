@@ -3,9 +3,10 @@
 
 版本锚点
 --------
-主脚本 memleak_monitor_2d.py：sha256 前缀 8a6c1541，1516 行，为 v11。
-前一版 v10（307f43b6，1495 行）已移入 archive/memleak_monitor_2d_261116_v10.py。
-再前一版 v8（4bf9136e，1471 行）在 archive/memleak_monitor_2d_261102_v8.py。
+主脚本 memleak_monitor_2d.py：sha256 前缀 04962290，1537 行，为 v12。
+前一版 v11（8a6c1541，1516 行）已移入 archive/memleak_monitor_2d_261119_v11.py。
+再前一版 v10（307f43b6，1495 行）在 archive/memleak_monitor_2d_261116_v10.py；
+v8（4bf9136e，1471 行）在 archive/memleak_monitor_2d_261102_v8.py。
 在跑版本不等于本文件，且必须逐台 sha 回读才算数（现态经 2026-11-19 20:06 逐台复测）：
 · 现态：**fleet 无进程在跑**。Owner 于 2026-11-19 14:13 提前收口，20 台 `stop_2d.sh`
   全部返回 `MONITOR_EXITED`，`STOP_REQUESTED` 标记在位；`deadline_epoch` 仍为
@@ -22,6 +23,8 @@
   字节比对）。
 · 停止或重启前必须逐台读 `/proc/<pid>/environ` 确认 `MEMLEAK_MONKEY` 未置 1：
   `stop_2d.sh` 触发的收尾会停设备上的 monkey 并删设备侧文件（本役 20/20 均为停用）。
+· v12（04962290，1537 行）只入库未下发：下发要按「使用」节重启监测，而重启会清零档位、
+  批次计时与当日重复门槛（见已知限制 6、8），必须等窗口收口或另行决策后再做。
 改脚本必须同步改本节版本号；行为变更必须新增版本并把上一版移入 archive/，不得原地替换不留档。
 
 它解决什么问题
@@ -52,6 +55,10 @@ Monkey 长跑专项中，system_server 的堆会缓慢爬坡直到打满（实�
     logcat 早期信号（blocking GC / Clamp / OOM / LOW MEMORY）：system_server 即时补抓；
         三个应用仅在堆占比 ≥60% 时补抓（压应用侧噪声）
     dump 冷却：system_server 2 小时，应用 30 分钟（dumpheap 会触发 Full GC，代价大）
+    当日重复门槛（v12 新增）：同一 (设备, 进程) 当天已抓过后，堆占比须再涨
+        DUMP_REPEAT_MIN_PCT_GAIN = 5（百分点）才允许再抓，否则只记一条 INFO 跳过。
+        冷却在先、门槛在后，两道闸独立；RSS 触发的 reason 不带堆占比，故不受本门槛约束。
+        可用 MEMLEAK_DUMP_REPEAT_GAIN 覆盖，设 0 即关闭门槛（退回 v11 行为）。
 
 读到的 pct 可以超过 100%（实测最高 190%），这不是 bug：分子取 max(Pss,Rss)，含共享与映射页，
 而 OOM 由 target footprint 决定（崩溃日志实证 target footprint = growth limit = 536870912）。
@@ -118,9 +125,30 @@ MEMLEAK_MONKEY 默认为 0：本工具只观测，Monkey 压力由测试平台�
 6. 重启监测会清零档位状态与批次计时，泄漏观测须重新计数；非必要不得在窗口中途重启。
 7. 盯防名单与「不得中途重启」（见 6）互相牵制：改 hot_devices.txt 必须重启才生效，
    而重启又清零档位。要加名单就随下一次计划内的重启一起做，别为它单独重启。
+8. 当日重复门槛的状态（每设备每进程当天已 dump 的最高占比）只存内存：重启即清零，
+   重启后的第一次抓取不受门槛约束。被门槛拦下时每个冷却周期留 1 条 INFO（应用侧最坏
+   ≈48 条/日/主机），这是「为什么没抓到第二份」的留痕，不是新的噪声类别。
 
 变更记录
 --------
+v12 2026-11-19  当日重复 dump 门槛（唯一判据变更，只减产物、不减覆盖）。
+                · 动因（现场实测，非推测）：11-18 全 fleet 只出 8 个 (设备,进程) 键的 38 份
+                  hprof，其中 AZ6QNX6A06000008/com.android.launcher3 一台占 30 份 / 9164MB
+                  （当日总量 10570MB 的 87%）；11-19 同键再出 23 份 / 7252MB，且当天再无
+                  其它设备触发。堆体量已在平台期（328MB 上下反复），重复份没有新增信息。
+                · 改法：_trigger_hprof_dump 增 heap_pct 形参，四个带堆占比的触发点（system_server
+                  与 launcher/apps 的「上穿档」与「早期信号补抓」）传入 ratio*100；同日同键
+                  增幅 <DUMP_REPEAT_MIN_PCT_GAIN 个百分点即 INFO 跳过，抓取成功后状态取 max 上移。
+                  门槛键含当日日期，跨日互不影响；RSS 触发不传占比 → 不受约束（不拿无法比较的
+                  量去压触发）。
+                · 覆盖度：11-18 的 8 个键各留当日首份即覆盖当日全部问题类别，重复的 30 份
+                  （该台 29 + 另一台 1）可省 9013MB / 当日 10570MB；11-19 的 1 个键重复 22 份，
+                  可省 6937MB / 当日 7252MB。爬坡继续抬升的情形仍可再次抓取（增幅达标即可）。
+                · 新增 test/test_dump_repeat_gate.py 9 例：当日首份放行、增幅不足跳过且不回写状态、
+                  增幅达标放行并上移、按 (设备,进程) 分键、跨日不残留、无占比不受闸、门槛可置 0
+                  关闭、冷却与门槛是两道独立闸、readme 记录的门槛值与源码常量同轴。
+                回归：v12 字节 28 passed；同一测试集跑在 v11 字节上 19 passed + 9 errors
+                （全部 AttributeError：v11 无 last_dump_pct_by_day 状态，新例无法在旧行为下成立）。
 v11 2026-11-16  三条 PR #28 复核整改。判据、触发逻辑、产物路径、节流窗口均未动：
                 · P2-1/N4  `proc=` 字段收回多进程文件。v10 把日志文案用的 label 同时当作 proc= 入参，
                   launcher 曲线被写成「… | proc=launcher3 heap=…」，既与「行格式约束」的口径不符，
