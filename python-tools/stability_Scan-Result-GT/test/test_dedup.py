@@ -93,3 +93,15 @@ def test_swt_searching_line_fallback_not_merged():
     ]
     before, after = dedup(records)
     assert len(after) == 2
+
+
+def test_jank_focus_timeout_cross_device_merged():
+    """Jank focus timeout：同 Package + 同 CausedBy 跨设备归并。"""
+    a = _rec("Jank", "com.android.settings", "focus timeout", "2026-11-12-034705")
+    a["snNum"] = "MSW000003J6AU0000D"
+    b = _rec("Jank", "com.android.settings", "focus timeout", "2026-11-12-041535")
+    b["snNum"] = "MSW000003J6AU00042"
+    before, after = dedup([a, b])
+    assert len(after) == 1
+    assert after[0]["sum"] == 2
+    assert after[0]["DeviceCount"] == 2

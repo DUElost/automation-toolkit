@@ -32,9 +32,12 @@ _ASSERT_RE = re.compile(r"Assert|109000001", re.IGNORECASE)
 _WCN_RE = re.compile(r"WCN|109000003", re.IGNORECASE)
 _PACKAGE_RE = re.compile(r"^(.+)[_-](\d{4}-\d{2}-\d{2}-\d{6})$")
 
-# uniview 元信息不作 CausedBy 兜底（event_name 过粗，SWT 会误并）
-_SKIP_UNIVIEW_CAUSE_FALLBACK = frozenset(("SWT", "Jank", "Assert", "WCN", "SR"))
+# uniview 元信息不作 CausedBy 兜底（event_name 过粗，SWT 会误并）。
+# Jank 已有专用稳定指纹（event_name + 包名），不在此列。
+_SKIP_UNIVIEW_CAUSE_FALLBACK = frozenset(("SWT", "Assert", "WCN", "SR"))
 _AM_CRASH_RE = re.compile(r"am_crash:\s*\[([^]]+)\]")
+# ActivityRecord{… u0 com.foo/.Bar tN d0} → 包名 / 组件
+_ACTIVITY_RECORD_RE = re.compile(r"([\w.]+)/(\.?[\w.$]+)")
 
 
 def _find_problem_dirs(root):
@@ -177,24 +180,37 @@ def _read_lines(path, max_lines=None):
         return []
 
 
-def _uniview_info(package_dir):
-    """读取 uniview 事件元信息（unievent_info.json，包根）。
+def _uniview_info_path(package_dir):
+    """优先读第一阶段落盘的 ``unievent_info.json``；兼容设备原文 ``unievent_info``。"""
+    for name in ("unievent_info.json", "unievent_info"):
+        p = os.path.join(package_dir, name)
+        if os.path.isfile(p):
+            return p
+    return None
 
-    兼容：单对象 JSON；设备 JSONL 多行（设备信息 + 多事件 kick_datetime 行）。
-    多事件时按问题包 ExpTime 匹配对应 kick_datetime 行。
+
+def _uniview_info(package_dir):
+    """读取 uniview 事件元信息（unievent_info.json / unievent_info，包根）。
+
+    兼容：单对象 JSON；设备 JSONL 多行（设备头 + B 类元数据 + 多事件 kick 行）。
+    多事件时按问题包 ExpTime 匹配对应 kick_datetime 行，并把 B 类
+    ``event_name`` / ``event_id`` 合并进返回对象（供 Jank 等稳定指纹使用）。
     """
-    p = os.path.join(package_dir, "unievent_info.json")
-    if not os.path.isfile(p):
+    p = _uniview_info_path(package_dir)
+    if not p:
         return None
     try:
         text = open(p, encoding="utf-8").read()
     except OSError:
         return None
     try:
-        return json.loads(text)
+        obj = json.loads(text)
+        if isinstance(obj, dict):
+            return obj
     except (ValueError, json.JSONDecodeError):
         pass
     _, exp_time = _parse_package_name(package_dir)
+    meta = {}
     events = []
     for line in text.splitlines():
         line = line.strip()
@@ -204,18 +220,31 @@ def _uniview_info(package_dir):
             obj = json.loads(line)
         except (ValueError, json.JSONDecodeError):
             continue
+        if not isinstance(obj, dict):
+            continue
+        # B 类元数据行：event_name / event_id，不是发生行
+        if "event_name" in obj or "event_id" in obj:
+            for key in ("event_name", "event_id", "event_type", "event_level"):
+                if obj.get(key) not in (None, ""):
+                    meta[key] = obj[key]
         if obj.get("kick_datetime") or obj.get("event_time") or obj.get("reboot_reason"):
             events.append(obj)
         elif obj.get("tag") and obj.get("proc"):
             events.append(obj)
     if not events:
-        return None
+        return dict(meta) if meta else None
+    chosen = events[0]
     if exp_time:
         for ev in events:
             kd = ev.get("kick_datetime") or ev.get("event_time") or ""
             if _kick_matches_exp_time(kd, exp_time):
-                return ev
-    return events[0]
+                chosen = ev
+                break
+    if meta:
+        folded = dict(meta)
+        folded.update({k: v for k, v in chosen.items() if v not in (None, "")})
+        return folded
+    return chosen
 
 
 def _kick_matches_exp_time(kick_datetime, exp_time):
@@ -576,9 +605,11 @@ def _format_rom_ram(data_kb, ddr_raw):
 
 
 def _extract_pid(package_dir, ev, detail_lines):
-    """pid：unievent_info.pid -> detail PID: 行 -> tombstone pid: 行（三级兜底）。"""
-    if ev and ev.get("pid"):
-        return str(ev["pid"])
+    """pid：unievent_info.pid / halfAnrPid -> detail PID: 行 -> tombstone pid: 行。"""
+    if ev:
+        for key in ("pid", "halfAnrPid"):
+            if ev.get(key) not in (None, ""):
+                return str(ev[key])
     for line in detail_lines:
         s = line.strip()
         if s.startswith("PID:"):
@@ -602,6 +633,105 @@ def _pkg_version_suffix(detail_lines):
             rest = s[len("Package:"):].strip()
             m = re.search(r"\sv\d+(?: \([^)]*\))?", rest)
             return m.group(0) if m else ""
+    return ""
+
+
+def _parse_appname_identity(appname):
+    """从 ActivityRecord / proc 提取 (package, component)。
+
+    例：``ActivityRecord{… u0 com.android.settings/.SubSettings t6470 d0}``
+    → ``("com.android.settings", "com.android.settings/.SubSettings")``
+    """
+    text = (appname or "").strip()
+    if not text:
+        return "", ""
+    m = _ACTIVITY_RECORD_RE.search(text)
+    if m:
+        pkg, comp = m.group(1), m.group(2)
+        if not comp.startswith("."):
+            comp = "." + comp
+        return pkg, "%s/%s" % (pkg, comp)
+    m = re.search(r"([\w.]+)/", text)
+    if m:
+        return m.group(1), ""
+    if re.match(r"^[\w.]+$", text):
+        return text, ""
+    return "", ""
+
+
+def _event_name_from_json_lines(lines):
+    """从 exp_main / unievent JSON 行提取首个非空 event_name。"""
+    for line in lines or []:
+        s = (line or "").strip()
+        if not s.startswith("{"):
+            continue
+        try:
+            obj = json.loads(s)
+        except (ValueError, json.JSONDecodeError):
+            continue
+        if isinstance(obj, dict):
+            name = (obj.get("event_name") or "").strip()
+            if name:
+                return name
+    return ""
+
+
+def _jank_event_name(package_dir, ev, exp_detail=None):
+    """Jank 问题名：unievent event_name → exp_main → summary 关键词。"""
+    if ev:
+        name = (ev.get("event_name") or "").strip()
+        if name:
+            return name
+    name = _event_name_from_json_lines(exp_detail)
+    if name:
+        return name
+    # 打包在 tar / 展开目录里的 exp_main（Jank 无 crash 信号，_extract_exp_detail 可能跳过）
+    em = _read_pkg_file(package_dir, "exp_main.txt")
+    name = _event_name_from_json_lines(em)
+    if name:
+        return name
+    summary = _find_summary(package_dir)
+    if summary:
+        for line in _read_lines(summary, 40):
+            low = line.lower()
+            if "focus timeout" in low:
+                return "focus timeout"
+            if "event_name" in low and ":" in line:
+                return line.split(":", 1)[1].strip()[:80]
+    return ""
+
+
+def _jank_package_name(ev, fallback_package=""):
+    """Jank 真实包名：unievent appname/proc → 已提取的 Package → 空。"""
+    if ev:
+        pkg, _comp = _parse_appname_identity(ev.get("appname") or ev.get("proc") or "")
+        if pkg:
+            return pkg
+    fb = (fallback_package or "").strip()
+    if fb and fb != "Jank" and re.match(r"^[\w.]+$", fb):
+        return fb
+    return ""
+
+
+def _extract_caused_by_jank(package_dir, ev=None, exp_detail=None, package=""):
+    """Jank 稳定去重指纹。
+
+    优先 ``event_name``（如 focus timeout）；缺省时用 ``Jank | <package|component>``。
+    与 Package 字段组合即可跨设备归并；不再写随机兜底串。
+    """
+    if ev is None:
+        ev = _uniview_info(package_dir)
+    event_name = _jank_event_name(package_dir, ev, exp_detail)
+    if event_name:
+        return event_name[:200]
+    pkg = _jank_package_name(ev, package)
+    component = ""
+    if ev:
+        _p, component = _parse_appname_identity(ev.get("appname") or ev.get("proc") or "")
+    if component:
+        return ("Jank | %s" % component)[:200]
+    if pkg:
+        return ("Jank | %s" % pkg)[:200]
     return ""
 
 
@@ -962,6 +1092,8 @@ def extract_caused_by(expclass, package_dir, extra_lines=None):
             if caused:
                 return caused
         return ""
+    elif expclass == "Jank":
+        return _extract_caused_by_jank(package_dir, exp_detail=extra_lines)
     else:  # JE 等
         caused = _je_caused_by_from_lines(lines)
         if caused:
@@ -1222,9 +1354,26 @@ def _collect_package(package_dir, version, device):
         # uniview：message/reboot_reason 可作弱兜底；不用 event_name（过粗）
         if ev:
             caused_by = (ev.get("message") or ev.get("reboot_reason") or "").strip()[:200]
-    if expclass in ("Jank", "Assert", "WCN", "SR"):
+    if expclass == "Jank":
+        # 可去重：真实包名 + 稳定 event_name（focus timeout），不用随机兜底
+        jank_pkg = _jank_package_name(ev, package)
+        if jank_pkg:
+            package = jank_pkg
+        jank_cb = _extract_caused_by_jank(
+            package_dir, ev=ev, exp_detail=exp_detail, package=package)
+        if jank_cb:
+            caused_by = jank_cb
+        if not package:
+            package = expclass
+        _p, component = _parse_appname_identity(
+            (ev or {}).get("appname") or (ev or {}).get("proc") or "")
+        cur_process = component or package
+    elif expclass in ("Assert", "WCN", "SR"):
         # 参照 MTK：特殊类型无法确定进程时，CurProcess/Package 直接填 ExpClass
         package = expclass
+        cur_process = package
+    else:
+        cur_process = package
     if expclass == "SR" or not caused_by:
         # MTK 兜底：SR（严重重启）每个问题单独看待；其他类型无根因时防误合并
         caused_by = _fallback_caused_by(expclass, package)
@@ -1243,7 +1392,7 @@ def _collect_package(package_dir, version, device):
         "Version": version,
         "ExpTime": ts,
         "ExpType": exp_type,
-        "CurProcess": package,
+        "CurProcess": cur_process,
         "Package": package,
         "Detail": detail_text,
         "CausedBy": caused_by,

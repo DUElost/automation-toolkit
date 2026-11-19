@@ -239,15 +239,119 @@ def test_extract_caused_by_ne_tombstone_file(tmp_path):
 
 
 def test_uniview_type_package(tmp_path):
+    """无 unievent 身份时仍可识别 Jank；Package 回退类型名，CausedBy 不写随机串也可为空后兜底。"""
     _make_package(str(tmp_path), "Jank", "2026-08-04-205511",
                   detail_lines=["focus timeout", "appname: launcher"])
     records = collect_problems(str(tmp_path))
     assert len(records) == 1
     r = records[0]
     assert r["ExpClass"] == "Jank"
-    # 参照 MTK：特殊类型 CurProcess/Package 直接填 ExpClass
+    # detail 无 Process: / 无 unievent → Package 回退 ExpClass
     assert r["Package"] == "Jank"
     assert r["CurProcess"] == "Jank"
+
+
+def test_jank_focus_timeout_stable_fingerprint(tmp_path):
+    """Jank/focus timeout：Package=真实包名，CausedBy=稳定 event_name（可跨次归并）。"""
+    import json as _json
+
+    appname = (
+        "ActivityRecord{150074856 u0 com.android.settings/.SubSettings t6470 d0}"
+    )
+    samples = (
+        ("2026-11-12-034705", "2026-11-12_03:47:05.822"),
+        ("2026-11-12-035235", "2026-11-12_03:52:35.274"),
+    )
+    for ts, kick in samples:
+        pkg = _make_package(str(tmp_path), "Jank", ts, summary="类型: Jank\n")
+        with open(os.path.join(pkg, "unievent_info.json"), "w", encoding="utf-8") as f:
+            _json.dump({
+                "kick_datetime": kick,
+                "appname": appname,
+                "halfAnrPid": 20498,
+                "event_name": "focus timeout",
+                "uniview_type_dir": "Jank",
+            }, f)
+
+    records = collect_problems(str(tmp_path))
+    assert len(records) == 2
+    for r in records:
+        assert r["ExpClass"] == "Jank"
+        assert r["Package"] == "com.android.settings"
+        assert r["CurProcess"] == "com.android.settings/.SubSettings"
+        assert r["CausedBy"] == "focus timeout"
+        assert not r["CausedBy"].startswith("class:[")
+        assert "pid：['20498']" in r["Detail"]
+
+    from modules.dedup import dedup
+    _before, after = dedup(records)
+    assert len(after) == 1
+    assert after[0]["sum"] == 2
+
+
+def test_jank_focus_timeout_from_exp_main_jsonl(tmp_path):
+    """第一阶段仅落 occurrence 行时，仍可从 exp_main 取 event_name。"""
+    import json as _json
+    import tarfile
+    import io
+
+    ts = "2026-11-12-034705"
+    pkg = _make_package(str(tmp_path), "Jank", ts, summary="类型: Jank\n")
+    with open(os.path.join(pkg, "unievent_info.json"), "w", encoding="utf-8") as f:
+        _json.dump({
+            "kick_datetime": "2026-11-12_03:47:05.822",
+            "appname": (
+                "ActivityRecord{150074856 u0 com.android.settings/.SubSettings "
+                "t6470 d0}"
+            ),
+            "halfAnrPid": 20498,
+            "uniview_type_dir": "Jank",
+        }, f)
+    exp_main = (
+        '{"event_id":"102200004","event_type":"FAULT","event_level":"DEBUG",'
+        '"event_name":"focus timeout"}\n'
+        '{"kick_datetime":"2026-11-12_03:47:05.822","appname":'
+        '"ActivityRecord{150074856 u0 com.android.settings/.SubSettings '
+        't6470 d0}","halfAnrPid":20498}\n'
+    )
+    with tarfile.open(os.path.join(pkg, "001-2026-11-12_03-47-05.tar.gz"), "w:gz") as tf:
+        data = exp_main.encode()
+        info = tarfile.TarInfo("001-2026-11-12_03-47-05/exp_main.txt")
+        info.size = len(data)
+        tf.addfile(info, io.BytesIO(data))
+
+    records = collect_problems(str(tmp_path))
+    assert len(records) == 1
+    r = records[0]
+    assert r["Package"] == "com.android.settings"
+    assert r["CausedBy"] == "focus timeout"
+
+
+def test_jank_different_packages_not_merged(tmp_path):
+    """不同应用的 focus timeout 不得并成一条。"""
+    import json as _json
+    from modules.dedup import dedup
+
+    cases = (
+        ("2026-11-12-034705",
+         "ActivityRecord{1 u0 com.android.settings/.SubSettings t1 d0}"),
+        ("2026-11-12-035235",
+         "ActivityRecord{2 u0 com.android.chrome/.Main t2 d0}"),
+    )
+    for ts, appname in cases:
+        pkg = _make_package(str(tmp_path), "Jank", ts, summary="类型: Jank\n")
+        with open(os.path.join(pkg, "unievent_info.json"), "w", encoding="utf-8") as f:
+            _json.dump({
+                "kick_datetime": "2026-11-12_03:47:05.822",
+                "appname": appname,
+                "event_name": "focus timeout",
+            }, f)
+
+    records = collect_problems(str(tmp_path))
+    assert {r["Package"] for r in records} == {
+        "com.android.settings", "com.android.chrome"}
+    _before, after = dedup(records)
+    assert len(after) == 2
 
 
 def test_detail_sr_dump_report(tmp_path):

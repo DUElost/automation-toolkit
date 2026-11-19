@@ -48,10 +48,10 @@ python scan_result.py -d <第一阶段保存根目录> [--threshold 0.9]
 | 字段 | 来源 |
 |---|---|
 | ExpType | 问题包名类型段（`system-app-crash` → `system_app_crash`） |
-| ExpClass | 类型映射（`config.json expclass_map`）；Jank/Assert/WCN/SR 的 CurProcess/Package 填类型名 |
-| Package | detail `Process:` / anr_trace `Cmd line:` / unievent_info proc / summary，路径型统一 `/` |
+| ExpClass | 类型映射（`config.json expclass_map`）；Assert/WCN/SR 的 CurProcess/Package 填类型名；Jank 填真实包名 |
+| Package | detail `Process:` / anr_trace `Cmd line:` / unievent_info proc·appname / summary，路径型统一 `/` |
 | Detail | MTK 识别报告模板：Device_id / 解析库版本 / 手机版本 / 异常包名（含应用版本）/ 异常进程 / pid / Backtrace（根因行+栈帧）+ 类型附加现场段 |
-| CausedBy | NE：backtrace 首帧 pc（去重指纹）；JE：`Caused by:`/异常行；ANR：main 栈顶帧；SWT：`Blocked in` 详情；SR/无根因：MTK 兜底（随机串防误合并） |
+| CausedBy | NE：backtrace 首帧 pc；JE：`Caused by:`/异常行；ANR：main 栈顶帧；SWT：`Blocked in`；**Jank：`event_name`（如 focus timeout）**；SR/无根因：MTK 兜底（随机串） |
 | Rom_Ram | 设备级 `rom_ram.json`（第一阶段采集，SN 对应）优先，聚合包 SYS_* 提取兜底 |
 | DeviceCount | 去重组内不同设备数（跨设备归并） |
 
@@ -63,6 +63,8 @@ python scan_result.py -d <第一阶段保存根目录> [--threshold 0.9]
   `get_str_similar(format_str)`——阻塞秒数/行号等动态值不干扰归并）
 - 空 CausedBy：同秒视为同一事件（uniview + dropbox 双写）
 - SWT 无阻塞详情（仅 Searching 行/压力统计）：CausedBy 走 MTK 兜底（随机串，各自保留不误并）
+- **Jank / focus timeout**：`Package`=unievent `appname` 包名，`CausedBy`=`event_name`（缺省时
+  `Jank \| <component|package>`）；同包同 event_name 跨次/跨设备归并。不再对 Jank 写随机兜底串
 - 组内保留 ExpTime 最早的代表条目，`Count` = 组内条数；`DeviceCount` = 组内设备数
 - **跨设备归并**：同根因问题跨设备合并为 1 条（DeviceCount>1），Rom_Ram 组内多配置以 `/` 拼接
   （如 `64GB+4GB/128GB+4GB`）
@@ -73,7 +75,7 @@ python scan_result.py -d <第一阶段保存根目录> [--threshold 0.9]
 python -m pytest test/ -v
 ```
 
-45 passed（classify / collect / dedup / export / caused_by_rules / ylog_enrich）。
+pytest 覆盖 classify / collect / dedup / export / caused_by_rules / ylog_enrich（含 Jank focus timeout 归并）。
 
 ## 验证状态（真机 Z2581/MyOS16，2026-08 验收）
 
