@@ -74,3 +74,30 @@ jobs:
         run: |
           python -m pytest || true
         continue-on-error: true
+
+  stability-memory-leak-monitor:
+    name: Stability Memory Leak Monitor
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: python-tools/stability_Memory-Leak-Monitor
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest flake8
+
+      - name: Lint with flake8
+        run: flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+
+      - name: Test
+        run: python -m pytest -v

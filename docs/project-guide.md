@@ -156,11 +156,12 @@ python main.py
 | performance_SMT_ResultFiller | pytest | 未配置 | CI 中预留测试命令 |
 | performance_Top300_ResultFiller | pytest | 未配置 | CI 中预留测试命令 |
 | stability_Jira-Automation | pytest | 局部覆盖 | Transsion / Tinno 各自 `test/` 目录；Tinno venv38 无 pytest，用 `-m unittest discover -s test -p "test_*.py"` |
+| stability_Memory-Leak-Monitor | pytest | 已配置 | CI 运行 `python-tools/stability_Memory-Leak-Monitor/test/`（阻塞，flake8 关键错误 + pytest） |
 | python-utils | - | 无测试 | 空模块，待开发 |
 
 **CI 配置**: `.github/workflows/python-tools.yml`
-- Lint: flake8（非阻塞）
-- Test: pytest（非阻塞）
+- Lint: flake8（`performance_*` 非阻塞；`stability_Memory-Leak-Monitor` 阻塞）
+- Test: pytest（`performance_*` 非阻塞；`stability_Memory-Leak-Monitor` 阻塞）
 
 ---
 
