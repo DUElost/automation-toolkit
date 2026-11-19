@@ -5,6 +5,9 @@
 # v3 改动: 只采 meminfo、不导出 mobilelog/aee；1)不跑Monkey 2)移除4条setprop 3)移除固定1h/2h dump 4)任一应用RSS>1GB才dump 5)修正RSS段落越界解析 6)目录命名对齐 sonic_tinno 约定
 # v7（2026-10-20）：只监控 system_server OOM；移除应用 RSS/Logcat OOM 触发与 systemui meminfo 采集
 # v8（2026-10-21）：接入 monkey 压测（复用平台 AIMonkey 资源，设备端 mobilelog 已禁用）；监控面仍只针对 system_server
+# v12（2026-11-19）：同一 (设备, 进程) 当日「早期信号补抓」需堆占比再涨 DUMP_REPEAT_MIN_PCT_GAIN 个百分点，
+#                   否则只记 INFO 跳过（现场：11-18/11-19 一台 launcher3 各 30/23 份、7–9GB，堆已进平台期）。
+#                   上穿档位（L1/L2）不受该门槛约束，只负责抬高当日峰值；RSS 触发两者都不参与。
 import sys
 
 import time
@@ -27,6 +30,8 @@ MAIN_LOG_FILE_PATTERN = re.compile(r"^main_log.*")
 
 # 【内存泄露触发配置】
 HPROF_DUMP_COOLDOWN_SECONDS = 1800      # 按 (设备, 进程) 冷却 30 分钟，沿用原脚本机制
+# v12: 当日重复 dump 的堆占比增幅门槛（百分点）。设为 0 即关闭门槛，退回 v11 行为。
+DUMP_REPEAT_MIN_PCT_GAIN = float(os.environ.get("MEMLEAK_DUMP_REPEAT_GAIN", "5.0"))
 DUMP_MIN_FREE_GB = 20                   # 15.4 共享剩余低于 20GB 时跳过 dump，只记日志
 # 2026-10-19 变更：system_server 纳入监控对象，已从排除名单移出；
 SYSTEM_SERVER_MEMINFO_NAME = "system"            # dumpsys meminfo 中 system_server 显示为 "system"
@@ -139,6 +144,7 @@ app_heap_level = {}              # v8: (device, pkg) 堆档位状态（systemui/
 device_log_path_map = {}         # device -> 产物目录（供加密轮询复用）
 MEMINFO_RSS_PATTERN = re.compile(r"^\s*([\d,]+)K:\s*([\w.-]+)") # 用于解析meminfo中进程内存的正则表达式
 last_hprof_dump_times = {} # 【新增】记录每个设备上次dump hprof的时间
+last_dump_pct_by_day = {}  # v12: (设备, 进程, 当日日期) -> 当日已 dump 的最高堆占比（百分点）
 
 # 日志模块代码（从modules.common.logger导入）
 class Logger(object):
@@ -720,10 +726,17 @@ def _resolve_system_server_pid(device_id):
     return None
 
 
-def _trigger_hprof_dump(device_id, log_path, reason, target_package=SYSTEM_SERVER_PROC_NAME, ignore_cooldown=False):
+def _trigger_hprof_dump(device_id, log_path, reason, target_package=SYSTEM_SERVER_PROC_NAME,
+                        ignore_cooldown=False, heap_pct=None, gate_repeat=True):
     """
     条件触发式 hprof dump。v5 流程：dumpheap → pull 到主机本地暂存 → 删除设备侧文件 → 再镜像拷贝到 15.4。
     这样即使 15.4（被别人写到 98% 满、soft 挂载）掉线或写满，关键堆也不会丢。
+    v12 门槛语义（三个参数各管一段，别混）：
+    · heap_pct 非空 → 无论是否受闸，抓取成功后都把当日峰值抬到 max(旧值, heap_pct)；
+    · gate_repeat=True 且 heap_pct 非空 → 受「当日重复」门槛约束（早期信号补抓走这条）；
+    · gate_repeat=False → 一定放行，但仍抬峰值（上穿档走这条：档位上穿本身就是新信息，
+      且堆跌破复位线后重新爬上 L1 也必须抓，否则会丢「同日第二次发作」的证据）；
+    · RSS 类触发两者都不传 → 不受闸、不抬峰值（无法与堆占比比较，不拿它去压触发）。
     """
     current_time = time.time()
     cooldown_key = f"{device_id}_{target_package}"
@@ -731,6 +744,16 @@ def _trigger_hprof_dump(device_id, log_path, reason, target_package=SYSTEM_SERVE
 
     if not ignore_cooldown and (current_time - last_hprof_dump_times.get(cooldown_key, 0)) < cooldown_seconds:
         TEST_LOGGER.info(f"设备 {device_id}: [{target_package}] 处于hprof dump冷却期，跳过本次触发。距上次触发: {int(current_time - last_hprof_dump_times.get(cooldown_key, 0))}秒。")
+        return
+
+    # v12: 当日重复门槛——堆占比没继续往上爬，就不再产出第二份几乎同尺寸的 hprof。
+    day_key = f"{device_id}_{target_package}_{datetime.now().strftime('%Y-%m-%d')}"
+    prev_pct = last_dump_pct_by_day.get(day_key)
+    if (gate_repeat and DUMP_REPEAT_MIN_PCT_GAIN > 0 and heap_pct is not None and prev_pct is not None
+            and heap_pct - prev_pct < DUMP_REPEAT_MIN_PCT_GAIN):
+        TEST_LOGGER.info(
+            f"设备 {device_id}: [{target_package}] 当日 {prev_pct:.1f}% 时已抓过 hprof，本次 {heap_pct:.1f}% "
+            f"未再上涨 {DUMP_REPEAT_MIN_PCT_GAIN:.0f} 个百分点，跳过重复抓取。原因: [{reason}]")
         return
 
     # 本地暂存目录：/home/android/memleak_local/<构建目录>/<序列号>/（主机盘 ~210GB 空闲）
@@ -777,6 +800,8 @@ def _trigger_hprof_dump(device_id, log_path, reason, target_package=SYSTEM_SERVE
 
     execute_commands(device_id, dump_commands, "hprof_dump_batch")
     last_hprof_dump_times[cooldown_key] = current_time
+    if heap_pct is not None:
+        last_dump_pct_by_day[day_key] = max(prev_pct or 0.0, heap_pct)
 
     # 镜像到 15.4（失败不影响本地留存）
     if share_free_gb < MIRROR_MIN_FREE_GB:
@@ -933,7 +958,8 @@ def check_launcher_heap(device_id, log_path, pkg=LAUNCHER_PKG):
         reason = (f"{label} 堆占比 {ratio:.0%} 上穿 L{level}"
                   f"（Dalvik Heap={heap_kb / 1024:.0f}MB / 上限 {target_kb / 1024:.0f}MB，剩余 {headroom_mb:.0f}MB 即 OOM）")
         _trigger_hprof_dump(device_id, log_path, reason,
-                            target_package=pkg, ignore_cooldown=True)
+                            target_package=pkg, ignore_cooldown=True,
+                            heap_pct=ratio * 100.0, gate_repeat=False)
         return
     if early and ratio >= LAUNCHER_EARLY_MIN_RATIO:
         key = f"{device_id}_{pkg}"
@@ -941,7 +967,7 @@ def check_launcher_heap(device_id, log_path, pkg=LAUNCHER_PKG):
         if since >= HPROF_DUMP_COOLDOWN_SECONDS:
             _trigger_hprof_dump(device_id, log_path,
                                 f"{label} 早期信号[{early}]（堆占比 {ratio:.0%}，剩余 {headroom_mb:.0f}MB）补抓",
-                                target_package=pkg)
+                                target_package=pkg, heap_pct=ratio * 100.0)
 
 
 def check_system_server_heap(device_id, log_path):
@@ -980,7 +1006,8 @@ def check_system_server_heap(device_id, log_path):
         ss_hot_devices.add(device_id)
         reason = (f"system_server 堆占比 {ratio:.0%} 上穿 L{level}"
                   f"（Dalvik Heap={heap_kb / 1024:.0f}MB / 上限 {target_kb / 1024:.0f}MB，剩余 {headroom_mb:.0f}MB 即 OOM）")
-        _trigger_hprof_dump(device_id, log_path, reason, target_package=SYSTEM_SERVER_PROC_NAME, ignore_cooldown=True)
+        _trigger_hprof_dump(device_id, log_path, reason, target_package=SYSTEM_SERVER_PROC_NAME,
+                            ignore_cooldown=True, heap_pct=ratio * 100.0, gate_repeat=False)
         return
 
     ss_hot_devices.add(device_id)
@@ -990,7 +1017,8 @@ def check_system_server_heap(device_id, log_path):
         if since >= SS_EARLY_SIGNAL_MIN_INTERVAL:
             _trigger_hprof_dump(device_id, log_path,
                                 f"system_server 早期信号[{early}]（堆占比 {ratio:.0%}，剩余 {headroom_mb:.0f}MB）补抓",
-                                target_package=SYSTEM_SERVER_PROC_NAME, ignore_cooldown=True)
+                                target_package=SYSTEM_SERVER_PROC_NAME, ignore_cooldown=True,
+                                heap_pct=ratio * 100.0)
         return
 
     if ratio >= 0.55:
