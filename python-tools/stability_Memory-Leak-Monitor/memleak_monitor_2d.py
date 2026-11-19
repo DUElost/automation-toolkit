@@ -5,8 +5,9 @@
 # v3 改动: 只采 meminfo、不导出 mobilelog/aee；1)不跑Monkey 2)移除4条setprop 3)移除固定1h/2h dump 4)任一应用RSS>1GB才dump 5)修正RSS段落越界解析 6)目录命名对齐 sonic_tinno 约定
 # v7（2026-10-20）：只监控 system_server OOM；移除应用 RSS/Logcat OOM 触发与 systemui meminfo 采集
 # v8（2026-10-21）：接入 monkey 压测（复用平台 AIMonkey 资源，设备端 mobilelog 已禁用）；监控面仍只针对 system_server
-# v12（2026-11-19）：同一 (设备, 进程) 当日重复抓 hprof 需堆占比再涨 DUMP_REPEAT_MIN_PCT_GAIN 个百分点，
-#                   否则只记 INFO 跳过（现场：11-18/11-19 一台 launcher3 各 30/23 份、7–9GB，堆已进平台期）
+# v12（2026-11-19）：同一 (设备, 进程) 当日「早期信号补抓」需堆占比再涨 DUMP_REPEAT_MIN_PCT_GAIN 个百分点，
+#                   否则只记 INFO 跳过（现场：11-18/11-19 一台 launcher3 各 30/23 份、7–9GB，堆已进平台期）。
+#                   上穿档位（L1/L2）不受该门槛约束，只负责抬高当日峰值；RSS 触发两者都不参与。
 import sys
 
 import time
@@ -726,11 +727,16 @@ def _resolve_system_server_pid(device_id):
 
 
 def _trigger_hprof_dump(device_id, log_path, reason, target_package=SYSTEM_SERVER_PROC_NAME,
-                        ignore_cooldown=False, heap_pct=None):
+                        ignore_cooldown=False, heap_pct=None, gate_repeat=True):
     """
     条件触发式 hprof dump。v5 流程：dumpheap → pull 到主机本地暂存 → 删除设备侧文件 → 再镜像拷贝到 15.4。
     这样即使 15.4（被别人写到 98% 满、soft 挂载）掉线或写满，关键堆也不会丢。
-    v12：heap_pct（百分点）非空时受当日重复门槛约束；RSS 类触发不传该参数，因此不受门槛约束。
+    v12 门槛语义（三个参数各管一段，别混）：
+    · heap_pct 非空 → 无论是否受闸，抓取成功后都把当日峰值抬到 max(旧值, heap_pct)；
+    · gate_repeat=True 且 heap_pct 非空 → 受「当日重复」门槛约束（早期信号补抓走这条）；
+    · gate_repeat=False → 一定放行，但仍抬峰值（上穿档走这条：档位上穿本身就是新信息，
+      且堆跌破复位线后重新爬上 L1 也必须抓，否则会丢「同日第二次发作」的证据）；
+    · RSS 类触发两者都不传 → 不受闸、不抬峰值（无法与堆占比比较，不拿它去压触发）。
     """
     current_time = time.time()
     cooldown_key = f"{device_id}_{target_package}"
@@ -743,7 +749,7 @@ def _trigger_hprof_dump(device_id, log_path, reason, target_package=SYSTEM_SERVE
     # v12: 当日重复门槛——堆占比没继续往上爬，就不再产出第二份几乎同尺寸的 hprof。
     day_key = f"{device_id}_{target_package}_{datetime.now().strftime('%Y-%m-%d')}"
     prev_pct = last_dump_pct_by_day.get(day_key)
-    if (DUMP_REPEAT_MIN_PCT_GAIN > 0 and heap_pct is not None and prev_pct is not None
+    if (gate_repeat and DUMP_REPEAT_MIN_PCT_GAIN > 0 and heap_pct is not None and prev_pct is not None
             and heap_pct - prev_pct < DUMP_REPEAT_MIN_PCT_GAIN):
         TEST_LOGGER.info(
             f"设备 {device_id}: [{target_package}] 当日 {prev_pct:.1f}% 时已抓过 hprof，本次 {heap_pct:.1f}% "
@@ -952,7 +958,8 @@ def check_launcher_heap(device_id, log_path, pkg=LAUNCHER_PKG):
         reason = (f"{label} 堆占比 {ratio:.0%} 上穿 L{level}"
                   f"（Dalvik Heap={heap_kb / 1024:.0f}MB / 上限 {target_kb / 1024:.0f}MB，剩余 {headroom_mb:.0f}MB 即 OOM）")
         _trigger_hprof_dump(device_id, log_path, reason,
-                            target_package=pkg, ignore_cooldown=True, heap_pct=ratio * 100.0)
+                            target_package=pkg, ignore_cooldown=True,
+                            heap_pct=ratio * 100.0, gate_repeat=False)
         return
     if early and ratio >= LAUNCHER_EARLY_MIN_RATIO:
         key = f"{device_id}_{pkg}"
@@ -1000,7 +1007,7 @@ def check_system_server_heap(device_id, log_path):
         reason = (f"system_server 堆占比 {ratio:.0%} 上穿 L{level}"
                   f"（Dalvik Heap={heap_kb / 1024:.0f}MB / 上限 {target_kb / 1024:.0f}MB，剩余 {headroom_mb:.0f}MB 即 OOM）")
         _trigger_hprof_dump(device_id, log_path, reason, target_package=SYSTEM_SERVER_PROC_NAME,
-                            ignore_cooldown=True, heap_pct=ratio * 100.0)
+                            ignore_cooldown=True, heap_pct=ratio * 100.0, gate_repeat=False)
         return
 
     ss_hot_devices.add(device_id)

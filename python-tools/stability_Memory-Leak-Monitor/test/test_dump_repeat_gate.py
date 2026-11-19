@@ -163,3 +163,68 @@ def test_cooldown_and_repeat_gate_are_two_separate_gates():
     assert ran == []
     assert [r for r in rows if "冷却期" in r[1]]
     assert not [r for r in rows if "跳过重复抓取" in r[1]]
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# 调用点级锁定（C 方案）：上穿档一定放行，只有「早期信号补抓」受当日门槛约束
+# ─────────────────────────────────────────────────────────────────────────
+TARGET_KB = 256 * 1024          # dalvik.vm.heapgrowthlimit = 256MB
+
+
+def _via_check(ratio, early=None, prev_level=0, device=DEV_A, pkg=LAUNCHER):
+    """走真实调用方 check_launcher_heap，返回 (是否执行 dump, 日志行)。"""
+    import contextlib
+    logger = _RecLogger()
+    ran = []
+    mon.la_heap_level[device] = prev_level
+    mon.app_heap_level[(device, pkg)] = prev_level
+    stack = [
+        patch.object(mon, "TEST_LOGGER", logger),
+        patch.object(mon, "_read_dalvik_heap_kb", lambda d, p=pkg: int(TARGET_KB * ratio)),
+        patch.object(mon, "_read_target_heap_kb", lambda d, k=None: TARGET_KB),
+        patch.object(mon, "_scan_logcat_early_signal", lambda d: early),
+        patch.object(mon, "_append_heap_series", lambda *a, **k: None),
+        patch.object(mon.os, "makedirs", lambda *a, **k: None),
+        patch.object(mon.shutil, "disk_usage", _disk_of),
+        patch.object(mon, "execute_commands", lambda d, c, n: ran.append(n)),
+    ]
+    with contextlib.ExitStack() as st:
+        for ctx in stack:
+            st.enter_context(ctx)
+        mon.check_launcher_heap(device, LOG_DIR % device, pkg=pkg)
+    return ran, logger.rows
+
+
+def test_level_crossing_call_site_bypasses_the_gate():
+    """上穿 L1 时即使低于当日峰值（86% < 95%）也必须抓——这是「同日第二次发作」的唯一入口。"""
+    mon.last_dump_pct_by_day[_day_key()] = 95.0
+    ran, rows = _via_check(ratio=0.86, early=None, prev_level=0)
+    assert ran == ["hprof_dump_batch"]
+    assert not [r for r in rows if "跳过重复抓取" in r[1]]
+    assert mon.last_dump_pct_by_day[_day_key()] == 95.0      # max(95, 86)：低档上穿不会把峰值拉低
+
+
+def test_early_signal_catchup_call_site_is_gated():
+    """档位没变、只有早期信号、堆没再涨：补抓必须被当日门槛拦下（这正是 9.0GB 的来源）。"""
+    mon.last_dump_pct_by_day[_day_key()] = 95.0
+    _age_cooldown()
+    ran, rows = _via_check(ratio=0.86, early="Clamp target GC heap", prev_level=1)
+    assert ran == []
+    assert [r for r in rows if "跳过重复抓取" in r[1]]
+
+
+def test_crossing_seeds_the_peak_then_quietens_catchup():
+    """联动效果：上穿先抓并记下 86%，之后平台期的补抓就被同一门槛收住。"""
+    assert _via_check(ratio=0.86, early=None, prev_level=0)[0] == ["hprof_dump_batch"]
+    assert mon.last_dump_pct_by_day[_day_key()] == pytest.approx(86.0, abs=0.01)
+    _age_cooldown()
+    assert _via_check(ratio=0.87, early="Waiting for a blocking GC", prev_level=1)[0] == []
+    _age_cooldown()
+    assert _via_check(ratio=0.93, early="Throwing OutOfMemoryError", prev_level=1)[0] == ["hprof_dump_batch"]
+    assert mon.last_dump_pct_by_day[_day_key()] == pytest.approx(93.0, abs=0.01)   # 真在爬坡就继续给证据
+
+
+def test_readme_documents_which_paths_the_gate_covers():
+    """文档必须写清门槛只管补抓、上穿不受闸（避免下一个人以为上穿也会被拦）。"""
+    readme = (TOOL_DIR / "readme.txt").read_text(encoding="utf-8")
+    assert "上穿" in readme and "不受" in readme and "补抓" in readme
