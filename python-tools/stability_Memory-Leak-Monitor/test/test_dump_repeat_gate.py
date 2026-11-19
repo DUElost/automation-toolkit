@@ -4,6 +4,8 @@
 23 份 / 7.1GB，堆体量已在平台期。门槛只放行「继续爬坡」的那一次，问题覆盖度不减。
 本文件不触碰真实 adb 与共享盘：dump 命令用桩记录，15.4 空间刻意报低以走「只留本地」早退分支。
 """
+import os
+import re
 import sys
 import time
 from datetime import datetime
@@ -79,11 +81,22 @@ def _dump(device=DEV_A, pkg=LAUNCHER, pct=None, reason="测试触发"):
     return ran, logger.rows
 
 
+def _source_default_gain():
+    src = (TOOL_DIR / "memleak_monitor_2d.py").read_text(encoding="utf-8")
+    m = re.search(
+        r'DUMP_REPEAT_MIN_PCT_GAIN\s*=\s*float\(os\.environ\.get\("MEMLEAK_DUMP_REPEAT_GAIN",\s*"([^"]+)"\)\)',
+        src,
+    )
+    assert m, "未在源码中找到 DUMP_REPEAT_MIN_PCT_GAIN 默认值定义"
+    return float(m.group(1))
+
+
 @pytest.fixture(autouse=True)
 def _clean_state():
     mon.last_dump_pct_by_day.clear()
     mon.last_hprof_dump_times.clear()
-    yield
+    with patch.object(mon, "DUMP_REPEAT_MIN_PCT_GAIN", _source_default_gain()):
+        yield
     mon.last_dump_pct_by_day.clear()
     mon.last_hprof_dump_times.clear()
 
@@ -152,9 +165,9 @@ def test_gate_can_be_disabled_without_a_new_version():
 
 
 def test_documented_gain_matches_source_constant():
-    """readme.txt 记录的门槛值必须与源码常量一致（沿用既有文档-代码同轴约定）。"""
+    """readme.txt 记录的默认门槛值必须与源码默认常量一致（不受外部环境变量干扰）。"""
     readme = (TOOL_DIR / "readme.txt").read_text(encoding="utf-8")
-    assert f"DUMP_REPEAT_MIN_PCT_GAIN = {mon.DUMP_REPEAT_MIN_PCT_GAIN:g}" in readme
+    assert f"DUMP_REPEAT_MIN_PCT_GAIN = {_source_default_gain():g}" in readme
 
 def test_cooldown_and_repeat_gate_are_two_separate_gates():
     """增幅够但仍在 30 分钟冷却期内：应被冷却挡下（报「冷却期」），而不是被门槛挡下。"""
