@@ -157,11 +157,22 @@
 3. killed by signal 弱兜底                        [已实现]
 ```
 
-### SR / Jank / Assert / WCN
+### SR / Assert / WCN
 
 ```
 CausedBy → _fallback_caused_by 随机串（故意不合并）  [已实现]
 stab_cpassert 关键字 → Detail 附录                  [已实现]
+```
+
+### Jank（focus timeout 等）
+
+```
+Package    → unievent appname ActivityRecord 包名     [已实现]
+CurProcess → appname 组件（pkg/.Activity）            [已实现]
+CausedBy   → event_name（unievent / exp_main）        [已实现]
+             缺省 → "Jank | <component|package>"      [已实现]
+             无身份才走随机兜底                        [已实现]
+去重前置   → ExpClass=Jank + Package 相同后比 CausedBy
 ```
 
 ---
