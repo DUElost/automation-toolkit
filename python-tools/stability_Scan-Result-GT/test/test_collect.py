@@ -601,6 +601,33 @@ def test_rom_ram_extract(tmp_path):
     assert _extract_rom_ram(pkg) == "64GB+4GB"
 
 
+def test_version_prefers_internal_build_version(tmp_path):
+    """Version / Detail 手机版本优先 rom_ram.json 的 internal_build_version。"""
+    import json
+
+    internal = "P532AA_EVT_16.0_DailyBuild_userdebug_202611090000"
+    _make_package(str(tmp_path), "system-app-crash", "2026-08-05-171310",
+                  detail_lines=[
+                      "Process: com.android.systemui",
+                      "PID: 100",
+                      "android.app.RemoteServiceException: boom",
+                      "Caused by: android.os.RemoteException",
+                  ],
+                  summary="类型: system_app_crash  场景: FC\n")
+    props = os.path.join(str(tmp_path), VERSION, DEVICE, "rom_ram.json")
+    with open(props, "w", encoding="utf-8") as f:
+        json.dump({"rom": 64, "ram": 4, "internal_build_version": internal}, f)
+
+    records = collect_problems(str(tmp_path))
+    assert len(records) == 1
+    r = records[0]
+    assert r["Version"] == internal
+    assert "手机版本：['%s']" % internal in r["Detail"]
+    assert r["Rom_Ram"] == "64GB+4GB"
+    # 目录名（display.id）不得误写入 Version
+    assert r["Version"] != VERSION
+
+
 def test_uniview_info_jsonl_matches_exp_time(tmp_path):
     """unievent_info.json JSONL：按包 ExpTime 匹配 kick_datetime 对应事件行。"""
     pkg = os.path.join(str(tmp_path), VERSION, DEVICE, "SWT_2026-08-12-092852")

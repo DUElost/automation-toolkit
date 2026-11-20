@@ -1446,12 +1446,30 @@ def _abs_path(path):
     return os.path.abspath(path) if path else ""
 
 
-def _load_device_rom_ram(root):
-    """第一阶段采集的设备级 rom_ram.json：{version}/{device}/rom_ram.json -> {device: '64GB+4GB'}。
+def _internal_build_version_from_info(info):
+    """从 rom_ram.json 取 ro.internal.build.version（表格 Version 优先源）。
 
+    兼容键：`internal_build_version` / `ro.internal.build.version`。
+    """
+    if not isinstance(info, dict):
+        return ""
+    for key in ("internal_build_version", "ro.internal.build.version"):
+        val = info.get(key)
+        if isinstance(val, str) and val.strip():
+            return val.strip()
+    return ""
+
+
+def _load_device_rom_ram(root):
+    """第一阶段采集的设备级 rom_ram.json。
+
+    返回 (rom_ram_map, internal_version_map)：
+    - rom_ram_map: {device: '64GB+4GB'}
+    - internal_version_map: {device: ro.internal.build.version}
     全部问题包统一使用设备级值（覆盖 dropbox/tombstone/小包等无聚合包的场景）。
     """
-    result = {}
+    rom_ram = {}
+    internal_versions = {}
     try:
         for version in os.listdir(root):
             vpath = os.path.join(root, version)
@@ -1470,12 +1488,16 @@ def _load_device_rom_ram(root):
                     if info.get("ram"):
                         parts.append("%dGB" % int(info["ram"]))
                     if parts:
-                        result[device] = "+".join(parts)
+                        rom_ram[device] = "+".join(parts)
+                    ibv = _internal_build_version_from_info(info)
+                    if ibv:
+                        # 同 SN 多版本目录时保留首次非空；通常一树一版本
+                        internal_versions.setdefault(device, ibv)
                 except (OSError, ValueError, TypeError):
                     continue
     except OSError:
         pass
-    return result
+    return rom_ram, internal_versions
 
 
 def collect_problems(root, config=None):
@@ -1488,12 +1510,15 @@ def collect_problems(root, config=None):
         TEST_LOGGER.warn("未发现问题包目录")
         return []
     TEST_LOGGER.info("发现问题包: %d" % len(packages))
-    device_rom_ram = _load_device_rom_ram(root)
+    device_rom_ram, device_internal_versions = _load_device_rom_ram(root)
     records = []
     total = len(packages)
     for idx, pkg in enumerate(packages, 1):
         device = os.path.basename(os.path.dirname(pkg))
-        version = os.path.basename(os.path.dirname(os.path.dirname(pkg)))
+        dir_version = os.path.basename(os.path.dirname(os.path.dirname(pkg)))
+        # 表格 Version / Detail「手机版本」优先 ro.internal.build.version；
+        # 目录名仍是 ro.build.display.id（路径隔离），缺省时回退目录名。
+        version = device_internal_versions.get(device) or dir_version
         pkg_name = os.path.basename(pkg)
         TEST_LOGGER.info("采集 [%d/%d] %s/%s %s" % (idx, total, version, device, pkg_name))
         rec = _collect_package(pkg, version, device)
