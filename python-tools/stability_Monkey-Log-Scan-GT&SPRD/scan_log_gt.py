@@ -69,11 +69,14 @@ class ScanLogGT:
         return {t: len(self.adb.get_dropbox_entries(device, t)) for t in self.types}
 
     def collect_device_rom_ram(self, device, folderpath):
-        """采集设备 ROM/RAM 落盘 {version}/{device}/rom_ram.json（SN 对应）。
+        """采集设备 ROM/RAM/内部版本落盘 {version}/{device}/rom_ram.json（SN 对应）。
 
-        启动（首次扫描）时执行一次：单台设备 Rom/Ram 不变，后续轮次复用。
+        启动（首次扫描）时执行一次：单台设备 Rom/Ram/内部版本不变，后续轮次复用。
         RAM：getprop ro.boot.ddrsize（如 4096M -> 4GB SKU）；
-        ROM：/sys/block/mmcblk0/size（块数*512 字节 -> SKU）。
+        ROM：/sys/block/mmcblk0/size（块数*512 字节 -> SKU）；
+        internal_build_version：getprop ro.internal.build.version（供第二阶段
+        Scan-Result-GT 表格 Version / Detail「手机版本」；目录名仍用
+        ro.build.display.id）。
         幂等：已存在且非空则跳过；解析失败保持已有值。
         """
         target = os.path.join(folderpath, device, "rom_ram.json")
@@ -97,6 +100,11 @@ class ScanLogGT:
             if blocks and blocks[0].strip().isdigit():
                 bytes_gb = int(blocks[0].strip()) * 512 / 1024.0 ** 3
                 info["rom"] = self._sku(bytes_gb, (32, 64, 128, 256, 512, 1024))
+                changed = True
+        if not (info.get("internal_build_version") or "").strip():
+            ibv = (self.adb.getprop(device, "ro.internal.build.version") or "").strip()
+            if ibv:
+                info["internal_build_version"] = ibv
                 changed = True
         if changed:
             os.makedirs(os.path.dirname(target), exist_ok=True)

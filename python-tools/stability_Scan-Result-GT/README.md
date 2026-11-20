@@ -49,8 +49,9 @@ python scan_result.py -d <第一阶段保存根目录> [--threshold 0.9]
 |---|---|
 | ExpType | 问题包名类型段（`system-app-crash` → `system_app_crash`） |
 | ExpClass | 类型映射（`config.json expclass_map`）；Assert/WCN/SR 的 CurProcess/Package 填类型名；Jank 填真实包名 |
+| Version | 优先设备级 `rom_ram.json` 的 `internal_build_version`（`ro.internal.build.version`）；缺省回退目录名（`ro.build.display.id`） |
 | Package | detail `Process:` / anr_trace `Cmd line:` / unievent_info proc·appname / summary，路径型统一 `/` |
-| Detail | MTK 识别报告模板：Device_id / 解析库版本 / 手机版本 / 异常包名（含应用版本）/ 异常进程 / pid / Backtrace（根因行+栈帧）+ 类型附加现场段 |
+| Detail | MTK 识别报告模板：Device_id / 解析库版本 / 手机版本（同 Version）/ 异常包名（含应用版本）/ 异常进程 / pid / Backtrace（根因行+栈帧）+ 类型附加现场段 |
 | CausedBy | NE：backtrace 首帧 pc；JE：`Caused by:`/异常行；ANR：main 栈顶帧；SWT：`Blocked in`；**Jank：`event_name`（如 focus timeout）**；SR/无根因：MTK 兜底（随机串） |
 | Rom_Ram | 设备级 `rom_ram.json`（第一阶段采集，SN 对应）优先，聚合包 SYS_* 提取兜底 |
 | DeviceCount | 去重组内不同设备数（跨设备归并） |

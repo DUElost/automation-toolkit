@@ -223,8 +223,14 @@ def enrich_record(rec, package_dir, save_root, config=None):
     anchor = _parse_exp_time(rec.get("ExpTime"))
     if anchor is None:
         return rec
-    version = rec.get("Version", "")
-    device = rec.get("snNum", "")
+    # ylog 路径按第一阶段目录名（ro.build.display.id），不取表格 Version
+    # （表格 Version 可为 ro.internal.build.version）。
+    if package_dir:
+        device = os.path.basename(os.path.dirname(package_dir))
+        version = os.path.basename(os.path.dirname(os.path.dirname(package_dir)))
+    else:
+        version = rec.get("Version", "")
+        device = rec.get("snNum", "")
     ylog_root = os.path.join(save_root, version, device, "ylog")
     if not os.path.isdir(ylog_root):
         return rec
