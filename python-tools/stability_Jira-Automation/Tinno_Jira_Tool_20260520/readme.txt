@@ -191,6 +191,10 @@ python ".\create_tinno_jira_batch_from_excel.py" `
   - 真实建单默认追加评论；只有明确加上 `--no-add-comments` 时才不追加
   - 仅在真实执行时生效
   - 新建问题单成功后，会把 Excel 中 `PS` 列追加为评论
+- Issue Nature（新建问题时）
+  - 默认填写 `New issues`（`config/tinno_jira_defaults.json` → `default_issue_nature`）
+  - 字段 ID：`customfield_10400`（multicheckboxes，按数组载荷提交）；上传模板可带 `Issue Nature` 列覆盖默认值
+  - 仅随新建/重建写入；`OPEN_LIKE_UPDATE` 更新路径不改该字段
 - labels 字段（新建问题时）
   - labels = 该行测试专项标签 + 型号标签 + 固定标签 `稳定性测试`，重复值自动去重
   - 出现版本前缀 `MLD-NX2`、`MLD-NX3`、`MLD-NX3Carrier`、`MLD-NX3-Claro` 追加 `NX2`、`NX3`、`NX3Carrier`、`NX3Claro`；`MLD-LX1`、`MLD-LX2`、`MLD-LX3`、`ELA-LX2`、`ELA-LX3` 追加 `LX1`、`LX2`、`LX3`。`MLD-NX3` 不会覆盖 `MLD-NX3Carrier` / `MLD-NX3-Claro`。标题产品名 `V552AA`、`V551A` 不加型号标签
@@ -200,8 +204,13 @@ python ".\create_tinno_jira_batch_from_excel.py" `
   - 仅影响新建；命中历史单更新时不改 labels
 - 问题等级
   - 按 `config/问题等级定级表.xls` 匹配；报错类型同时对照异常类型、异常子类和包名
+  - `JE` 与 `Java (JE)`、`NE` 与 `Native (NE)` 在异常类型/子类上等价（Unisoc 短名兼容）；`Fatal JE` 仍只走 Fatal 规则
+  - `Assert` 跟随 `Java (JE)`：定级表含 Assert 行（`>=3`→A，`<3`→B），且与 `JE`/`Java (JE)` 别名等价
   - 多条规则同时命中时，用更长的报错类型
-  - 有定级表但一条都对不上时，该行不进入上传模板，并在结束时列出跳过记录
+  - 有定级表但一条都对不上时：默认硬中断——不生成上传模板，WARNING 列出明细，
+    写入 `result/tinno_upload_severity_skipped_*.json`，退出码 2；加
+    `--allow-severity-skips` 才继续生成模板并返回 0（跳过明细仍落盘）
+  - `Jank` 定级规则与 `ANR` 相同（`>=10`→A，`<10`→B）
 - 历史单备注
   - 当命中历史单且决策需要评论时，脚本会追加结构化 FAIL 备注
   - 当回归 PASS 判定成立时，脚本会追加结构化 PASS 备注

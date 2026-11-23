@@ -33,6 +33,7 @@ from tinno_upload_template_common import (
     load_test_case_summary,
     read_excel_smart,
     save_upload_list,
+    write_skipped_severity_report,
 )
 
 logger = logging.getLogger(__name__)
@@ -103,6 +104,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--set-reporter", dest="reporter", default=None, help="覆盖 Reporter")
     parser.add_argument("--set-assignee", dest="assignee", default=None, help="覆盖 Assignee")
     parser.add_argument("--test-mode", action="store_true", help="VCAME 测试模式：默认使用测试原始 Excel、AUTOTEST 与当前用户")
+    parser.add_argument(
+        "--allow-severity-skips",
+        dest="allow_severity_skips",
+        action="store_true",
+        help="允许在存在定级未命中行时继续生成上传模板并返回 0；默认硬中断（不写模板，退出码 2）",
+    )
     return parser.parse_args()
 
 
@@ -183,13 +190,29 @@ def main() -> int:
     if not rows and not skipped_rows:
         logger.error("没有生成任何上传记录")
         return 1
-    if not rows:
-        logger.info("没有可写入上传模板的记录")
-        for line in format_skipped_severity_rows(skipped_rows):
-            logger.info("%s", line)
-        return 0
 
-    output_path = args.output_path
+    RESULT_DIR.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    allow_severity_skips = bool(getattr(args, "allow_severity_skips", False))
+    source_excel_abs = os.path.abspath(args.main_excel_path)
+
+    if skipped_rows and not allow_severity_skips:
+        skip_report_path = RESULT_DIR / f"tinno_upload_severity_skipped_{timestamp}.json"
+        write_skipped_severity_report(
+            skipped_rows,
+            skip_report_path,
+            source_excel_path=source_excel_abs,
+            upload_excel_path="",
+        )
+        for line in format_skipped_severity_rows(skipped_rows):
+            logger.warning("%s", line)
+        logger.warning("定级跳过明细已写入: %s", skip_report_path)
+        logger.warning(
+            "已中断第一阶段：存在 %d 条定级未命中行，未生成上传模板；修复定级/别名后重跑，或加 --allow-severity-skips",
+            len(skipped_rows),
+        )
+        return 2
+
     resolved_test_cases = sorted(
         {
             str(row.get("Test Case") or "").strip()
@@ -197,20 +220,34 @@ def main() -> int:
             if str(row.get("Test Case") or "").strip()
         }
     )
-    if not output_path:
-        RESULT_DIR.mkdir(parents=True, exist_ok=True)
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_path = args.output_path
+    if rows and not output_path:
         output_case_name = resolved_test_cases[0] if len(resolved_test_cases) == 1 else "多专项"
         output_path = str(RESULT_DIR / f"{DEFAULT_OUTPUT_PREFIX}_{output_case_name}_{timestamp}.xlsx")
 
-    saved = save_upload_list(rows, output_path)
-    logger.info("原始结果: %s", os.path.abspath(args.main_excel_path))
-    if resolved_test_cases:
-        logger.info("识别到测试专项: %s", ", ".join(resolved_test_cases))
-    logger.info("上传模板已生成: %s", saved)
-    logger.info("成功处理 %d 条记录", len(rows))
-    for line in format_skipped_severity_rows(skipped_rows):
-        logger.info("%s", line)
+    saved = ""
+    if rows:
+        saved = str(save_upload_list(rows, output_path))
+        logger.info("原始结果: %s", source_excel_abs)
+        if resolved_test_cases:
+            logger.info("识别到测试专项: %s", ", ".join(resolved_test_cases))
+        logger.info("上传模板已生成: %s", saved)
+        logger.info("成功处理 %d 条记录", len(rows))
+    else:
+        logger.warning("没有可写入上传模板的记录")
+
+    if skipped_rows:
+        # 仅 --allow-severity-skips 会走到这里：继续出模板，但仍落盘跳过明细。
+        skip_report_path = RESULT_DIR / f"tinno_upload_severity_skipped_{timestamp}.json"
+        write_skipped_severity_report(
+            skipped_rows,
+            skip_report_path,
+            source_excel_path=source_excel_abs,
+            upload_excel_path=saved,
+        )
+        for line in format_skipped_severity_rows(skipped_rows):
+            logger.warning("%s", line)
+        logger.warning("定级跳过明细已写入: %s", skip_report_path)
     return 0
 
 

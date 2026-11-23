@@ -42,5 +42,9 @@
   "MLD-NX3-Claro": {
     "jira_project": "PAANX",
     "monkey_project": "PAANX"
+  },
+  "P532AA": {
+    "jira_project": "PFDCAA",
+    "monkey_project": "PFDCAA"
   }
 }

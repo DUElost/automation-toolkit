@@ -51,6 +51,8 @@ class TinnoToolScaffoldTest(unittest.TestCase):
         self.assertEqual("customfield_10500", defaults["field_ids"]["key_information"])
         self.assertEqual("customfield_10123", defaults["field_ids"]["previous_version_status"])
         self.assertEqual("customfield_10124", defaults["field_ids"]["previous_version_text"])
+        self.assertEqual("customfield_10400", defaults["field_ids"]["issue_nature"])
+        self.assertEqual("New issues", defaults["default_issue_nature"])
         self.assertEqual("AUTOTEST", defaults["default_component"])
         self.assertEqual("Previous version exists", defaults["default_previous_version_status"])
         self.assertEqual("100%", defaults["default_previous_version_text"])

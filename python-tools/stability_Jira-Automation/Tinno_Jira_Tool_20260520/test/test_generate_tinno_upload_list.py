@@ -1,3 +1,4 @@
+import json
 import os
 import sys
 import tempfile
@@ -238,6 +239,127 @@ class GenerateTinnoUploadListTest(unittest.TestCase):
         self.assertEqual("current.user", build_kwargs["assignee_override"])
         self.assertEqual("AUTOTEST", build_kwargs["module_override"])
         self.assertEqual("Monkey专项", build_kwargs["default_test_case"])
+
+    def test_main_warns_writes_report_and_exits_nonzero_on_severity_skips(self) -> None:
+        args = Namespace(
+            main_excel_path="input.xlsx",
+            output_path="custom-output.xlsx",
+            config_file="config.json",
+            package_mapping_file="mapping.xlsx",
+            severity_rules_file="severity.xlsx",
+            affect_project_mapping_file="affect.json",
+            test_summary_file="test-summary.xlsx",
+            project_key=None,
+            test_case=None,
+            reporter=None,
+            assignee=None,
+            test_mode=False,
+            allow_severity_skips=False,
+        )
+        skipped_item = {
+            "excel_row": 4,
+            "package": "com.android.launcher3",
+            "exp_class": "JE",
+            "exp_type": "system_app_crash",
+            "count": 1,
+        }
+
+        def _build_upload_rows(**kwargs):
+            kwargs["skipped_rows"].append(skipped_item)
+            return [{"Summary": "kept", "Test Case": "Monkey专项"}]
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_result_dir = Path(temp_dir) / "result"
+            temp_result_dir.mkdir(parents=True, exist_ok=True)
+            with mock.patch.object(generate_module, "setup_logging"):
+                with mock.patch.object(generate_module, "load_local_env"):
+                    with mock.patch.object(generate_module, "parse_args", return_value=args):
+                        with mock.patch.object(generate_module, "load_defaults", return_value={"project_key": "VCAME", "issue_type": "Bug"}):
+                            with mock.patch.object(generate_module, "read_excel_smart", return_value=pd.DataFrame([{"Package": "pkg"}])):
+                                with mock.patch.object(generate_module, "load_package_owner_mapping", return_value={}):
+                                    with mock.patch.object(generate_module, "load_severity_rules", return_value=[{"level": "A"}]):
+                                        with mock.patch.object(generate_module, "load_affect_project_mapping", return_value={}):
+                                            with mock.patch.object(generate_module, "load_test_case_summary", return_value={"Monkey专项": {"index": "0"}}):
+                                                with mock.patch.object(generate_module, "build_upload_rows", side_effect=_build_upload_rows):
+                                                    with mock.patch.object(generate_module, "RESULT_DIR", temp_result_dir):
+                                                        with mock.patch.object(generate_module, "datetime", _FixedDatetime):
+                                                            with mock.patch.object(generate_module, "save_upload_list") as save_upload:
+                                                                with mock.patch.object(generate_module.logger, "warning") as warning_log:
+                                                                    result = generate_module.main()
+
+            report_path = temp_result_dir / "tinno_upload_severity_skipped_20260522_101010.json"
+            self.assertEqual(2, result)
+            save_upload.assert_not_called()
+            self.assertTrue(report_path.exists())
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+            self.assertEqual(1, report["skipped_count"])
+            self.assertEqual([skipped_item], report["skipped_rows"])
+            self.assertEqual("", report["upload_excel_path"])
+            warning_joined = " ".join(
+                " ".join(str(arg) for arg in call.args) if call.args else ""
+                for call in warning_log.call_args_list
+            )
+            self.assertIn("未命中问题等级规则", warning_joined)
+            self.assertIn("已中断", warning_joined)
+            self.assertIn(str(report_path), warning_joined)
+
+    def test_main_allow_severity_skips_keeps_exit_zero_after_report(self) -> None:
+        args = Namespace(
+            main_excel_path="input.xlsx",
+            output_path="custom-output.xlsx",
+            config_file="config.json",
+            package_mapping_file="mapping.xlsx",
+            severity_rules_file="severity.xlsx",
+            affect_project_mapping_file="affect.json",
+            test_summary_file="test-summary.xlsx",
+            project_key=None,
+            test_case=None,
+            reporter=None,
+            assignee=None,
+            test_mode=False,
+            allow_severity_skips=True,
+        )
+
+        def _build_upload_rows(**kwargs):
+            kwargs["skipped_rows"].append(
+                {
+                    "excel_row": 5,
+                    "package": "com.android.launcher3",
+                    "exp_class": "JE",
+                    "exp_type": "system_app_crash",
+                    "count": 1,
+                }
+            )
+            return [{"Summary": "kept", "Test Case": "Monkey专项"}]
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_result_dir = Path(temp_dir) / "result"
+            temp_result_dir.mkdir(parents=True, exist_ok=True)
+            with mock.patch.object(generate_module, "setup_logging"):
+                with mock.patch.object(generate_module, "load_local_env"):
+                    with mock.patch.object(generate_module, "parse_args", return_value=args):
+                        with mock.patch.object(generate_module, "load_defaults", return_value={"project_key": "VCAME", "issue_type": "Bug"}):
+                            with mock.patch.object(generate_module, "read_excel_smart", return_value=pd.DataFrame([{"Package": "pkg"}])):
+                                with mock.patch.object(generate_module, "load_package_owner_mapping", return_value={}):
+                                    with mock.patch.object(generate_module, "load_severity_rules", return_value=[{"level": "A"}]):
+                                        with mock.patch.object(generate_module, "load_affect_project_mapping", return_value={}):
+                                            with mock.patch.object(generate_module, "load_test_case_summary", return_value={"Monkey专项": {"index": "0"}}):
+                                                with mock.patch.object(generate_module, "build_upload_rows", side_effect=_build_upload_rows):
+                                                    with mock.patch.object(generate_module, "RESULT_DIR", temp_result_dir):
+                                                        with mock.patch.object(generate_module, "datetime", _FixedDatetime):
+                                                            with mock.patch.object(
+                                                                generate_module,
+                                                                "save_upload_list",
+                                                                return_value=Path(args.output_path),
+                                                            ) as save_upload:
+                                                                result = generate_module.main()
+
+            self.assertEqual(0, result)
+            save_upload.assert_called_once()
+            report_path = temp_result_dir / "tinno_upload_severity_skipped_20260522_101010.json"
+            self.assertTrue(report_path.exists())
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+            self.assertEqual(args.output_path, report["upload_excel_path"])
 
     def test_main_requires_excel_when_not_test_mode(self) -> None:
         args = Namespace(

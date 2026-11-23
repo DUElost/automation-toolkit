@@ -43,6 +43,7 @@ EXCEL_FIELD_CANDIDATES = {
     "exp_class": ["异常类型", "Exp Class", "exp_class", "Exception Class"],
     "previous_version_status": ["Previous Version Status", "previous_version_status"],
     "previous_version_text": ["Previous Version Text", "previous_version_text"],
+    "issue_nature": ["Issue Nature", "问题性质", "issue_nature"],
     "ps": ["PS", "ps"],
 }
 
@@ -1002,6 +1003,9 @@ def build_issue_fields(
         find_first_value(row, "previous_version_text", ""),
         defaults,
     )
+    issue_nature = str(
+        find_first_value(row, "issue_nature", defaults.get("default_issue_nature", "New issues")) or ""
+    ).strip()
     assignee_raw = create_assignee_override or find_first_value(row, "assignee", defaults.get("default_assignee"))
 
     assignee = resolve_user_name(jira_client, assignee_raw, user_cache, fallback=defaults.get("default_assignee"))
@@ -1048,4 +1052,7 @@ def build_issue_fields(
         fields[field_ids["previous_version_status"]] = {"value": previous_version_status}
     if previous_version_text and field_ids.get("previous_version_text"):
         fields[field_ids["previous_version_text"]] = {"value": previous_version_text}
+    if issue_nature and field_ids.get("issue_nature"):
+        # Tinno Issue Nature 为 multicheckboxes（array/option），需数组载荷。
+        fields[field_ids["issue_nature"]] = [{"value": item} for item in normalize_comma_values(issue_nature)]
     return fields

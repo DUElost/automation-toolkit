@@ -127,6 +127,41 @@ class TinnoBuildIssueFieldsTest(unittest.TestCase):
             fields[self.defaults["field_ids"]["previous_version_text"]],
         )
 
+    def test_build_issue_fields_defaults_issue_nature_to_new_issues(self) -> None:
+        row = pd.Series(
+            {
+                "Project": "VCAME",
+                "Issue Type": "Bug",
+                "Summary": "summary",
+                "Description": "description",
+            }
+        )
+
+        fields = build_issue_fields(self.jira, row, self.defaults)
+
+        self.assertEqual(
+            [{"value": "New issues"}],
+            fields[self.defaults["field_ids"]["issue_nature"]],
+        )
+
+    def test_build_issue_fields_uses_excel_issue_nature_override(self) -> None:
+        row = pd.Series(
+            {
+                "Project": "VCAME",
+                "Issue Type": "Bug",
+                "Summary": "summary",
+                "Description": "description",
+                "Issue Nature": "Omission",
+            }
+        )
+
+        fields = build_issue_fields(self.jira, row, self.defaults)
+
+        self.assertEqual(
+            [{"value": "Omission"}],
+            fields[self.defaults["field_ids"]["issue_nature"]],
+        )
+
     def test_build_issue_fields_remaps_legacy_previous_version_status_probability_value(self) -> None:
         row = pd.Series(
             {

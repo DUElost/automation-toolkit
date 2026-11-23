@@ -1,3 +1,4 @@
+import json
 import sys
 import tempfile
 import unittest
@@ -266,6 +267,7 @@ class TinnoUploadTemplateCommonTest(unittest.TestCase):
         self.assertNotIn("Affect Project", row)
         self.assertEqual("Previous version exists", row["Previous Version Status"])
         self.assertEqual("100%", row["Previous Version Text"])
+        self.assertEqual("New issues", row["Issue Nature"])
         self.assertIn("com.android.settings", row["Summary"])
         self.assertIn("Java (JE)", row["Summary"])
         self.assertIn("[MonkeyAEE]", row["Summary"])
@@ -369,6 +371,32 @@ class TinnoUploadTemplateCommonTest(unittest.TestCase):
         self.assertEqual("A", rows[0]["Bug Severity"])
         self.assertEqual("High", rows[0]["Priority"])
 
+    def test_write_skipped_severity_report_persists_json(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_path = Path(temp_dir) / "skipped.json"
+            skipped_rows = [
+                {
+                    "excel_row": 4,
+                    "package": "com.android.healthconnect.controller",
+                    "exp_class": "JE",
+                    "exp_type": "system_app_crash",
+                    "count": 1,
+                }
+            ]
+            saved = upload_common.write_skipped_severity_report(
+                skipped_rows,
+                output_path,
+                source_excel_path="input.xls",
+                upload_excel_path="output.xlsx",
+            )
+            payload = json.loads(Path(saved).read_text(encoding="utf-8"))
+
+        self.assertEqual(output_path, Path(saved))
+        self.assertEqual(1, payload["skipped_count"])
+        self.assertEqual("input.xls", payload["source_excel_path"])
+        self.assertEqual("output.xlsx", payload["upload_excel_path"])
+        self.assertEqual(skipped_rows, payload["skipped_rows"])
+
     def test_unmatched_severity_rule_is_skipped(self) -> None:
         main_df = pd.DataFrame(
             [
@@ -429,6 +457,188 @@ class TinnoUploadTemplateCommonTest(unittest.TestCase):
             ],
             skipped_rows,
         )
+
+    def test_short_je_ne_aliases_match_java_native_severity_rules(self) -> None:
+        severity_rules = [
+            {"level": "A", "keyword": "Java (JE)", "operator": ">=", "threshold": 3},
+            {"level": "B", "keyword": "Java (JE)", "operator": "<", "threshold": 3},
+            {"level": "A", "keyword": "Native (NE)", "operator": ">=", "threshold": 2},
+            {"level": "B", "keyword": "Native (NE)", "operator": ">=", "threshold": 1},
+            {"level": "S", "keyword": "Fatal JE", "operator": ">", "threshold": 0},
+        ]
+        main_df = pd.DataFrame(
+            [
+                {
+                    "Package": "com.android.healthconnect.controller",
+                    "Version": "P532AA_EVT_16.0_DailyBuild_userdebug_202611090000",
+                    "Exp Class": "JE",
+                    "Exp Type": "system_app_crash",
+                    "Count": 1,
+                    "DeviceCount": 1,
+                },
+                {
+                    "Package": "com.android.launcher3",
+                    "Version": "P532AA_EVT_16.0_DailyBuild_userdebug_202611090000",
+                    "Exp Class": "JE",
+                    "Exp Type": "system_app_crash",
+                    "Count": 1,
+                    "DeviceCount": 1,
+                },
+                {
+                    "Package": "com.android.settings",
+                    "Version": "P532AA_EVT_16.0_DailyBuild_userdebug_202611090000",
+                    "Exp Class": "NE",
+                    "Exp Type": "system_app_native_crash",
+                    "Count": 1,
+                    "DeviceCount": 1,
+                },
+                {
+                    "Package": "com.android.settings",
+                    "Version": "P532AA_EVT_16.0_DailyBuild_userdebug_202611090000",
+                    "Exp Class": "Fatal JE",
+                    "Count": 1,
+                    "DeviceCount": 1,
+                },
+            ]
+        )
+
+        rows = upload_common.build_upload_rows(
+            main_df=main_df,
+            defaults={
+                "project_key": "PFDCAA",
+                "issue_type": "Bug",
+                "default_reporter": "dai.lv",
+                "default_assignee": "autotest",
+                "default_bug_severity": "B",
+                "default_test_case": "Monkey专项",
+                "default_module_fallback": "System Stability",
+            },
+            package_mapping={},
+            severity_rules=severity_rules,
+            default_test_case="Monkey专项",
+        )
+
+        self.assertEqual(["B", "B", "B", "S"], [row["Bug Severity"] for row in rows])
+
+    def test_assert_follows_je_severity_thresholds(self) -> None:
+        severity_rules = upload_common.load_severity_rules(
+            Path(__file__).resolve().parents[1] / "config" / "问题等级定级表.xls"
+        )
+        main_df = pd.DataFrame(
+            [
+                {
+                    "Package": "Assert",
+                    "Version": "p532a_64only-userdebug 16 BP2A.250605.031.A3 117 test-keys",
+                    "Exp Class": "Assert",
+                    "Exp Type": "Assert",
+                    "Count": 1,
+                    "DeviceCount": 1,
+                },
+                {
+                    "Package": "Assert",
+                    "Version": "p532a_64only-userdebug 16 BP2A.250605.031.A3 117 test-keys",
+                    "Exp Class": "Assert",
+                    "Exp Type": "Assert",
+                    "Count": 7,
+                    "DeviceCount": 1,
+                },
+            ]
+        )
+        rows = upload_common.build_upload_rows(
+            main_df=main_df,
+            defaults={
+                "project_key": "VCAME",
+                "issue_type": "Bug",
+                "default_reporter": "dai.lv",
+                "default_assignee": "autotest",
+                "default_bug_severity": "B",
+                "default_test_case": "开关机专项",
+                "default_module_fallback": "System Stability",
+            },
+            package_mapping={},
+            severity_rules=severity_rules,
+            default_test_case="开关机专项",
+        )
+        self.assertEqual(["B", "A"], [row["Bug Severity"] for row in rows])
+        # Also verify JE-table alias alone (without Assert keyword rows) still grades Assert.
+        je_only_rules = [
+            {"level": "A", "keyword": "Java (JE)", "operator": ">=", "threshold": 3},
+            {"level": "B", "keyword": "Java (JE)", "operator": "<", "threshold": 3},
+        ]
+        aliased = upload_common.build_upload_rows(
+            main_df=main_df,
+            defaults={
+                "project_key": "VCAME",
+                "issue_type": "Bug",
+                "default_reporter": "dai.lv",
+                "default_assignee": "autotest",
+                "default_bug_severity": "B",
+                "default_test_case": "开关机专项",
+                "default_module_fallback": "System Stability",
+            },
+            package_mapping={},
+            severity_rules=je_only_rules,
+            default_test_case="开关机专项",
+        )
+        self.assertEqual(["B", "A"], [row["Bug Severity"] for row in aliased])
+
+    def test_jank_severity_rules_match_anr_thresholds(self) -> None:
+        severity_rules = upload_common.load_severity_rules(
+            Path(__file__).resolve().parents[1] / "config" / "问题等级定级表.xls"
+        )
+        main_df = pd.DataFrame(
+            [
+                {
+                    "Package": "com.android.settings",
+                    "Version": "P532AA_EVT_16.0_DailyBuild_userdebug_202611090000",
+                    "Exp Class": "Jank",
+                    "Exp Type": "Jank",
+                    "Count": 40,
+                    "DeviceCount": 4,
+                },
+                {
+                    "Package": "com.android.settings",
+                    "Version": "P532AA_EVT_16.0_DailyBuild_userdebug_202611090000",
+                    "Exp Class": "Jank",
+                    "Exp Type": "Jank",
+                    "Count": 9,
+                    "DeviceCount": 1,
+                },
+                {
+                    "Package": "android.process.media",
+                    "Version": "P532AA_EVT_16.0_DailyBuild_userdebug_202611090000",
+                    "Exp Class": "ANR",
+                    "Count": 40,
+                    "DeviceCount": 1,
+                },
+                {
+                    "Package": "android.process.media",
+                    "Version": "P532AA_EVT_16.0_DailyBuild_userdebug_202611090000",
+                    "Exp Class": "ANR",
+                    "Count": 9,
+                    "DeviceCount": 1,
+                },
+            ]
+        )
+
+        rows = upload_common.build_upload_rows(
+            main_df=main_df,
+            defaults={
+                "project_key": "PFDCAA",
+                "issue_type": "Bug",
+                "default_reporter": "dai.lv",
+                "default_assignee": "autotest",
+                "default_bug_severity": "B",
+                "default_test_case": "Monkey专项",
+                "default_module_fallback": "System Stability",
+            },
+            package_mapping={},
+            severity_rules=severity_rules,
+            default_test_case="Monkey专项",
+        )
+
+        self.assertEqual(["A", "B", "A", "B"], [row["Bug Severity"] for row in rows])
+        self.assertEqual(["High", "Medium", "High", "Medium"], [row["Priority"] for row in rows])
 
     def test_system_server_rules_override_generic_java_rule(self) -> None:
         main_df = pd.DataFrame(

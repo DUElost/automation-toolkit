@@ -10,6 +10,7 @@
   "default_component": "AUTOTEST",
   "default_previous_version_status": "Previous version exists",
   "default_previous_version_text": "100%",
+  "default_issue_nature": "New issues",
   "labels": [
     "MonkeyAEE"
   ],
@@ -47,6 +48,7 @@
     "bug_severity": "customfield_10120",
     "key_information": "customfield_10500",
     "previous_version_status": "customfield_10123",
-    "previous_version_text": "customfield_10124"
+    "previous_version_text": "customfield_10124",
+    "issue_nature": "customfield_10400"
   }
 }

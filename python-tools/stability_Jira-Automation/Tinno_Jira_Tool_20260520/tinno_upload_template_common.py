@@ -432,19 +432,68 @@ def _match_count_requirement(actual_count: int, operator: str, threshold: int) -
     return actual_count >= threshold
 
 
+# Unisoc 等源表常用短名 JE/NE，定级表写的是 Java (JE) / Native (NE)。
+# Assert 与 JE 同级：可命中定级表 Java (JE) 规则，也可使用表中 Assert 行。
+_SEVERITY_CLASS_ALIAS_GROUPS = (
+    frozenset({"je", "java(je)", "java (je)", "assert"}),
+    frozenset({"ne", "native(ne)", "native (ne)"}),
+)
+
+
+def _compact_severity_token(value: Any) -> str:
+    return re.sub(r"[\s_\-+/\\]+", "", str(clean_cell_value(value) or "")).lower()
+
+
+def _severity_alias_group(token: str) -> Optional[frozenset]:
+    compact = _compact_severity_token(token)
+    if not compact:
+        return None
+    for group in _SEVERITY_CLASS_ALIAS_GROUPS:
+        if compact in group or token.strip().lower() in group:
+            return group
+    return None
+
+
+def _severity_keyword_matches(keyword: str, search_text: str, class_tokens: List[str]) -> bool:
+    """关键字既支持原文子串，也支持 JE↔Java (JE)、NE↔Native (NE) 整类名等价。"""
+    keyword_text = str(keyword or "").strip().lower()
+    if not keyword_text:
+        return False
+    if keyword_text in search_text:
+        return True
+    keyword_group = _severity_alias_group(keyword_text)
+    if not keyword_group:
+        return False
+    for token in class_tokens:
+        token_text = str(token or "").strip().lower()
+        if not token_text:
+            continue
+        # 只对完整异常类型/子类做别名，避免 Fatal JE 被扩成 Java (JE)。
+        if _severity_alias_group(token_text) == keyword_group:
+            return True
+    return False
+
+
 def _detect_severity_level(issue_data: Dict[str, Any], defaults: Dict[str, Any], severity_rules: Optional[List[Dict[str, Any]]]) -> Optional[str]:
     """按定级表匹配问题等级。没有规则表时沿用默认等级；有规则但没有命中时返回 None。"""
     if not severity_rules:
         return str(defaults.get("default_bug_severity", "B"))
-    search_text = " ".join(
+    class_tokens = [
         str(issue_data.get(field_name) or "")
-        for field_name in ("exp_class", "exp_type", "package", "cur_process")
+        for field_name in ("exp_class", "exp_type")
+    ]
+    search_text = " ".join(
+        class_tokens
+        + [
+            str(issue_data.get(field_name) or "")
+            for field_name in ("package", "cur_process")
+        ]
     ).lower()
     count = int(issue_data.get("count") or 0)
     matches: List[tuple[int, int, Dict[str, Any]]] = []
     for index, rule in enumerate(severity_rules):
         keyword = str(rule.get("keyword") or "").strip().lower()
-        if not keyword or keyword not in search_text:
+        if not keyword or not _severity_keyword_matches(keyword, search_text, class_tokens):
             continue
         if _match_count_requirement(count, str(rule.get("operator") or ">="), int(rule.get("threshold") or 0)):
             matches.append((len(keyword), index, rule))
@@ -470,6 +519,26 @@ def format_skipped_severity_rows(skipped_rows: List[Dict[str, Any]]) -> List[str
             )
         )
     return lines
+
+
+def write_skipped_severity_report(
+    skipped_rows: List[Dict[str, Any]],
+    output_path: str | Path,
+    *,
+    source_excel_path: str | Path | None = None,
+    upload_excel_path: str | Path | None = None,
+) -> Path:
+    """把定级未命中而跳过的行落到 JSON，避免只存在于控制台日志里。"""
+    path = Path(output_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "skipped_count": len(skipped_rows or []),
+        "source_excel_path": str(source_excel_path or ""),
+        "upload_excel_path": str(upload_excel_path or ""),
+        "skipped_rows": list(skipped_rows or []),
+    }
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return path
 
 
 def match_version_prefix(version: str, prefixes: Optional[Iterable[str]] = None) -> str:
@@ -626,6 +695,7 @@ def build_upload_rows(
                 "PS": build_ps(issue_data, reporter=reporter),
                 "Previous Version Status": defaults.get("default_previous_version_status", "Previous version exists"),
                 "Previous Version Text": defaults.get("default_previous_version_text", "100%"),
+                "Issue Nature": defaults.get("default_issue_nature", "New issues"),
             }
         )
     return rows
