@@ -423,6 +423,105 @@ def test_jank_caused_by_fallback(tmp_path):
     assert r["CausedBy"].startswith("class:[Jank]")
 
 
+def test_assert_cp2_message_stable_fingerprint(tmp_path):
+    """Assert/CP2：CausedBy=unievent.message，同根因跨设备归并；不同 message 不并。"""
+    import json as _json
+    from modules.dedup import dedup
+
+    cases = (
+        ("2026-11-16-161849", "2026-11-16_16:18:49.698",
+         "WCN-CP2-EXCEPTION [CMD] CMD_SET_ROAM_OFFLOAD, [REASON] CMD_RSP_TIMEOUT_ERROR"),
+        ("2026-11-17-035604", "2026-11-17_03:56:04.512",
+         "WCN-CP2-EXCEPTION [CMD] CMD_SET_ROAM_OFFLOAD, [REASON] CMD_RSP_TIMEOUT_ERROR"),
+        ("2026-11-16-042127", "2026-11-16_04:21:27.054",
+         "WCN-CP2-EXCEPTION WCN loopcheck erro!"),
+        ("2026-11-16-094132", "2026-11-16_09:41:32.362",
+         "WCN-CP2-EXCEPTION WCN loopcheck erro!"),
+    )
+    for ts, kick, message in cases:
+        pkg = _make_package(str(tmp_path), "Assert", ts, summary="类型: Assert\n")
+        with open(os.path.join(pkg, "unievent_info.json"), "w", encoding="utf-8") as f:
+            _json.dump({
+                "kick_datetime": kick,
+                "event_name": "CP2 Assert",
+                "event_id": "109000001",
+                "type": "wcn assert",
+                "message": message,
+            }, f)
+
+    records = collect_problems(str(tmp_path))
+    assert len(records) == 4
+    for r in records:
+        assert r["ExpClass"] == "Assert"
+        assert r["Package"] == "Assert"
+        assert not r["CausedBy"].startswith("class:[")
+        assert r["CausedBy"].startswith("WCN-CP2-EXCEPTION")
+
+    _before, after = dedup(records)
+    assert len(after) == 2
+    counts = sorted(x["sum"] for x in after)
+    assert counts == [2, 2]
+
+
+def test_assert_message_from_exp_main_jsonl(tmp_path):
+    """unievent 无 message 时，仍可从 exp_main JSON 行取根因。"""
+    import json as _json
+    import tarfile
+    import io
+
+    ts = "2026-11-17-190828"
+    pkg = _make_package(str(tmp_path), "Assert", ts, summary="类型: Assert\n")
+    with open(os.path.join(pkg, "unievent_info.json"), "w", encoding="utf-8") as f:
+        _json.dump({
+            "kick_datetime": "2026-11-17_19:08:28.046",
+            "event_name": "CP2 Assert",
+            "type": "wcn assert",
+        }, f)
+    exp_main = (
+        '{"event_id":"109000001","event_type":"FAULT","event_level":"GENERAL",'
+        '"event_name":"CP2 Assert"}\n'
+        '{"kick_datetime":"2026-11-17_19:08:28.046","type":"wcn assert",'
+        '"message":"WCN-CP2-EXCEPTION [CMD] CMD_SET_ROAM_OFFLOAD, '
+        '[REASON] CMD_RSP_TIMEOUT_ERROR"}\n'
+    )
+    with tarfile.open(os.path.join(pkg, "001-2026-11-17_19-08-28.tar.gz"), "w:gz") as tf:
+        data = exp_main.encode()
+        info = tarfile.TarInfo("001-2026-11-17_19-08-28/exp_main.txt")
+        info.size = len(data)
+        tf.addfile(info, io.BytesIO(data))
+
+    records = collect_problems(str(tmp_path))
+    assert len(records) == 1
+    assert records[0]["CausedBy"] == (
+        "WCN-CP2-EXCEPTION [CMD] CMD_SET_ROAM_OFFLOAD, [REASON] CMD_RSP_TIMEOUT_ERROR"
+    )
+
+
+def test_assert_without_message_keeps_fallback(tmp_path):
+    """Assert 无 message：仍走随机兜底，避免仅凭 event_name=CP2 Assert 误并。"""
+    import json as _json
+    from modules.dedup import dedup
+
+    for ts, kick in (
+        ("2026-11-16-161849", "2026-11-16_16:18:49.698"),
+        ("2026-11-17-035604", "2026-11-17_03:56:04.512"),
+    ):
+        pkg = _make_package(str(tmp_path), "Assert", ts, summary="类型: Assert\n")
+        with open(os.path.join(pkg, "unievent_info.json"), "w", encoding="utf-8") as f:
+            _json.dump({
+                "kick_datetime": kick,
+                "event_name": "CP2 Assert",
+                "type": "wcn assert",
+            }, f)
+
+    records = collect_problems(str(tmp_path))
+    assert len(records) == 2
+    for r in records:
+        assert r["CausedBy"].startswith("class:[Assert]")
+    _before, after = dedup(records)
+    assert len(after) == 2
+
+
 def test_detail_ne_tombstone_key(tmp_path):
     """NE（tombstone 包）：Detail 含 tombstone 头部 + backtrace 段。"""
     pkg = _make_package(str(tmp_path), "SYSTEM-TOMBSTONE", "2026-07-01-121751",

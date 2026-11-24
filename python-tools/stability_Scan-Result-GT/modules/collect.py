@@ -32,8 +32,9 @@ _ASSERT_RE = re.compile(r"Assert|109000001", re.IGNORECASE)
 _WCN_RE = re.compile(r"WCN|109000003", re.IGNORECASE)
 _PACKAGE_RE = re.compile(r"^(.+)[_-](\d{4}-\d{2}-\d{2}-\d{6})$")
 
-# uniview 元信息不作 CausedBy 兜底（event_name 过粗，SWT 会误并）。
-# Jank 已有专用稳定指纹（event_name + 包名），不在此列。
+# uniview 通用 message/event_name 不作弱兜底：event_name 过粗（SWT/Assert 会误并）。
+# Assert/WCN 已有专用指纹（unievent.message）；Jank 已有 event_name + 包名。
+# SR 仍走随机兜底，不按 reboot_reason 合并。
 _SKIP_UNIVIEW_CAUSE_FALLBACK = frozenset(("SWT", "Assert", "WCN", "SR"))
 _AM_CRASH_RE = re.compile(r"am_crash:\s*\[([^]]+)\]")
 # ActivityRecord{… u0 com.foo/.Bar tN d0} → 包名 / 组件
@@ -735,6 +736,46 @@ def _extract_caused_by_jank(package_dir, ev=None, exp_detail=None, package=""):
     return ""
 
 
+def _assert_message_from_lines(lines):
+    """从 exp_main / unievent JSON 行提取首个非空 ``message``。"""
+    if not lines:
+        return ""
+    for line in lines:
+        s = (line or "").strip()
+        if not s.startswith("{"):
+            continue
+        try:
+            obj = json.loads(s)
+        except (ValueError, json.JSONDecodeError):
+            continue
+        if not isinstance(obj, dict):
+            continue
+        msg = (obj.get("message") or "").strip()
+        if msg:
+            return msg[:200]
+    return ""
+
+
+def _extract_caused_by_assert(package_dir, ev=None, exp_detail=None):
+    """Assert/WCN 稳定去重指纹。
+
+    优先 ``unievent.message``（如 ``WCN-CP2-EXCEPTION WCN loopcheck erro!`` /
+    ``WCN-CP2-EXCEPTION [CMD] ..., [REASON] ...``）；缺省再读 exp_main JSON 行。
+    不用 ``event_name``（本批恒为 ``CP2 Assert``，过粗会误并）。
+    """
+    if ev is None:
+        ev = _uniview_info(package_dir)
+    if ev:
+        msg = (ev.get("message") or "").strip()
+        if msg:
+            return msg[:200]
+    msg = _assert_message_from_lines(exp_detail)
+    if msg:
+        return msg
+    exp_main = _read_pkg_file(package_dir, "exp_main.txt")
+    return _assert_message_from_lines(exp_main)
+
+
 def _fallback_caused_by(expclass, package):
     """MTK 兜底逻辑：未获取到详细信息时随机串（200 字符），防止去重误合并。
 
@@ -1372,6 +1413,12 @@ def _collect_package(package_dir, version, device):
         # 参照 MTK：特殊类型无法确定进程时，CurProcess/Package 直接填 ExpClass
         package = expclass
         cur_process = package
+        if expclass in ("Assert", "WCN"):
+            # 可去重：unievent.message 稳定根因串；不用 event_name，不用随机兜底
+            assert_cb = _extract_caused_by_assert(
+                package_dir, ev=ev, exp_detail=exp_detail)
+            if assert_cb:
+                caused_by = assert_cb
     else:
         cur_process = package
     if expclass == "SR" or not caused_by:
