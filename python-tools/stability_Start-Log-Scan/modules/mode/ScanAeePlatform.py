@@ -16,11 +16,13 @@ class ScanAeePlatform(ScanBase):
                  skip_extract, skip_unzip, nas_address=None, task_tag=None, 
                  pipeline_id=None, uuid=None, end_of_scan=False, start_time=None,
                  device_count=0, trunk_branch=None, project=None, build=None, 
-                 android=None, utp_tcid=None, utp_taskid=None, scan_root_dir_abs=None):
+                 android=None, utp_tcid=None, utp_taskid=None, scan_root_dir_abs=None,
+                 ignore_pkglist=False):
         TEST_LOGGER.info("初始化 ScanAeePlatform")
         super(ScanAeePlatform, self).__init__(scan_mode, scan_place, days_before,
                                                scan_root_dir, cur_tool_dir, skip_extract,
-                                               skip_unzip, task_tag)
+                                               skip_unzip, task_tag,
+                                               ignore_pkglist=ignore_pkglist)
         self._nas_address = nas_address
         self._pipeline_id = pipeline_id
         self._uuid = uuid

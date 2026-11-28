@@ -17,7 +17,7 @@ class DedupOrgExcel(ScanBase):
         "factory": ("factory", "pkglist_factory.txt"),
     }
 
-    def __init__(self, org_excel_path, side="shanghai", config_dir=None):
+    def __init__(self, org_excel_path, side="shanghai", config_dir=None, ignore_pkglist=False):
         self._project_root = str(Path(__file__).resolve().parents[2])
         self._config_dir = self._resolve_config_dir(config_dir)
         super(DedupOrgExcel, self).__init__(
@@ -28,6 +28,7 @@ class DedupOrgExcel(ScanBase):
             self._project_root,
             True,
             True,
+            ignore_pkglist=ignore_pkglist,
         )
         self._org_excel_path = os.path.abspath(org_excel_path)
         self._side = (side or "shanghai").strip().lower()

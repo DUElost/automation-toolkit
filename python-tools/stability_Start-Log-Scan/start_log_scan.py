@@ -43,6 +43,8 @@ if __name__ == "__main__":
     parser.add_argument("-sz", "--skip_unzip", dest="skip_unzip", action="store_const", const=True, default=False, metavar="跳过解压", help="跳过解压zip文件")
     parser.add_argument("-inc", "--incremental", dest="incremental", action="store_const", const=True, default=False,
       help="增量扫描：仍生成全量_org.xls；去重报告仅保留相对同目录上次_org.xls的新增Path")
+    parser.add_argument("-nw", "--no_whitelist", dest="no_whitelist", action="store_const", const=True, default=False, metavar="关闭白名单校验",
+      help="关闭白名单校验（忽略pkglist过滤）；不传时默认开启白名单校验")
     choices_list = [
      SCAN_MODE_AEE_TNE, SCAN_MODE_AEE, SCAN_MODE_TNE, SCAN_MODE_FANS, 
      SCAN_MODE_USIC, SCAN_MODE_PLATFORM, 
@@ -115,7 +117,10 @@ if __name__ == "__main__":
                 TEST_LOGGER.error("-dedup_org 缺少_org.xls文件路径，退出离线去重")
                 sys.exit(1)
             try:
-                output_path = DedupOrgExcel(args.dedup_org, args.merge_side).run()
+                if args.no_whitelist:
+                    output_path = DedupOrgExcel(args.dedup_org, args.merge_side, ignore_pkglist=True).run()
+                else:
+                    output_path = DedupOrgExcel(args.dedup_org, args.merge_side).run()
             except SystemExit:
                 raise
             except:
@@ -144,7 +149,7 @@ if __name__ == "__main__":
         merge_excels = None
         if merge_files:
             TEST_LOGGER.info("合并多个已生成的Excel文件，文件列表：{}，归属地：{}".format(merge_files, merge_side))
-            merge_excels = MergeExcels(merge_files, merge_side, "", SCAN_MODE_AEE, priority=merge_priority)
+            merge_excels = MergeExcels(merge_files, merge_side, "", SCAN_MODE_AEE, priority=merge_priority, ignore_pkglist=args.no_whitelist)
             try:
                 merge_excels.start_merge_files(merge_files)
             except:
@@ -156,11 +161,11 @@ if __name__ == "__main__":
             sys.exit()
         if merge_factory:
             TEST_LOGGER.info("合并扫描结果Excel文件，merge_factory模式：{}，合并关键字：{}".format(merge_factory, merge_key))
-            merge_excels = MergeExcels(merge_factory, "factory", merge_key, scan_mode, True, priority=merge_priority)
+            merge_excels = MergeExcels(merge_factory, "factory", merge_key, scan_mode, True, priority=merge_priority, ignore_pkglist=args.no_whitelist)
         else:
             if merge_excel_dir_list:
                 TEST_LOGGER.info("合并扫描结果Excel文件，文件存放目录：{}，文件归属地：{}, 合并关键字：{}".format(merge_excel_dir_list, merge_side, merge_key))
-                merge_excels = MergeExcels(merge_excel_dir_list, merge_side, merge_key, scan_mode, priority=merge_priority)
+                merge_excels = MergeExcels(merge_excel_dir_list, merge_side, merge_key, scan_mode, priority=merge_priority, ignore_pkglist=args.no_whitelist)
             if merge_excels:
                 try:
                     merge_excels.start_merge()
@@ -199,11 +204,13 @@ if __name__ == "__main__":
             utp_taskid = args.utp_taskid
             limit_dbg_count = args.limit_dbg_count
             incremental = args.incremental
+            no_whitelist = args.no_whitelist
             TEST_LOGGER.info("获取输入参数：")
             TEST_LOGGER.info("-del [删除不提交日志目录]：{}".format(delete_logs))
             TEST_LOGGER.info("-s [跳过所有解压步骤]：{}".format(skip_extract))
             TEST_LOGGER.info("-sz [跳过解压zip文件]：{}".format(skip_unzip))
             TEST_LOGGER.info("-inc [增量Path差集]：{}".format(incremental))
+            TEST_LOGGER.info("-nw [关闭白名单校验]：{}".format(no_whitelist))
             TEST_LOGGER.info("-m [扫描模式]：{}".format(scan_mode))
             TEST_LOGGER.info("-b [指定日期]：{}".format(days_before))
             TEST_LOGGER.info("-d [扫描目录]：{}".format(scan_root_dir))
@@ -248,6 +255,7 @@ if __name__ == "__main__":
             special_build_prefix = False
             delete_logs = False
             incremental = False
+            no_whitelist = False
             limit_dbg_count = 0
             TEST_LOGGER.info("默认扫描模式：0，扫描路径：{}".format(scan_root_dir))
         else:
@@ -265,7 +273,7 @@ if __name__ == "__main__":
     TEST_LOGGER.info("工具当前目录：{}\n".format(cur_tool_dir))
     if scan_mode in [SCAN_MODE_AEE_TNE, SCAN_MODE_AEE, SCAN_MODE_TNE, SCAN_MODE_JENKINS, SCAN_MODE_HWASAN, 
      SCAN_MODE_FUZZ, SCAN_MODE_TRANSSION]:
-        scanner = ScanAeeTne(scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir, skip_extract, skip_unzip, nas_address, task_tag, special_build_prefix, delete_logs, limit_dbg_count=limit_dbg_count, incremental=incremental)
+        scanner = ScanAeeTne(scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir, skip_extract, skip_unzip, nas_address, task_tag, special_build_prefix, delete_logs, limit_dbg_count=limit_dbg_count, incremental=incremental, ignore_pkglist=no_whitelist)
         loggerName = datetime.datetime.now().strftime("LogScanAeeTne_%Y_%m_%d_%H_%M_%S.log")
         loggerPath = os.path.join(PathManager.log_folder, loggerName)
         TEST_LOGGER.resetLogFile(loggerPath)
@@ -274,7 +282,7 @@ if __name__ == "__main__":
         TEST_LOGGER.info("**************************************************\n")
     else:
         if scan_mode == SCAN_MODE_FANS:
-            scanner = ScanAeeFans(scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir, skip_extract, skip_unzip)
+            scanner = ScanAeeFans(scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir, skip_extract, skip_unzip, ignore_pkglist=no_whitelist)
             loggerName = datetime.datetime.now().strftime("LogScanFans_%Y_%m_%d.log")
             loggerPath = os.path.join(PathManager.log_folder, loggerName)
             TEST_LOGGER.resetLogFile(loggerPath)
@@ -283,7 +291,7 @@ if __name__ == "__main__":
             TEST_LOGGER.info("**************************************************\n")
         else:
             if scan_mode == SCAN_MODE_USIC:
-                scanner = ScanTneUsic(scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir, skip_extract, skip_unzip)
+                scanner = ScanTneUsic(scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir, skip_extract, skip_unzip, ignore_pkglist=no_whitelist)
                 loggerName = datetime.datetime.now().strftime("LogScanUsic_%Y_%m_%d.log")
                 loggerPath = os.path.join(PathManager.log_folder, loggerName)
                 TEST_LOGGER.resetLogFile(loggerPath)
@@ -292,7 +300,7 @@ if __name__ == "__main__":
                 TEST_LOGGER.info("**************************************************\n")
             else:
                 if scan_mode == SCAN_MODE_FREEZE:
-                    scanner = ScanTneUsic(scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir, skip_extract, skip_unzip)
+                    scanner = ScanTneUsic(scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir, skip_extract, skip_unzip, ignore_pkglist=no_whitelist)
                     loggerName = datetime.datetime.now().strftime("LogScanFreeze_%Y_%m_%d.log")
                     loggerPath = os.path.join(PathManager.log_folder, loggerName)
                     TEST_LOGGER.resetLogFile(loggerPath)
@@ -301,7 +309,7 @@ if __name__ == "__main__":
                     TEST_LOGGER.info("**************************************************\n")
                 else:
                     if scan_mode == SCAN_MODE_DAEMON_CRASH:
-                        scanner = ScanTneUsic(scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir, skip_extract, skip_unzip)
+                        scanner = ScanTneUsic(scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir, skip_extract, skip_unzip, ignore_pkglist=no_whitelist)
                         loggerName = datetime.datetime.now().strftime("LogScanDaemonCrash_%Y_%m_%d.log")
                         loggerPath = os.path.join(PathManager.log_folder, loggerName)
                         TEST_LOGGER.resetLogFile(loggerPath)
@@ -310,7 +318,7 @@ if __name__ == "__main__":
                         TEST_LOGGER.info("**************************************************\n")
                     else:
                         if scan_mode == SCAN_MODE_SUBSYSTEM_CRASH:
-                            scanner = ScanTneUsic(scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir, skip_extract, skip_unzip)
+                            scanner = ScanTneUsic(scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir, skip_extract, skip_unzip, ignore_pkglist=no_whitelist)
                             loggerName = datetime.datetime.now().strftime("LogScanSubsystemCrash_%Y_%m_%d.log")
                             loggerPath = os.path.join(PathManager.log_folder, loggerName)
                             TEST_LOGGER.resetLogFile(loggerPath)
@@ -319,7 +327,7 @@ if __name__ == "__main__":
                             TEST_LOGGER.info("**************************************************\n")
                         else:
                             if scan_mode == SCAN_MODE_STUCK_LOGO:
-                                scanner = ScanStuckLogo(scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir, skip_extract, skip_unzip)
+                                scanner = ScanStuckLogo(scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir, skip_extract, skip_unzip, ignore_pkglist=no_whitelist)
                                 loggerName = datetime.datetime.now().strftime("LogScanStuckLogo_%Y_%m_%d.log")
                                 loggerPath = os.path.join(PathManager.log_folder, loggerName)
                                 TEST_LOGGER.resetLogFile(loggerPath)
@@ -328,7 +336,7 @@ if __name__ == "__main__":
                                 TEST_LOGGER.info("**************************************************\n")
                             else:
                                 if scan_mode in [SCAN_MODE_PLATFORM, SCAN_MODE_SUNMAO_PLATFORM, SCAN_MODE_HWASAN_PLATFORM, SCAN_MODE_FUZZ_PLATFORM]:
-                                    scanner = ScanAeePlatform(scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir, skip_extract, skip_unzip, nas_address, task_tag, pipeline_id, uuid, end_of_scan, start_time, device_count, trunk_branch, project, build, android, utp_tcid, utp_taskid, scan_root_dir_abs)
+                                    scanner = ScanAeePlatform(scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir, skip_extract, skip_unzip, nas_address, task_tag, pipeline_id, uuid, end_of_scan, start_time, device_count, trunk_branch, project, build, android, utp_tcid, utp_taskid, scan_root_dir_abs, ignore_pkglist=no_whitelist)
                                     if scan_mode == SCAN_MODE_SUNMAO_PLATFORM:
                                         loggerName = datetime.datetime.now().strftime(f"LogScanPlatformSunmao_{pipeline_id}_%Y%m%d_%H%M%S_%f.log")
                                     else:
@@ -346,7 +354,7 @@ if __name__ == "__main__":
                                     TEST_LOGGER.info("**************************************************\n")
                                 else:
                                     if scan_mode in [SCAN_MODE_CAMERA_PLATFORM, SCAN_MODE_VIDEO_PLATFORM]:
-                                        scanner = ScanAeePlatformMedia(scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir, skip_extract, skip_unzip, nas_address, task_tag, pipeline_id, uuid, end_of_scan, start_time, device_count, project, build, android, device_list, reporter, utp_tcid, utp_taskid)
+                                        scanner = ScanAeePlatformMedia(scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir, skip_extract, skip_unzip, nas_address, task_tag, pipeline_id, uuid, end_of_scan, start_time, device_count, project, build, android, device_list, reporter, utp_tcid, utp_taskid, ignore_pkglist=no_whitelist)
                                         loggerName = datetime.datetime.now().strftime(f"LogScanPlatformMedia_{pipeline_id}_%Y%m%d_%H%M%S_%f.log")
                                         loggerPath = os.path.join(PathManager.log_folder, loggerName)
                                         TEST_LOGGER.resetLogFile(loggerPath)
@@ -355,7 +363,7 @@ if __name__ == "__main__":
                                         TEST_LOGGER.info("**************************************************\n")
                                     else:
                                         if scan_mode == SCAN_MODE_DAILY:
-                                            scanner = ScanAeeDaily(scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir, skip_extract, skip_unzip, task_tag)
+                                            scanner = ScanAeeDaily(scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir, skip_extract, skip_unzip, task_tag, ignore_pkglist=no_whitelist)
                                             loggerName = datetime.datetime.now().strftime("LogScanDaily_%Y_%m_%d.log")
                                             loggerPath = os.path.join(PathManager.log_folder, loggerName)
                                             TEST_LOGGER.resetLogFile(loggerPath)
@@ -364,7 +372,7 @@ if __name__ == "__main__":
                                             TEST_LOGGER.info("**************************************************\n")
                                         else:
                                             if scan_mode == SCAN_MODE_MTBF_PLATFORM:
-                                                scanner = ScanAeeMTBF(scan_mode, scan_place, scan_root_dir, cur_tool_dir, nas_address, pipeline_id, uuid, end_of_scan, project, build, utp_tcid, utp_taskid)
+                                                scanner = ScanAeeMTBF(scan_mode, scan_place, scan_root_dir, cur_tool_dir, nas_address, pipeline_id, uuid, end_of_scan, project, build, utp_tcid, utp_taskid, ignore_pkglist=no_whitelist)
                                                 loggerName = datetime.datetime.now().strftime(f"LogScanMTBF_{pipeline_id}_%Y%m%d_%H%M%S_%f.log")
                                                 loggerPath = os.path.join(PathManager.log_folder, loggerName)
                                                 TEST_LOGGER.resetLogFile(loggerPath)
@@ -373,7 +381,7 @@ if __name__ == "__main__":
                                                 TEST_LOGGER.info("**************************************************\n")
                                             else:
                                                 if scan_mode == SCAN_MODE_OTA_DAILY:
-                                                    scanner = ScanAeeOTADaily(scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir, skip_extract, skip_unzip)
+                                                    scanner = ScanAeeOTADaily(scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir, skip_extract, skip_unzip, ignore_pkglist=no_whitelist)
                                                     loggerName = datetime.datetime.now().strftime("LogScanOtaDaily_%Y_%m_%d.log")
                                                     loggerPath = os.path.join(PathManager.log_folder, loggerName)
                                                     TEST_LOGGER.resetLogFile(loggerPath)
@@ -382,7 +390,7 @@ if __name__ == "__main__":
                                                     TEST_LOGGER.info("**************************************************\n")
                                                 else:
                                                     if scan_mode == SCAN_MODE_INDEPENDENT:
-                                                        scanner = ScanAeeIndependent(scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir, skip_extract, skip_unzip, nas_address, task_tag, delete_logs)
+                                                        scanner = ScanAeeIndependent(scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir, skip_extract, skip_unzip, nas_address, task_tag, delete_logs, ignore_pkglist=no_whitelist)
                                                         loggerName = datetime.datetime.now().strftime("LogScanIndependent_%Y%m%d_%H%M%S_%f.log")
                                                         loggerPath = os.path.join(PathManager.log_folder, loggerName)
                                                         TEST_LOGGER.resetLogFile(loggerPath)
@@ -391,7 +399,7 @@ if __name__ == "__main__":
                                                         TEST_LOGGER.info("**************************************************\n")
                                                     else:
                                                         if scan_mode == SCAN_MODE_UPLOAD_TNE:
-                                                            scanner = ScanTneUpload(scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir, skip_extract, skip_unzip)
+                                                            scanner = ScanTneUpload(scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir, skip_extract, skip_unzip, ignore_pkglist=no_whitelist)
                                                             loggerName = datetime.datetime.now().strftime("LogScanUploadTne_%Y_%m_%d.log")
                                                             loggerPath = os.path.join(PathManager.log_folder, loggerName)
                                                             TEST_LOGGER.resetLogFile(loggerPath)

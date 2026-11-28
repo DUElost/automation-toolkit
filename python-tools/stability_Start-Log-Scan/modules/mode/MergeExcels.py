@@ -11,8 +11,8 @@ from modules.mode.BaseScan import ScanBase
 
 class MergeExcels(ScanBase):
 
-    def __init__(self, merge_excel_dir_list, merge_side, merge_key, scan_mode, merge_factory=False, priority=False):
-        super(MergeExcels, self).__init__(scan_mode, merge_side, -1, None, None, False, False)
+    def __init__(self, merge_excel_dir_list, merge_side, merge_key, scan_mode, merge_factory=False, priority=False, ignore_pkglist=False):
+        super(MergeExcels, self).__init__(scan_mode, merge_side, -1, None, None, False, False, ignore_pkglist=ignore_pkglist)
         self._MergeExcels__merge_excel_dir_list = merge_excel_dir_list
         self._MergeExcels__merge_side = merge_side
         self._MergeExcels__merge_key = merge_key

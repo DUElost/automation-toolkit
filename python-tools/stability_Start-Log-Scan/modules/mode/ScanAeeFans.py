@@ -15,7 +15,7 @@ from modules.mode.BaseScan import ScanBase
 class ScanAeeFans(ScanBase):
     __doc__ = "\n    粉丝日志每日扫描脚本\n    "
 
-    def __init__(self, scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir, skip_extract, skip_unzip):
+    def __init__(self, scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir, skip_extract, skip_unzip, ignore_pkglist=False):
         TEST_LOGGER.info("初始化 ScanAeeFans，传入的参数列表：")
         TEST_LOGGER.info("scan_mode：{}".format(scan_mode))
         TEST_LOGGER.info("scan_place：{}".format(scan_place))
@@ -24,7 +24,8 @@ class ScanAeeFans(ScanBase):
         TEST_LOGGER.info("cur_tool_dir：{}".format(cur_tool_dir))
         TEST_LOGGER.info("skip_extract：{}".format(skip_extract))
         TEST_LOGGER.info("skip_unzip：{}".format(skip_unzip))
-        super(ScanAeeFans, self).__init__(scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir, skip_extract, skip_unzip)
+        TEST_LOGGER.info("no_whitelist：{}".format(ignore_pkglist))
+        super(ScanAeeFans, self).__init__(scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir, skip_extract, skip_unzip, ignore_pkglist=ignore_pkglist)
 
     def _get_scan_dir_failed(self, error_msg):
         return

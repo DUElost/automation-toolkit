@@ -11,11 +11,11 @@ class ScanAeeOTADaily(ScanBase):
     """OTA 每日 AEE 扫描类"""
 
     def __init__(self, scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir,
-                 skip_extract, skip_unzip):
+                 skip_extract, skip_unzip, ignore_pkglist=False):
         TEST_LOGGER.info("初始化 ScanAeeOTADaily")
         super(ScanAeeOTADaily, self).__init__(scan_mode, scan_place, days_before,
                                                scan_root_dir, cur_tool_dir, skip_extract,
-                                               skip_unzip)
+                                               skip_unzip, ignore_pkglist=ignore_pkglist)
 
     def _get_scan_dir_failed(self, error_msg):
         TEST_LOGGER.error(f"扫描目录获取失败: {error_msg}")

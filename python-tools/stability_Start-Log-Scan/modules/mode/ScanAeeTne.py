@@ -43,7 +43,7 @@ class ScanAeeTne(ScanBase):
     def __init__(self, scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir,
                  skip_extract, skip_unzip, nas_address=None, task_tag=None,
                  special_build_prefix=None, delete_logs=False, limit_dbg_count=0,
-                 incremental=False):
+                 incremental=False, ignore_pkglist=False):
         TEST_LOGGER.info("初始化 ScanAeeTne，传入的参数列表：")
         TEST_LOGGER.info("scan_mode：{}".format(scan_mode))
         TEST_LOGGER.info("scan_place：{}".format(scan_place))
@@ -58,10 +58,12 @@ class ScanAeeTne(ScanBase):
         TEST_LOGGER.info("delete_logs：{}".format(delete_logs))
         TEST_LOGGER.info("limit_dbg_count：{}".format(limit_dbg_count))
         TEST_LOGGER.info("incremental：{}".format(incremental))
+        TEST_LOGGER.info("no_whitelist：{}".format(ignore_pkglist))
         super(ScanAeeTne, self).__init__(scan_mode, scan_place, days_before,
                                           scan_root_dir, cur_tool_dir, skip_extract,
                                           skip_unzip, task_tag, delete_logs,
-                                          limit_dbg_count=limit_dbg_count)
+                                          limit_dbg_count=limit_dbg_count,
+                                          ignore_pkglist=ignore_pkglist)
         self._nas_address = nas_address
         self._special_build_prefix = special_build_prefix
         self._incremental = bool(incremental)
@@ -783,6 +785,7 @@ class ScanAeeTne(ScanBase):
             "generated_at": "summary 生成时间，格式为 YYYY-MM-DD HH:MM:SS",
             "skip_extract": "是否跳过 dbg 解压阶段",
             "skip_unzip": "是否跳过 zip 解压阶段",
+            "no_whitelist": "是否关闭白名单校验（忽略 pkglist 过滤）",
             "unexpected_dbg_count": "是否因问题数量过多而触发提前停止",
             "build_version": "本次报告识别到的版本号；若无法识别则为 VersionNone",
             "generated_files": {
@@ -869,6 +872,7 @@ class ScanAeeTne(ScanBase):
             "generated_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "skip_extract": self._skip_extract,
             "skip_unzip": self._skip_unzip,
+            "no_whitelist": self._ignore_pkglist,
             "unexpected_dbg_count": unexpected_dbg_count,
             "counts": counts,
             "invalid_dbg": {

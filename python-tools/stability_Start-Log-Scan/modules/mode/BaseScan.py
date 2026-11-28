@@ -53,7 +53,7 @@ class FallbackAeeResult(object):
 class ScanBase(ABC):
     __doc__ = "\n    配置文件读取优先级： 平台传入tag值 value > hostname对应 value > default value\n    扫描目录优先级：传入扫描目录参数 > 配置参数配置 > 扫描工具本地目录\n    "
 
-    def __init__(self, scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir, skip_extract, skip_unzip, task_tag=None, delete_logs=False, limit_dbg_count=0):
+    def __init__(self, scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir, skip_extract, skip_unzip, task_tag=None, delete_logs=False, limit_dbg_count=0, ignore_pkglist=False):
         super(ScanBase, self).__init__()
         self._scan_mode = scan_mode
         self._scan_place = scan_place
@@ -65,6 +65,7 @@ class ScanBase(ABC):
         self._task_tag = task_tag
         self._delete_logs = delete_logs
         self._limit_dbg_count = limit_dbg_count
+        self._cli_ignore_pkglist = bool(ignore_pkglist)
         self._build_version = None
         self._scan_site = "UnknownSite"
         TEST_LOGGER.info("初始化 ScanBase，传入的参数列表：")
@@ -78,6 +79,7 @@ class ScanBase(ABC):
         TEST_LOGGER.info("task_tag：{}".format(self._task_tag))
         TEST_LOGGER.info("delete_logs：{}".format(self._delete_logs))
         TEST_LOGGER.info("limit_dbg_count：{}".format(self._limit_dbg_count))
+        TEST_LOGGER.info("ignore_pkglist：{}".format(self._cli_ignore_pkglist))
         self._android = None
         self._hostname = None
         self._platform_system = None
@@ -139,7 +141,7 @@ class ScanBase(ABC):
         self._extract_failed_dbg_reason_map = {}
         self._extract_failed_dbg_report_status_map = {}
         self._win_to_mnt_dict = {}
-        self._ignore_pkglist = False
+        self._ignore_pkglist = self._cli_ignore_pkglist
         self._reporter = None
         self._get_tne_type_list = False
         self._tne_tag_dict = {}
@@ -509,7 +511,7 @@ class ScanBase(ABC):
         TEST_LOGGER.info("MP_Block映射文件：{}".format(self._mp_block_file))
         self._jira_project_file = self._default_config["jira_project_file"]
         TEST_LOGGER.info("JiraProject文件：{}".format(self._jira_project_file))
-        self._ignore_pkglist = self._default_config["ignore_pkglist"]
+        self._ignore_pkglist = bool(self._default_config["ignore_pkglist"]) or self._cli_ignore_pkglist
         TEST_LOGGER.info("去重时忽略白名单文件标志ignore_pkglist：{}".format(self._ignore_pkglist))
         self._submit_jira = self._default_config["submit_jira"]
         TEST_LOGGER.info("是否提交Jira：{}".format(self._submit_jira))

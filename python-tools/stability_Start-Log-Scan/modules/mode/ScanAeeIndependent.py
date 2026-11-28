@@ -10,7 +10,7 @@ from modules.mode.BaseScan import ScanBase
 
 class ScanAeeIndependent(ScanBase):
 
-    def __init__(self, scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir, skip_extract, skip_unzip, nas_address=None, task_tag=None, delete_logs=False):
+    def __init__(self, scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir, skip_extract, skip_unzip, nas_address=None, task_tag=None, delete_logs=False, ignore_pkglist=False):
         TEST_LOGGER.info("初始化 ScanAeeIndependent，传入的参数列表：")
         TEST_LOGGER.info("scan_mode：{}".format(scan_mode))
         TEST_LOGGER.info("scan_place：{}".format(scan_place))
@@ -21,7 +21,8 @@ class ScanAeeIndependent(ScanBase):
         TEST_LOGGER.info("skip_unzip：{}".format(skip_unzip))
         TEST_LOGGER.info("task_tag：{}".format(task_tag))
         TEST_LOGGER.info("delete_logs：{}".format(delete_logs))
-        super(ScanAeeIndependent, self).__init__(scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir, skip_extract, skip_unzip, task_tag, delete_logs)
+        TEST_LOGGER.info("no_whitelist：{}".format(ignore_pkglist))
+        super(ScanAeeIndependent, self).__init__(scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir, skip_extract, skip_unzip, task_tag, delete_logs, ignore_pkglist=ignore_pkglist)
         TEST_LOGGER.info("nas_address：{}".format(nas_address))
 
     def _get_scan_dir_failed(self, error_msg):

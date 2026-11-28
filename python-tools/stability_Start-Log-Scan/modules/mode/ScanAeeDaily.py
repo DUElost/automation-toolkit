@@ -12,7 +12,7 @@ from modules.mode.BaseScan import ScanBase, PATTERN_MAIL
 
 class ScanAeeDaily(ScanBase):
 
-    def __init__(self, scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir, skip_extract, skip_unzip, task_tag):
+    def __init__(self, scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir, skip_extract, skip_unzip, task_tag, ignore_pkglist=False):
         TEST_LOGGER.info("初始化 ScanAeeDaily，传入的参数列表：")
         TEST_LOGGER.info("scan_mode：{}".format(scan_mode))
         TEST_LOGGER.info("scan_place：{}".format(scan_place))
@@ -22,7 +22,8 @@ class ScanAeeDaily(ScanBase):
         TEST_LOGGER.info("skip_extract：{}".format(skip_extract))
         TEST_LOGGER.info("skip_unzip：{}".format(skip_unzip))
         TEST_LOGGER.info("task_tag：{}".format(task_tag))
-        super(ScanAeeDaily, self).__init__(scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir, skip_extract, skip_unzip, task_tag)
+        TEST_LOGGER.info("no_whitelist：{}".format(ignore_pkglist))
+        super(ScanAeeDaily, self).__init__(scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir, skip_extract, skip_unzip, task_tag, ignore_pkglist=ignore_pkglist)
 
     def _get_scan_dir_failed(self, error_msg):
         self._ScanAeeDaily__send_failure_mail(error_msg)

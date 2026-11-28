@@ -12,7 +12,7 @@ from modules.mode.BaseScan import ScanBase, PATTERN_MAIL
 
 class ScanAeeMTBF(ScanBase):
 
-    def __init__(self, scan_mode, scan_place, scan_root_dir, cur_tool_dir, nas_address, pipeline_id, uuid, end_of_scan, target_project, target_build, utp_tcid, utp_taskid):
+    def __init__(self, scan_mode, scan_place, scan_root_dir, cur_tool_dir, nas_address, pipeline_id, uuid, end_of_scan, target_project, target_build, utp_tcid, utp_taskid, ignore_pkglist=False):
         TEST_LOGGER.info("初始化 ScanAeeMTBF，传入的参数列表：")
         TEST_LOGGER.info("scan_mode：{}".format(scan_mode))
         TEST_LOGGER.info("scan_place：{}".format(scan_place))
@@ -26,11 +26,12 @@ class ScanAeeMTBF(ScanBase):
         TEST_LOGGER.info("target_build：{}".format(target_build))
         TEST_LOGGER.info("utp_tcid：{}".format(utp_tcid))
         TEST_LOGGER.info("utp_taskid：{}".format(utp_taskid))
+        TEST_LOGGER.info("no_whitelist：{}".format(ignore_pkglist))
         days_before = 0
         skip_extract = False
         skip_unzip = False
         task_tag = None
-        super(ScanAeeMTBF, self).__init__(scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir, skip_extract, skip_unzip, task_tag)
+        super(ScanAeeMTBF, self).__init__(scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir, skip_extract, skip_unzip, task_tag, ignore_pkglist=ignore_pkglist)
         self._nas_address = nas_address
         self._pipeline_id = pipeline_id
         self._uuid = uuid

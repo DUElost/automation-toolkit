@@ -36,6 +36,7 @@ python start_log_scan.py -m <模式> -d <日志目录> -p <地点>
 | `-s` | 跳过所有解压步骤 | 无参数 |
 | `-sz` | 跳过解压 zip 文件 | 无参数 |
 | `-inc` | 增量扫描：全量写 `_org.xls`，去重报告仅保留相对上次 `_org.xls` 的新增 Path | 无参数 |
+| `-nw` / `--no_whitelist` | 关闭白名单校验（忽略 pkglist 过滤）；不传时默认启用白名单校验 | 无参数 |
 | `-b` | 指定扫描往前第几天的日志，-1 表示所有 | `-1` |
 | `-del` | 删除不提交的 log 目录 | 无参数 |
 | `-merge_files` | 合并多个已生成的 xls（`_org.xls` 或去重 xls） | `a_org.xls b_org.xls` |

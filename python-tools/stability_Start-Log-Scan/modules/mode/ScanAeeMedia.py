@@ -13,7 +13,7 @@ from modules.mode.BaseScan import ScanBase, PATTERN_MAIL
 
 class ScanAeePlatformMedia(ScanBase):
 
-    def __init__(self, scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir, skip_extract, skip_unzip, nas_address, task_tag, pipeline_id, uuid, end_of_scan, start_time, device_count, target_project, target_build, android, device_list, reporter, utp_tcid, utp_taskid):
+    def __init__(self, scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir, skip_extract, skip_unzip, nas_address, task_tag, pipeline_id, uuid, end_of_scan, start_time, device_count, target_project, target_build, android, device_list, reporter, utp_tcid, utp_taskid, ignore_pkglist=False):
         TEST_LOGGER.info("初始化 ScanAeePlatformMedia，传入的参数列表：")
         TEST_LOGGER.info("scan_mode：{}".format(scan_mode))
         TEST_LOGGER.info("scan_place：{}".format(scan_place))
@@ -36,7 +36,8 @@ class ScanAeePlatformMedia(ScanBase):
         TEST_LOGGER.info(f"reporter:{reporter}")
         TEST_LOGGER.info("utp_tcid：{}".format(utp_tcid))
         TEST_LOGGER.info("utp_taskid：{}".format(utp_taskid))
-        super(ScanAeePlatformMedia, self).__init__(scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir, skip_extract, skip_unzip, task_tag)
+        TEST_LOGGER.info("no_whitelist：{}".format(ignore_pkglist))
+        super(ScanAeePlatformMedia, self).__init__(scan_mode, scan_place, days_before, scan_root_dir, cur_tool_dir, skip_extract, skip_unzip, task_tag, ignore_pkglist=ignore_pkglist)
         self._nas_address = nas_address
         self._pipeline_id = pipeline_id
         self._uuid = uuid
