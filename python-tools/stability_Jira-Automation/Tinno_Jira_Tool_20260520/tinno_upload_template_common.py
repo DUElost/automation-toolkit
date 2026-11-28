@@ -693,7 +693,7 @@ def build_upload_rows(
                 "Versions": issue_data["version"],
                 "Environment": build_environment(issue_data),
                 "PS": build_ps(issue_data, reporter=reporter),
-                "Previous Version Status": defaults.get("default_previous_version_status", "Previous version exists"),
+                "Previous Version Status": defaults.get("default_previous_version_status", "No previous version"),
                 "Previous Version Text": defaults.get("default_previous_version_text", "100%"),
                 "Issue Nature": defaults.get("default_issue_nature", "New issues"),
             }

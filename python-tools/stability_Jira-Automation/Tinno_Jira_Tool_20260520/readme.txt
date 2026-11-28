@@ -195,6 +195,9 @@ python ".\create_tinno_jira_batch_from_excel.py" `
   - 默认填写 `New issues`（`config/tinno_jira_defaults.json` → `default_issue_nature`）
   - 字段 ID：`customfield_10400`（multicheckboxes，按数组载荷提交）；上传模板可带 `Issue Nature` 列覆盖默认值
   - 仅随新建/重建写入；`OPEN_LIKE_UPDATE` 更新路径不改该字段
+- Previous Version Status（新建问题时）
+  - 默认填写 `No previous version`（`config/tinno_jira_defaults.json` → `default_previous_version_status`）
+  - 字段 ID：`customfield_10123`；上传模板可带 `Previous Version Status` 列覆盖默认值
 - labels 字段（新建问题时）
   - labels = 该行测试专项标签 + 型号标签 + 固定标签 `稳定性测试`，重复值自动去重
   - 出现版本前缀 `MLD-NX2`、`MLD-NX3`、`MLD-NX3Carrier`、`MLD-NX3-Claro` 追加 `NX2`、`NX3`、`NX3Carrier`、`NX3Claro`；`MLD-LX1`、`MLD-LX2`、`MLD-LX3`、`ELA-LX2`、`ELA-LX3` 追加 `LX1`、`LX2`、`LX3`。`MLD-NX3` 不会覆盖 `MLD-NX3Carrier` / `MLD-NX3-Claro`。标题产品名 `V552AA`、`V551A` 不加型号标签

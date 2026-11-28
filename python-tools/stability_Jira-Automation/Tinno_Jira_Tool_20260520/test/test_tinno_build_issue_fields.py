@@ -119,7 +119,7 @@ class TinnoBuildIssueFieldsTest(unittest.TestCase):
         fields = build_issue_fields(self.jira, row, self.defaults)
 
         self.assertEqual(
-            {"value": "Previous version exists"},
+            {"value": "No previous version"},
             fields[self.defaults["field_ids"]["previous_version_status"]],
         )
         self.assertEqual(
@@ -176,7 +176,7 @@ class TinnoBuildIssueFieldsTest(unittest.TestCase):
         fields = build_issue_fields(self.jira, row, self.defaults)
 
         self.assertEqual(
-            {"value": "Previous version exists"},
+            {"value": "No previous version"},
             fields[self.defaults["field_ids"]["previous_version_status"]],
         )
         self.assertEqual(

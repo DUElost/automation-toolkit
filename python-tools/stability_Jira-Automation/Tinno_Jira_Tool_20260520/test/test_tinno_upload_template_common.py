@@ -1095,6 +1095,44 @@ class TinnoUploadTemplateCommonTest(unittest.TestCase):
         self.assertEqual("summary", df.loc[0, "Summary"])
         self.assertEqual("Setting", df.loc[0, "Module"])
 
+    def test_build_upload_rows_defaults_previous_version_status_to_no_previous_version(self) -> None:
+        main_df = pd.DataFrame(
+            [
+                {
+                    "Version": "V551A-15-250905V60",
+                    "Package": "com.android.settings",
+                    "ExpClass": "Java (JE)",
+                    "ExpType": "system_app_crash",
+                    "CurProcess": "com.android.settings",
+                    "Count": 7,
+                    "Detail": "Settings crash detail",
+                    "CausedBy": "java.lang.NullPointerException",
+                }
+            ]
+        )
+        defaults = {
+            "project_key": "VCAME",
+            "issue_type": "Bug",
+            "default_reporter": "dai.lv",
+            "default_assignee": "autotest",
+            "default_bug_severity": "B",
+            "default_test_case": "Monkey专项",
+            "test_case_label_mapping": {"Monkey专项": "MonkeyAEE"},
+            "default_module_fallback": "System Stability",
+        }
+
+        rows = upload_common.build_upload_rows(
+            main_df=main_df,
+            defaults=defaults,
+            package_mapping={},
+            test_case_summary_mapping={"Monkey专项": {"index": "0"}},
+            default_test_case="Monkey专项",
+            source_excel_path="input.xlsx",
+        )
+
+        self.assertEqual(1, len(rows))
+        self.assertEqual("No previous version", rows[0]["Previous Version Status"])
+
 
 if __name__ == "__main__":
     unittest.main()

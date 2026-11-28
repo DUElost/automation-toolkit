@@ -8,7 +8,7 @@
   "default_bug_severity": "B",
   "default_affect_project": "VCAME",
   "default_component": "AUTOTEST",
-  "default_previous_version_status": "Previous version exists",
+  "default_previous_version_status": "No previous version",
   "default_previous_version_text": "100%",
   "default_issue_nature": "New issues",
   "labels": [
